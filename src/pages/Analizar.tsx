@@ -1,5 +1,5 @@
-import { useState, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { useState, useCallback, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -10,21 +10,57 @@ import {
   ArrowRight,
   X,
   Loader2,
-  CreditCard
+  CreditCard,
+  LogOut
 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const Header = () => (
-  <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-    <div className="container flex items-center justify-between h-16">
-      <Link to="/" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-          <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-        </div>
-        <span className="text-xl font-semibold">ExpensaCheck</span>
-      </Link>
-    </div>
-  </header>
-);
+const Header = () => {
+  const navigate = useNavigate();
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    navigate("/");
+  };
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+      <div className="container flex items-center justify-between h-16">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-semibold">ExpensaCheck</span>
+        </Link>
+        {user && (
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-muted-foreground hidden sm:block">
+              {user.email}
+            </span>
+            <Button variant="ghost" size="sm" onClick={handleLogout}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Salir
+            </Button>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+};
 
 const steps = [
   { number: 1, title: "Subir expensa", description: "Cargá tu archivo" },
@@ -73,12 +109,14 @@ const UploadStep = ({
   file, 
   onFileSelect, 
   onFileRemove, 
-  onNext 
+  onNext,
+  isUploading
 }: { 
   file: File | null;
   onFileSelect: (file: File) => void;
   onFileRemove: () => void;
   onNext: () => void;
+  isUploading: boolean;
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
@@ -181,11 +219,20 @@ const UploadStep = ({
             <Button 
               variant="hero" 
               size="lg"
-              disabled={!file}
+              disabled={!file || isUploading}
               onClick={onNext}
             >
-              Continuar al pago
-              <ArrowRight className="w-4 h-4" />
+              {isUploading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Preparando...
+                </>
+              ) : (
+                <>
+                  Continuar al pago
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </div>
         </CardContent>
@@ -295,7 +342,7 @@ const ProcessingStep = () => (
           {[
             "Extrayendo datos del documento",
             "Identificando categorías de gastos",
-            "Comparando con historial"
+            "Generando reporte visual"
           ].map((step, index) => (
             <div 
               key={index}
@@ -313,9 +360,34 @@ const ProcessingStep = () => (
 );
 
 const Analizar = () => {
+  const navigate = useNavigate();
   const [currentStep, setCurrentStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [analysisId, setAnalysisId] = useState<string | null>(null);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    // Check auth state
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      setUser(session.user);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) {
+        navigate("/auth");
+        return;
+      }
+      setUser(session.user);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
@@ -325,18 +397,94 @@ const Analizar = () => {
     setFile(null);
   };
 
-  const handlePayment = async () => {
-    setIsProcessing(true);
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setIsProcessing(false);
-    setCurrentStep(3);
-    
-    // Simulate analysis processing then redirect
-    setTimeout(() => {
-      window.location.href = "/ejemplo";
-    }, 3000);
+  const handleUploadAndContinue = async () => {
+    if (!file || !user) return;
+
+    setIsUploading(true);
+    try {
+      // Create analysis record
+      const { data: analysis, error: analysisError } = await supabase
+        .from("expense_analyses")
+        .insert({
+          user_id: user.id,
+          period: new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" }),
+          total_amount: 0,
+          status: "pending",
+        })
+        .select()
+        .single();
+
+      if (analysisError) throw analysisError;
+
+      setAnalysisId(analysis.id);
+      setCurrentStep(2);
+    } catch (error: any) {
+      console.error("Error creating analysis:", error);
+      toast.error("Error al preparar el análisis");
+    } finally {
+      setIsUploading(false);
+    }
   };
+
+  const handlePayment = async () => {
+    if (!analysisId || !file) return;
+
+    setIsProcessing(true);
+    try {
+      // Get session token
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No autorizado");
+
+      // Create payment
+      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
+        "create-payment",
+        {
+          body: { analysisId },
+        }
+      );
+
+      if (paymentError) throw paymentError;
+
+      // Move to processing step
+      setCurrentStep(3);
+
+      // Process the expense with AI
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("analysisId", analysisId);
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-expense`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al procesar la expensa");
+      }
+
+      const result = await response.json();
+      
+      toast.success("¡Análisis completado!");
+      navigate(`/analisis/${analysisId}`);
+    } catch (error: any) {
+      console.error("Error processing:", error);
+      toast.error(error.message || "Error al procesar el pago");
+      setCurrentStep(2);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-soft">
@@ -350,7 +498,8 @@ const Analizar = () => {
               file={file}
               onFileSelect={handleFileSelect}
               onFileRemove={handleFileRemove}
-              onNext={() => setCurrentStep(2)}
+              onNext={handleUploadAndContinue}
+              isUploading={isUploading}
             />
           )}
           

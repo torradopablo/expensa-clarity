@@ -14,7 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      expense_analyses: {
+        Row: {
+          building_name: string | null
+          created_at: string
+          file_url: string | null
+          id: string
+          payment_id: string | null
+          period: string
+          previous_total: number | null
+          status: string
+          total_amount: number
+          unit: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          building_name?: string | null
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          payment_id?: string | null
+          period: string
+          previous_total?: number | null
+          status?: string
+          total_amount: number
+          unit?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          building_name?: string | null
+          created_at?: string
+          file_url?: string | null
+          id?: string
+          payment_id?: string | null
+          period?: string
+          previous_total?: number | null
+          status?: string
+          total_amount?: number
+          unit?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      expense_categories: {
+        Row: {
+          analysis_id: string
+          created_at: string
+          current_amount: number
+          explanation: string | null
+          icon: string | null
+          id: string
+          name: string
+          previous_amount: number | null
+          status: string
+        }
+        Insert: {
+          analysis_id: string
+          created_at?: string
+          current_amount: number
+          explanation?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          previous_amount?: number | null
+          status?: string
+        }
+        Update: {
+          analysis_id?: string
+          created_at?: string
+          current_amount?: number
+          explanation?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          previous_amount?: number | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expense_categories_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "expense_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          email: string | null
+          full_name: string | null
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
