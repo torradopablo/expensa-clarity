@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateAnalysisPdf } from "@/lib/generatePdf";
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -189,7 +190,10 @@ const AnalysisPage = () => {
                 Volver al inicio
               </Link>
             </Button>
-            <Button variant="outline">
+            <Button 
+              variant="outline" 
+              onClick={() => generateAnalysisPdf(analysis, categories)}
+            >
               <Download className="w-4 h-4 mr-2" />
               Descargar PDF
             </Button>
