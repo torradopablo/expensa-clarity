@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { 
@@ -11,7 +11,8 @@ import {
   X,
   Loader2,
   CreditCard,
-  LogOut
+  LogOut,
+  AlertCircle
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -275,18 +276,18 @@ const PaymentStep = ({
         <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
           <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
           <div>
-            <p className="text-sm font-medium">Pago seguro</p>
+            <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
             <p className="text-xs text-muted-foreground">
-              Procesado de forma segura por Mercado Pago. No almacenamos tus datos de pago.
+              Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
             </p>
           </div>
         </div>
 
         <ul className="space-y-3">
           {[
-            "Extracción automática de datos",
-            "Comparación con historial",
-            "Alertas de aumentos inusuales",
+            "Extracción automática de datos con IA",
+            "Detección de aumentos inusuales",
+            "Explicaciones claras en español",
             "Reporte descargable en PDF"
           ].map((item, index) => (
             <li key={index} className="flex items-center gap-2 text-sm">
@@ -310,7 +311,7 @@ const PaymentStep = ({
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Procesando...
+                Conectando...
               </>
             ) : (
               <>
@@ -359,14 +360,112 @@ const ProcessingStep = () => (
   </div>
 );
 
+const PaymentSuccessHandler = ({ 
+  analysisId, 
+  file,
+  onProcessingComplete 
+}: { 
+  analysisId: string;
+  file: File | null;
+  onProcessingComplete: (id: string) => void;
+}) => {
+  const [isProcessing, setIsProcessing] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const processExpense = async () => {
+      if (!file) {
+        setError("No se encontró el archivo. Por favor, volvé a subir tu expensa.");
+        setIsProcessing(false);
+        return;
+      }
+
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("No autorizado");
+
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("analysisId", analysisId);
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-expense`,
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+            body: formData,
+          }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || "Error al procesar la expensa");
+        }
+
+        onProcessingComplete(analysisId);
+      } catch (err: any) {
+        console.error("Processing error:", err);
+        setError(err.message || "Error al procesar la expensa");
+        setIsProcessing(false);
+      }
+    };
+
+    processExpense();
+  }, [analysisId, file, onProcessingComplete]);
+
+  if (error) {
+    return (
+      <div className="max-w-lg mx-auto text-center animate-fade-in-up">
+        <Card variant="elevated">
+          <CardContent className="py-16 space-y-6">
+            <div className="w-20 h-20 rounded-full bg-destructive/10 mx-auto flex items-center justify-center">
+              <AlertCircle className="w-10 h-10 text-destructive" />
+            </div>
+            <div>
+              <h2 className="text-2xl font-bold mb-2">Error al procesar</h2>
+              <p className="text-muted-foreground">{error}</p>
+            </div>
+            <Button asChild variant="hero">
+              <Link to="/analizar">Intentar de nuevo</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return <ProcessingStep />;
+};
+
 const Analizar = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [currentStep, setCurrentStep] = useState(1);
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
+  const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+
+  // Check for payment callback
+  useEffect(() => {
+    const paymentStatus = searchParams.get("payment");
+    const returnedAnalysisId = searchParams.get("analysisId");
+
+    if (paymentStatus === "success" && returnedAnalysisId) {
+      setAnalysisId(returnedAnalysisId);
+      setShowPaymentSuccess(true);
+      setCurrentStep(3);
+      toast.success("¡Pago confirmado! Procesando tu expensa...");
+    } else if (paymentStatus === "failure") {
+      toast.error("El pago no se pudo completar. Por favor, intentá de nuevo.");
+    } else if (paymentStatus === "pending") {
+      toast.info("Tu pago está pendiente de confirmación.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     // Check auth state
@@ -389,12 +488,26 @@ const Analizar = () => {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  // Store file in sessionStorage for payment return
+  useEffect(() => {
+    if (file) {
+      // We can't store File objects in sessionStorage, so we store metadata
+      // The user will need to re-upload if they close the browser
+      sessionStorage.setItem("pendingFile", JSON.stringify({
+        name: file.name,
+        size: file.size,
+        type: file.type,
+      }));
+    }
+  }, [file]);
+
   const handleFileSelect = (selectedFile: File) => {
     setFile(selectedFile);
   };
 
   const handleFileRemove = () => {
     setFile(null);
+    sessionStorage.removeItem("pendingFile");
   };
 
   const handleUploadAndContinue = async () => {
@@ -431,55 +544,40 @@ const Analizar = () => {
 
     setIsProcessing(true);
     try {
-      // Get session token
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("No autorizado");
 
-      // Create payment
-      const { data: paymentData, error: paymentError } = await supabase.functions.invoke(
-        "create-payment",
-        {
-          body: { analysisId },
-        }
-      );
+      // Create Mercado Pago payment preference
+      const { data, error } = await supabase.functions.invoke("create-payment", {
+        body: {
+          analysisId,
+          successUrl: `${window.location.origin}/analizar?payment=success&analysisId=${analysisId}`,
+          failureUrl: `${window.location.origin}/analizar?payment=failure`,
+        },
+      });
 
-      if (paymentError) throw paymentError;
+      if (error) throw error;
 
-      // Move to processing step
-      setCurrentStep(3);
-
-      // Process the expense with AI
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("analysisId", analysisId);
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-expense`,
-        {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || "Error al procesar la expensa");
+      if (data?.initPoint) {
+        // Store file temporarily before redirect
+        // Note: The file object itself can't be persisted across page loads
+        // After payment, user will need to re-upload if they closed the tab
+        
+        // Redirect to Mercado Pago checkout
+        window.location.href = data.initPoint;
+      } else {
+        throw new Error("No se recibió la URL de pago");
       }
-
-      const result = await response.json();
-      
-      toast.success("¡Análisis completado!");
-      navigate(`/analisis/${analysisId}`);
     } catch (error: any) {
-      console.error("Error processing:", error);
-      toast.error(error.message || "Error al procesar el pago");
-      setCurrentStep(2);
-    } finally {
+      console.error("Error creating payment:", error);
+      toast.error(error.message || "Error al iniciar el pago");
       setIsProcessing(false);
     }
+  };
+
+  const handleProcessingComplete = (id: string) => {
+    toast.success("¡Análisis completado!");
+    navigate(`/analisis/${id}`);
   };
 
   if (!user) {
@@ -493,7 +591,7 @@ const Analizar = () => {
         <div className="container">
           <Stepper currentStep={currentStep} />
           
-          {currentStep === 1 && (
+          {currentStep === 1 && !showPaymentSuccess && (
             <UploadStep
               file={file}
               onFileSelect={handleFileSelect}
@@ -503,7 +601,7 @@ const Analizar = () => {
             />
           )}
           
-          {currentStep === 2 && (
+          {currentStep === 2 && !showPaymentSuccess && (
             <PaymentStep
               onBack={() => setCurrentStep(1)}
               onNext={handlePayment}
@@ -511,7 +609,15 @@ const Analizar = () => {
             />
           )}
           
-          {currentStep === 3 && <ProcessingStep />}
+          {currentStep === 3 && showPaymentSuccess && analysisId && (
+            <PaymentSuccessHandler
+              analysisId={analysisId}
+              file={file}
+              onProcessingComplete={handleProcessingComplete}
+            />
+          )}
+
+          {currentStep === 3 && !showPaymentSuccess && <ProcessingStep />}
         </div>
       </main>
     </div>
