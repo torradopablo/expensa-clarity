@@ -8,8 +8,8 @@ import Auth from "./pages/Auth";
 import Analizar from "./pages/Analizar";
 import Ejemplo from "./pages/Ejemplo";
 import AnalysisPage from "./pages/AnalysisPage";
+import Historial from "./pages/Historial";
 import NotFound from "./pages/NotFound";
-
 const queryClient = new QueryClient();
 
 const App = () => (
@@ -24,6 +24,7 @@ const App = () => (
           <Route path="/analizar" element={<Analizar />} />
           <Route path="/ejemplo" element={<Ejemplo />} />
           <Route path="/analisis/:id" element={<AnalysisPage />} />
+          <Route path="/historial" element={<Historial />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

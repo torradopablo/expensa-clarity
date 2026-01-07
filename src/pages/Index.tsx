@@ -31,6 +31,9 @@ const Header = () => (
         <a href="#precios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
           Precios
         </a>
+        <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          Mi historial
+        </Link>
       </nav>
       <Button asChild size="default">
         <Link to="/analizar">Analizar expensas</Link>
