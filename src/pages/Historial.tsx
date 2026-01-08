@@ -1,9 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 import { 
   CheckCircle2, 
   ArrowRight,
@@ -13,7 +25,10 @@ import {
   History,
   FileText,
   LogOut,
-  Plus
+  Plus,
+  Filter,
+  X,
+  CalendarIcon
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -88,6 +103,59 @@ const Historial = () => {
   const navigate = useNavigate();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  
+  // Filter states
+  const [buildingFilter, setBuildingFilter] = useState<string>("all");
+  const [periodFilter, setPeriodFilter] = useState<string>("all");
+  const [dateFrom, setDateFrom] = useState<Date | undefined>();
+  const [dateTo, setDateTo] = useState<Date | undefined>();
+
+  // Get unique buildings and periods for filter options
+  const buildings = useMemo(() => {
+    const unique = [...new Set(analyses.map(a => a.building_name).filter(Boolean))];
+    return unique.sort();
+  }, [analyses]);
+
+  const periods = useMemo(() => {
+    const unique = [...new Set(analyses.map(a => a.period))];
+    return unique.sort().reverse();
+  }, [analyses]);
+
+  // Filter analyses
+  const filteredAnalyses = useMemo(() => {
+    return analyses.filter(analysis => {
+      // Building filter
+      if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
+        return false;
+      }
+      // Period filter
+      if (periodFilter !== "all" && analysis.period !== periodFilter) {
+        return false;
+      }
+      // Date range filter
+      const analysisDate = new Date(analysis.created_at);
+      if (dateFrom && analysisDate < dateFrom) {
+        return false;
+      }
+      if (dateTo) {
+        const endOfDay = new Date(dateTo);
+        endOfDay.setHours(23, 59, 59, 999);
+        if (analysisDate > endOfDay) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [analyses, buildingFilter, periodFilter, dateFrom, dateTo]);
+
+  const hasActiveFilters = buildingFilter !== "all" || periodFilter !== "all" || dateFrom || dateTo;
+
+  const clearFilters = () => {
+    setBuildingFilter("all");
+    setPeriodFilter("all");
+    setDateFrom(undefined);
+    setDateTo(undefined);
+  };
 
   useEffect(() => {
     const fetchAnalyses = async () => {
@@ -152,6 +220,110 @@ const Historial = () => {
             </div>
           </div>
 
+          {/* Filters Section */}
+          {analyses.length > 0 && (
+            <Card variant="soft" className="mb-6 animate-fade-in-up">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Filter className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Filtros</span>
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 px-2 ml-auto">
+                      <X className="w-3 h-3 mr-1" />
+                      Limpiar
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {/* Building filter */}
+                  <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Edificio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los edificios</SelectItem>
+                      {buildings.map((building) => (
+                        <SelectItem key={building} value={building as string}>
+                          {building}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Period filter */}
+                  <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los períodos</SelectItem>
+                      {periods.map((period) => (
+                        <SelectItem key={period} value={period}>
+                          {period}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  {/* Date from */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "h-9 justify-start text-left font-normal",
+                          !dateFrom && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateFrom ? format(dateFrom, "dd/MM/yyyy", { locale: es }) : "Desde"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={setDateFrom}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+
+                  {/* Date to */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "h-9 justify-start text-left font-normal",
+                          !dateTo && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateTo ? format(dateTo, "dd/MM/yyyy", { locale: es }) : "Hasta"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={setDateTo}
+                        initialFocus
+                        className="p-3 pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                {hasActiveFilters && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Mostrando {filteredAnalyses.length} de {analyses.length} análisis
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
           {analyses.length === 0 ? (
             <Card variant="soft" className="animate-fade-in-up">
               <CardContent className="p-12 text-center">
@@ -170,9 +342,24 @@ const Historial = () => {
                 </Button>
               </CardContent>
             </Card>
+          ) : filteredAnalyses.length === 0 ? (
+            <Card variant="soft" className="animate-fade-in-up">
+              <CardContent className="p-8 text-center">
+                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                  <Filter className="w-6 h-6 text-muted-foreground" />
+                </div>
+                <h2 className="text-lg font-semibold mb-2">Sin resultados</h2>
+                <p className="text-muted-foreground mb-4 text-sm">
+                  No hay análisis que coincidan con los filtros seleccionados.
+                </p>
+                <Button variant="outline" onClick={clearFilters}>
+                  Limpiar filtros
+                </Button>
+              </CardContent>
+            </Card>
           ) : (
             <div className="grid gap-4">
-              {analyses.map((analysis, index) => {
+              {filteredAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
                 
                 return (
