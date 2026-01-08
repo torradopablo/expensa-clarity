@@ -257,11 +257,11 @@ const PaymentStep = ({
     <Card variant="elevated">
       <CardHeader className="text-center">
         <CardTitle className="text-2xl">
-          {isDevMode ? "Modo desarrollo" : "Confirmar pago"}
+          {isDevMode ? "Mercado Pago deshabilitado" : "Confirmar pago"}
         </CardTitle>
         <CardDescription>
           {isDevMode 
-            ? "El pago está deshabilitado en modo desarrollo"
+            ? "El pago con Mercado Pago está deshabilitado. Tu análisis se procesará directamente."
             : "Pago único y seguro con Mercado Pago"
           }
         </CardDescription>
@@ -271,9 +271,9 @@ const PaymentStep = ({
           <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
             <div>
-              <p className="text-sm font-medium text-amber-500">Modo desarrollo activo</p>
+              <p className="text-sm font-medium text-amber-500">Mercado Pago deshabilitado</p>
               <p className="text-xs text-muted-foreground">
-                Variable VITE_SKIP_PAYMENT=true detectada. El pago se omitirá.
+                Variable VITE_MERCADO_PAGO_ENABLED=false detectada. El pago se omitirá.
               </p>
             </div>
           </div>
@@ -409,18 +409,29 @@ const PaymentSuccessHandler = ({
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("No autorizado");
 
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("analysisId", analysisId);
+        // Convert image to base64
+        const base64Data = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => {
+            const result = reader.result as string;
+            resolve(result.split(',')[1]); // Remove data:image/...;base64, prefix
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
 
         const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-expense`,
+          `${import.meta.env.VITE_API_URL}/analyses/${analysisId}/process`,
           {
             method: "POST",
             headers: {
+              "Content-Type": "application/json",
               Authorization: `Bearer ${session.access_token}`,
             },
-            body: formData,
+            body: JSON.stringify({
+              imageBase64: base64Data,
+              mimeType: file.type,
+            }),
           }
         );
 
@@ -564,8 +575,8 @@ const Analizar = () => {
     }
   };
 
-  // Check if payments are disabled for development
-  const isDevMode = import.meta.env.VITE_SKIP_PAYMENT === "true";
+  // Check if Mercado Pago is disabled
+  const isDevMode = import.meta.env.VITE_MERCADO_PAGO_ENABLED === "false";
 
   const handlePaymentOrSkip = async () => {
     if (isDevMode) {
@@ -573,7 +584,7 @@ const Analizar = () => {
       setIsProcessing(true);
       setShowPaymentSuccess(true);
       setCurrentStep(3);
-      toast.info("Modo desarrollo: pago omitido");
+      toast.info("Mercado Pago deshabilitado: procesando directamente");
     } else {
       await handlePayment();
     }
@@ -588,23 +599,33 @@ const Analizar = () => {
       if (!session) throw new Error("No autorizado");
 
       // Create Mercado Pago payment preference
-      const { data, error } = await supabase.functions.invoke("create-payment", {
-        body: {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/payments/create`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           analysisId,
           successUrl: `${window.location.origin}/analizar?payment=success&analysisId=${analysisId}`,
           failureUrl: `${window.location.origin}/analizar?payment=failure`,
-        },
+        }),
       });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al iniciar el pago");
+      }
 
-      if (data?.initPoint) {
+      const data = await response.json();
+
+      if (data.data?.initPoint) {
         // Store file temporarily before redirect
         // Note: The file object itself can't be persisted across page loads
         // After payment, user will need to re-upload if they closed the tab
         
         // Redirect to Mercado Pago checkout
-        window.location.href = data.initPoint;
+        window.location.href = data.data.initPoint;
       } else {
         throw new Error("No se recibió la URL de pago");
       }
