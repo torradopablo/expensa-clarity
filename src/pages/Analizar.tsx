@@ -551,21 +551,29 @@ const Analizar = () => {
 
     setIsUploading(true);
     try {
-      // Create analysis record
-      const { data: analysis, error: analysisError } = await supabase
-        .from("expense_analyses")
-        .insert({
-          user_id: user.id,
+      // Create analysis record using new API
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("No autorizado");
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/analyses`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
           period: new Date().toLocaleDateString("es-AR", { month: "long", year: "numeric" }),
-          total_amount: 0,
-          status: "pending",
-        })
-        .select()
-        .single();
+          unit: "A-101", // Default unit
+        }),
+      });
 
-      if (analysisError) throw analysisError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || "Error al crear el análisis");
+      }
 
-      setAnalysisId(analysis.id);
+      const analysis = await response.json();
+      setAnalysisId(analysis.data.id);
       setCurrentStep(2);
     } catch (error: any) {
       console.error("Error creating analysis:", error);

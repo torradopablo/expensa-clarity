@@ -9,6 +9,7 @@ export interface CreateAnalysisRequest {
   period: string;
   unit?: string;
   notes?: string;
+  accessToken?: string;
 }
 
 export interface ProcessExpenseRequest {
@@ -16,6 +17,7 @@ export interface ProcessExpenseRequest {
   userId: string;
   imageBase64: string;
   mimeType: string;
+  accessToken?: string;
 }
 
 export class ExpenseService {
@@ -55,7 +57,7 @@ export class ExpenseService {
       totalAmount: 0, // Will be updated after AI processing
       status: 'pending',
       notes: request.notes,
-    });
+    }, request.accessToken);
   }
 
   async processExpense(request: ProcessExpenseRequest): Promise<ExpenseAnalysis> {
@@ -79,7 +81,8 @@ export class ExpenseService {
           unit: extractedData.unit,
           totalAmount: extractedData.totalAmount,
           status: 'completed',
-        }
+        },
+        request.accessToken
       );
 
       // Create categories
@@ -89,11 +92,11 @@ export class ExpenseService {
           ...cat,
         }));
         
-        await this.expenseRepository.createCategories(categories);
+        await this.expenseRepository.createCategories(categories, request.accessToken);
       }
 
       // Fetch complete analysis with categories
-      return await this.getAnalysisById(request.analysisId, request.userId);
+      return await this.getAnalysisById(request.analysisId, request.userId, request.accessToken);
     } catch (error) {
       // Update status to failed
       await this.expenseRepository.updateAnalysisStatus(request.analysisId, 'failed');
@@ -101,14 +104,14 @@ export class ExpenseService {
     }
   }
 
-  async getAnalysisById(id: string, userId: string): Promise<ExpenseAnalysis> {
-    const analysis = await this.expenseRepository.getAnalysisById(id, userId);
+  async getAnalysisById(id: string, userId: string, accessToken?: string): Promise<ExpenseAnalysis> {
+    const analysis = await this.expenseRepository.getAnalysisById(id, userId, accessToken);
     if (!analysis) {
       throw new Error('Analysis not found');
     }
 
     // Fetch categories
-    const categories = await this.expenseRepository.getCategoriesByAnalysisId(id);
+    const categories = await this.expenseRepository.getCategoriesByAnalysisId(id, accessToken);
     analysis.categories = categories;
 
     return analysis;

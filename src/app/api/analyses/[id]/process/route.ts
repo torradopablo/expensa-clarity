@@ -4,11 +4,14 @@ import { authenticateUser } from '@/lib/shared/utils/auth';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const user = await authenticateUser(request);
     const expenseService = DIContainer.getExpenseService();
+    const { id } = await params;
+
+    console.log('Processing expense for analysisId:', id);
 
     const body = await request.json();
     const { imageBase64, mimeType } = body;
@@ -20,11 +23,16 @@ export async function POST(
       );
     }
 
+    // Get the access token from the header
+    const authHeader = request.headers.get('authorization');
+    const accessToken = authHeader?.replace('Bearer ', '');
+
     const analysis = await expenseService.processExpense({
-      analysisId: params.id,
+      analysisId: id,
       userId: user.id,
       imageBase64,
       mimeType,
+      accessToken,
     });
 
     return NextResponse.json({

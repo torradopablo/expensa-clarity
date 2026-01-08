@@ -45,11 +45,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Get the access token from the header
+    const authHeader = request.headers.get('authorization');
+    const accessToken = authHeader?.replace('Bearer ', '');
+
     const analysis = await expenseService.createAnalysis({
       userId: user.id,
       period,
       unit,
       notes,
+      accessToken,
     });
 
     return NextResponse.json({

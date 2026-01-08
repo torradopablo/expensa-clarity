@@ -3,8 +3,10 @@ import { ExpenseAnalysis, ExpenseCategory, ExpenseStatus } from '../../domain/en
 import { IExpenseRepository } from '../../domain/repositories/expense.repository';
 
 export class SupabaseExpenseRepository implements IExpenseRepository {
-  async createAnalysis(analysis: Omit<ExpenseAnalysis, 'id' | 'createdAt' | 'updatedAt'>): Promise<ExpenseAnalysis> {
-    const supabase = SupabaseClientFactory.createClient();
+  async createAnalysis(analysis: Omit<ExpenseAnalysis, 'id' | 'createdAt' | 'updatedAt'>, accessToken?: string): Promise<ExpenseAnalysis> {
+    const supabase = accessToken 
+      ? SupabaseClientFactory.createClientWithAuth(accessToken)
+      : SupabaseClientFactory.createClient();
     
     const { data, error } = await supabase
       .from('expense_analyses')
