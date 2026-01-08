@@ -245,43 +245,68 @@ const UploadStep = ({
 const PaymentStep = ({ 
   onBack, 
   onNext,
-  isProcessing
+  isProcessing,
+  isDevMode = false
 }: { 
   onBack: () => void;
   onNext: () => void;
   isProcessing: boolean;
+  isDevMode?: boolean;
 }) => (
   <div className="max-w-lg mx-auto animate-fade-in-up">
     <Card variant="elevated">
       <CardHeader className="text-center">
-        <CardTitle className="text-2xl">Confirmar pago</CardTitle>
+        <CardTitle className="text-2xl">
+          {isDevMode ? "Modo desarrollo" : "Confirmar pago"}
+        </CardTitle>
         <CardDescription>
-          Pago único y seguro con Mercado Pago
+          {isDevMode 
+            ? "El pago está deshabilitado en modo desarrollo"
+            : "Pago único y seguro con Mercado Pago"
+          }
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
+        {isDevMode && (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium text-amber-500">Modo desarrollo activo</p>
+              <p className="text-xs text-muted-foreground">
+                Variable VITE_SKIP_PAYMENT=true detectada. El pago se omitirá.
+              </p>
+            </div>
+          </div>
+        )}
+
         <div className="bg-muted/50 rounded-xl p-6 space-y-4">
           <div className="flex justify-between items-center">
             <span className="text-muted-foreground">Análisis de expensa</span>
-            <span className="font-medium">$500 ARS</span>
+            <span className={`font-medium ${isDevMode ? "line-through text-muted-foreground" : ""}`}>
+              $500 ARS
+            </span>
           </div>
           <div className="border-t border-border pt-4">
             <div className="flex justify-between items-center">
               <span className="font-semibold">Total</span>
-              <span className="text-2xl font-bold text-primary">$500 ARS</span>
+              <span className={`text-2xl font-bold ${isDevMode ? "text-status-ok" : "text-primary"}`}>
+                {isDevMode ? "GRATIS" : "$500 ARS"}
+              </span>
             </div>
           </div>
         </div>
 
-        <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
-          <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
-            <p className="text-xs text-muted-foreground">
-              Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
-            </p>
+        {!isDevMode && (
+          <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
+            <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
+              <p className="text-xs text-muted-foreground">
+                Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
+              </p>
+            </div>
           </div>
-        </div>
+        )}
 
         <ul className="space-y-3">
           {[
@@ -311,11 +336,11 @@ const PaymentStep = ({
             {isProcessing ? (
               <>
                 <Loader2 className="w-4 h-4 animate-spin" />
-                Conectando...
+                {isDevMode ? "Procesando..." : "Conectando..."}
               </>
             ) : (
               <>
-                Pagar con Mercado Pago
+                {isDevMode ? "Continuar sin pago" : "Pagar con Mercado Pago"}
                 <ArrowRight className="w-4 h-4" />
               </>
             )}
@@ -539,6 +564,21 @@ const Analizar = () => {
     }
   };
 
+  // Check if payments are disabled for development
+  const isDevMode = import.meta.env.VITE_SKIP_PAYMENT === "true";
+
+  const handlePaymentOrSkip = async () => {
+    if (isDevMode) {
+      // Skip payment and process directly
+      setIsProcessing(true);
+      setShowPaymentSuccess(true);
+      setCurrentStep(3);
+      toast.info("Modo desarrollo: pago omitido");
+    } else {
+      await handlePayment();
+    }
+  };
+
   const handlePayment = async () => {
     if (!analysisId || !file) return;
 
@@ -604,8 +644,9 @@ const Analizar = () => {
           {currentStep === 2 && !showPaymentSuccess && (
             <PaymentStep
               onBack={() => setCurrentStep(1)}
-              onNext={handlePayment}
+              onNext={handlePaymentOrSkip}
               isProcessing={isProcessing}
+              isDevMode={isDevMode}
             />
           )}
           

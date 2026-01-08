@@ -23,6 +23,9 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateAnalysisPdf } from "@/lib/generatePdf";
+import { TrendChart } from "@/components/TrendChart";
+import { AnomalyAlerts } from "@/components/AnomalyAlerts";
+import { AnalysisNotes } from "@/components/AnalysisNotes";
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -96,6 +99,7 @@ interface Analysis {
   previous_total: number | null;
   status: string;
   created_at: string;
+  notes: string | null;
 }
 
 const AnalysisPage = () => {
@@ -312,6 +316,29 @@ const AnalysisPage = () => {
               </div>
             </div>
           )}
+
+          {/* Anomaly Alerts */}
+          {categories.length > 0 && (
+            <div className="mb-8">
+              <AnomalyAlerts categories={categories} threshold={30} />
+            </div>
+          )}
+
+          {/* Trend Chart */}
+          {categories.length > 0 && (
+            <div className="mb-8">
+              <TrendChart categories={categories} period={analysis.period} />
+            </div>
+          )}
+
+          {/* Analysis Notes */}
+          <div className="mb-8">
+            <AnalysisNotes 
+              analysisId={analysis.id} 
+              initialNotes={analysis.notes}
+              onNotesUpdate={(notes) => setAnalysis(prev => prev ? { ...prev, notes } : null)}
+            />
+          </div>
 
           {/* Info Card */}
           <Card variant="soft" className="mb-8 animate-fade-in-up">

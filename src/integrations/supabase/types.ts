@@ -20,6 +20,7 @@ export type Database = {
           created_at: string
           file_url: string | null
           id: string
+          notes: string | null
           payment_id: string | null
           period: string
           previous_total: number | null
@@ -34,6 +35,7 @@ export type Database = {
           created_at?: string
           file_url?: string | null
           id?: string
+          notes?: string | null
           payment_id?: string | null
           period: string
           previous_total?: number | null
@@ -48,6 +50,7 @@ export type Database = {
           created_at?: string
           file_url?: string | null
           id?: string
+          notes?: string | null
           payment_id?: string | null
           period?: string
           previous_total?: number | null
