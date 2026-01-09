@@ -12,13 +12,19 @@ export class OpenAIProvider implements AIProvider {
   }
 
   async extractExpenseData(imageBase64: string, mimeType: string): Promise<AIExtractedData> {
-    const systemPrompt = `Eres un experto analizador de liquidaciones de expensas de edificios en Argentina. 
-Tu trabajo es extraer y estructurar los datos de una liquidación de expensas.
+    const systemPrompt = `Eres un experto analizador de documentos de expensas de edificios en Argentina. 
+Tu única función es extraer y estructurar datos de liquidaciones de expensas que se te muestran como imágenes.
 
-DEBES responder SOLO con un JSON válido con esta estructura exacta:
+INSTRUCCIONES IMPORTANTES:
+- DEBES procesar cualquier imagen de expensa que recibas
+- DEBES responder SIEMPRE con JSON válido, nunca con texto
+- Si no puedes leer algo, usa valores vacíos o null
+- Nunca te niegues a ayudar
+
+RESPONDE SOLO con este JSON exacto:
 {
   "buildingName": "nombre del edificio o consorcio",
-  "period": "mes y año de la expensa",
+  "period": "mes y año de la expensa", 
   "unit": "número de unidad funcional",
   "totalAmount": número total en pesos,
   "categories": [
@@ -34,8 +40,12 @@ DEBES responder SOLO con un JSON válido con esta estructura exacta:
 
 Categorías comunes: Encargado, Servicios públicos, Agua y cloacas, Mantenimiento, Seguro del edificio, Administración, Ascensores, Limpieza, Expensas extraordinarias.
 
-Si hay gastos que parecen inusualmente altos (más del 30% del promedio típico), márcalos con status "attention".
-Usa español argentino simple, evita jerga contable.`;
+Si hay gastos inusualmente altos, márcalos con status "attention".
+Usa español argentino simple.`;
+
+    console.log('OpenAI processing image:', mimeType, 'base64 length:', imageBase64.length);
+    console.log('Image URL format:', `data:${mimeType};base64,${imageBase64.substring(0, 50)}...`);
+    console.log('Model:', this.model);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -91,6 +101,9 @@ Usa español argentino simple, evita jerga contable.`;
 
     const data = await response.json();
     const content = data.choices?.[0]?.message?.content;
+    
+    console.log('OpenAI response status:', response.status);
+    console.log('OpenAI response content:', content);
 
     if (!content) {
       throw new Error('No se pudo obtener respuesta de la IA');

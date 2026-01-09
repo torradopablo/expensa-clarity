@@ -30,8 +30,10 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
     return this.mapToAnalysis(data);
   }
 
-  async getAnalysisById(id: string, userId: string): Promise<ExpenseAnalysis | null> {
-    const supabase = SupabaseClientFactory.createClient();
+  async getAnalysisById(id: string, userId: string, accessToken?: string): Promise<ExpenseAnalysis | null> {
+    const supabase = accessToken 
+      ? SupabaseClientFactory.createClientWithAuth(accessToken)
+      : SupabaseClientFactory.createClient();
     
     const { data, error } = await supabase
       .from('expense_analyses')
@@ -60,8 +62,10 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
     return data.map(this.mapToAnalysis);
   }
 
-  async updateAnalysis(id: string, userId: string, updates: Partial<ExpenseAnalysis>): Promise<ExpenseAnalysis> {
-    const supabase = SupabaseClientFactory.createClient();
+  async updateAnalysis(id: string, userId: string, updates: Partial<ExpenseAnalysis>, accessToken?: string): Promise<ExpenseAnalysis> {
+    const supabase = accessToken 
+      ? SupabaseClientFactory.createClientWithAuth(accessToken)
+      : SupabaseClientFactory.createClient();
     
     const updateData: any = {};
     if (updates.buildingName !== undefined) updateData.building_name = updates.buildingName;
@@ -74,6 +78,9 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
     if (updates.paymentId !== undefined) updateData.payment_id = updates.paymentId;
     if (updates.notes !== undefined) updateData.notes = updates.notes;
 
+    console.log('Updating analysis with data:', updateData);
+    console.log('Analysis ID:', id, 'User ID:', userId);
+
     const { data, error } = await supabase
       .from('expense_analyses')
       .update(updateData)
@@ -81,6 +88,9 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
       .eq('user_id', userId)
       .select()
       .single();
+
+    console.log('Supabase response data:', data);
+    console.log('Supabase error:', error);
 
     if (error) throw new Error(`Failed to update analysis: ${error.message}`);
     
@@ -99,8 +109,10 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
     if (error) throw new Error(`Failed to delete analysis: ${error.message}`);
   }
 
-  async createCategories(categories: Omit<ExpenseCategory, 'id' | 'createdAt'>[]): Promise<ExpenseCategory[]> {
-    const supabase = SupabaseClientFactory.createClient();
+  async createCategories(categories: Omit<ExpenseCategory, 'id' | 'createdAt'>[], accessToken?: string): Promise<ExpenseCategory[]> {
+    const supabase = accessToken 
+      ? SupabaseClientFactory.createClientWithAuth(accessToken)
+      : SupabaseClientFactory.createClient();
     
     const insertData = categories.map(cat => ({
       analysis_id: cat.analysisId,
@@ -156,8 +168,10 @@ export class SupabaseExpenseRepository implements IExpenseRepository {
     if (error) throw new Error(`Failed to delete category: ${error.message}`);
   }
 
-  async getCategoriesByAnalysisId(analysisId: string): Promise<ExpenseCategory[]> {
-    const supabase = SupabaseClientFactory.createClient();
+  async getCategoriesByAnalysisId(analysisId: string, accessToken?: string): Promise<ExpenseCategory[]> {
+    const supabase = accessToken 
+      ? SupabaseClientFactory.createClientWithAuth(accessToken)
+      : SupabaseClientFactory.createClient();
     
     const { data, error } = await supabase
       .from('expense_categories')
