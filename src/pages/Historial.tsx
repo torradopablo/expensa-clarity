@@ -16,6 +16,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import { 
   CheckCircle2, 
   ArrowRight,
@@ -28,7 +29,8 @@ import {
   Plus,
   Filter,
   X,
-  CalendarIcon
+  CalendarIcon,
+  ArrowLeftRight
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -104,11 +106,41 @@ const Historial = () => {
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   
+  // Selection states for comparison
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectionMode, setSelectionMode] = useState(false);
+  
   // Filter states
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+
+  const toggleSelection = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedIds(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else if (newSet.size < 2) {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
+
+  const handleCompare = () => {
+    const ids = Array.from(selectedIds);
+    if (ids.length === 2) {
+      navigate(`/comparar?left=${ids[0]}&right=${ids[1]}`);
+    }
+  };
+
+  const cancelSelection = () => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  };
 
   // Get unique buildings and periods for filter options
   const buildings = useMemo(() => {
@@ -208,16 +240,42 @@ const Historial = () => {
       <Header />
       <main className="pt-24 pb-20">
         <div className="container max-w-4xl">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
-              <History className="w-6 h-6 text-primary" />
+          <div className="flex items-center justify-between gap-3 mb-8">
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
+                <History className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Historial de expensas</h1>
+                <p className="text-muted-foreground text-sm">
+                  {analyses.length} {analyses.length === 1 ? "análisis realizado" : "análisis realizados"}
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-2xl font-bold">Historial de expensas</h1>
-              <p className="text-muted-foreground text-sm">
-                {analyses.length} {analyses.length === 1 ? "análisis realizado" : "análisis realizados"}
-              </p>
-            </div>
+            {analyses.length >= 2 && (
+              <div className="flex items-center gap-2">
+                {selectionMode ? (
+                  <>
+                    <Button variant="ghost" size="sm" onClick={cancelSelection}>
+                      Cancelar
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      onClick={handleCompare}
+                      disabled={selectedIds.size !== 2}
+                    >
+                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                      Comparar ({selectedIds.size}/2)
+                    </Button>
+                  </>
+                ) : (
+                  <Button variant="outline" size="sm" onClick={() => setSelectionMode(true)}>
+                    <ArrowLeftRight className="w-4 h-4 mr-2" />
+                    Comparar
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Filters Section */}
@@ -361,22 +419,30 @@ const Historial = () => {
             <div className="grid gap-4">
               {filteredAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
+                const isSelected = selectedIds.has(analysis.id);
                 
-                return (
-                  <Link 
-                    key={analysis.id} 
-                    to={`/analisis/${analysis.id}`}
-                    className="block"
+                const cardContent = (
+                  <Card 
+                    variant="interactive" 
+                    className={cn(
+                      "animate-fade-in-up transition-all",
+                      isSelected && "ring-2 ring-primary"
+                    )}
+                    style={{ animationDelay: `${index * 0.05}s` }}
                   >
-                    <Card 
-                      variant="interactive" 
-                      className="animate-fade-in-up"
-                      style={{ animationDelay: `${index * 0.05}s` }}
-                    >
-                      <CardContent className="p-0">
-                        <div className="flex flex-col sm:flex-row">
-                          <div className="flex-1 p-5 sm:p-6">
-                            <div className="flex items-start justify-between gap-4">
+                    <CardContent className="p-0">
+                      <div className="flex flex-col sm:flex-row">
+                        <div className="flex-1 p-5 sm:p-6">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex items-start gap-3">
+                              {selectionMode && (
+                                <Checkbox
+                                  checked={isSelected}
+                                  disabled={!isSelected && selectedIds.size >= 2}
+                                  className="mt-1"
+                                  onClick={(e) => toggleSelection(analysis.id, e)}
+                                />
+                              )}
                               <div className="min-w-0">
                                 <p className="text-sm text-muted-foreground truncate">
                                   {analysis.building_name || "Edificio"}
@@ -387,30 +453,52 @@ const Historial = () => {
                                   Analizado el {formatDate(analysis.created_at)}
                                 </p>
                               </div>
-                              <Badge variant="ok" className="flex-shrink-0">
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Completo
-                              </Badge>
                             </div>
-                          </div>
-                          <div className="flex items-center justify-between sm:justify-center gap-4 p-5 sm:p-6 bg-muted/30 sm:w-48 border-t sm:border-t-0 sm:border-l border-border">
-                            <div className="text-left sm:text-center">
-                              <p className="text-xs text-muted-foreground mb-0.5">Total</p>
-                              <p className="text-lg font-bold">{formatCurrency(analysis.total_amount)}</p>
-                              {change !== null && (
-                                <div className={`flex items-center justify-center gap-1 text-xs font-medium mt-1 ${
-                                  change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
-                                }`}>
-                                  {change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                                  {change > 0 ? "+" : ""}{change.toFixed(1)}%
-                                </div>
-                              )}
-                            </div>
-                            <ArrowRight className="w-5 h-5 text-muted-foreground sm:hidden" />
+                            <Badge variant="ok" className="flex-shrink-0">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Completo
+                            </Badge>
                           </div>
                         </div>
-                      </CardContent>
-                    </Card>
+                        <div className="flex items-center justify-between sm:justify-center gap-4 p-5 sm:p-6 bg-muted/30 sm:w-48 border-t sm:border-t-0 sm:border-l border-border">
+                          <div className="text-left sm:text-center">
+                            <p className="text-xs text-muted-foreground mb-0.5">Total</p>
+                            <p className="text-lg font-bold">{formatCurrency(analysis.total_amount)}</p>
+                            {change !== null && (
+                              <div className={`flex items-center justify-center gap-1 text-xs font-medium mt-1 ${
+                                change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                              }`}>
+                                {change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                              </div>
+                            )}
+                          </div>
+                          <ArrowRight className="w-5 h-5 text-muted-foreground sm:hidden" />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+
+                if (selectionMode) {
+                  return (
+                    <div 
+                      key={analysis.id} 
+                      className="cursor-pointer"
+                      onClick={(e) => toggleSelection(analysis.id, e)}
+                    >
+                      {cardContent}
+                    </div>
+                  );
+                }
+
+                return (
+                  <Link 
+                    key={analysis.id} 
+                    to={`/analisis/${analysis.id}`}
+                    className="block"
+                  >
+                    {cardContent}
                   </Link>
                 );
               })}
