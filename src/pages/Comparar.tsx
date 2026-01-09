@@ -5,6 +5,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ComparisonChart } from "@/components/ComparisonChart";
 import { 
   CheckCircle2, 
   ArrowLeft,
@@ -377,8 +378,19 @@ const CompararPage = () => {
                 </CardContent>
               </Card>
 
+              {/* Bar Chart Comparison */}
+              {categoryComparison.length > 0 && (
+                <div className="mb-8">
+                  <ComparisonChart 
+                    data={categoryComparison}
+                    leftLabel={`${leftAnalysis.building_name || "Edificio"} - ${leftAnalysis.period}`}
+                    rightLabel={`${rightAnalysis.building_name || "Edificio"} - ${rightAnalysis.period}`}
+                  />
+                </div>
+              )}
+
               {/* Category Comparison */}
-              <h2 className="text-xl font-semibold mb-4">Comparativa por Categoría</h2>
+              <h2 className="text-xl font-semibold mb-4">Detalle por Categoría</h2>
               <div className="space-y-3">
                 {categoryComparison.map((cat, index) => {
                   const Icon = iconMap[cat.icon] || Building;
