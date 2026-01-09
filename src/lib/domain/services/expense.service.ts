@@ -33,19 +33,27 @@ export class ExpenseService {
     const openrouterKey = process.env.OPENROUTER_API_KEY;
     const primaryProvider = process.env.AI_PROVIDER || 'openai';
 
+    console.log(`Initializing AI providers. Primary: ${primaryProvider}`);
+    console.log(`OpenAI key available: ${!!openaiKey}`);
+    console.log(`OpenRouter key available: ${!!openrouterKey}`);
+
     // Add primary provider first
-    if (primaryProvider === 'openai' && openaiKey) {
-      this.aiService.addProvider(new OpenAIProvider(openaiKey));
-    } else if (primaryProvider === 'openrouter' && openrouterKey) {
+    if (primaryProvider === 'openrouter' && openrouterKey) {
+      console.log('Adding OpenRouter as primary provider');
       this.aiService.addProvider(new OpenRouterProvider(openrouterKey));
+    } else if (primaryProvider === 'openai' && openaiKey) {
+      console.log('Adding OpenAI as primary provider');
+      this.aiService.addProvider(new OpenAIProvider(openaiKey));
     }
 
     // Add fallback providers
-    if (primaryProvider !== 'openai' && openaiKey) {
-      this.aiService.addProvider(new OpenAIProvider(openaiKey));
-    }
     if (primaryProvider !== 'openrouter' && openrouterKey) {
+      console.log('Adding OpenRouter as fallback provider');
       this.aiService.addProvider(new OpenRouterProvider(openrouterKey));
+    }
+    if (primaryProvider !== 'openai' && openaiKey) {
+      console.log('Adding OpenAI as fallback provider');
+      this.aiService.addProvider(new OpenAIProvider(openaiKey));
     }
   }
 

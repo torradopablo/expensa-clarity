@@ -1,13 +1,16 @@
 import { AIProvider } from '../ai.service';
 import { AIExtractedData } from '../../../domain/entities/expense';
+import { OpenRouter } from '@openrouter/sdk';
 
 export class OpenRouterProvider implements AIProvider {
   name = 'openrouter';
-  private apiKey: string;
+  private openrouter: OpenRouter;
   private model: string;
 
-  constructor(apiKey: string, model = 'openai/gpt-4o') {
-    this.apiKey = apiKey;
+  constructor(apiKey: string, model = 'anthropic/claude-3.5-sonnet') {
+    this.openrouter = new OpenRouter({
+      apiKey: apiKey
+    });
     this.model = model;
   }
 
@@ -27,7 +30,8 @@ DEBES responder SOLO con un JSON válido con esta estructura exacta:
       "icon": "users|zap|droplets|wrench|shield|building",
       "currentAmount": número,
       "status": "ok|attention",
-      "explanation": "explicación breve en español simple"
+      "previousAmount": número,
+      "notes": "comentarios adicionales si corresponde"
     }
   ]
 }
@@ -37,15 +41,8 @@ Categorías comunes: Encargado, Servicios públicos, Agua y cloacas, Mantenimien
 Si hay gastos que parecen inusualmente altos (más del 30% del promedio típico), márcalos con status "attention".
 Usa español argentino simple, evita jerga contable.`;
 
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-        'X-Title': 'ExpensaCheck',
-      },
-      body: JSON.stringify({
+    try {
+      const response = await this.openrouter.chat.send({
         model: this.model,
         messages: [
           {
@@ -61,54 +58,43 @@ Usa español argentino simple, evita jerga contable.`;
               },
               {
                 type: 'image_url',
-                image_url: {
-                  url: `data:${mimeType};base64,${imageBase64}`,
-                },
+                imageUrl: {
+                  url: `data:${mimeType};base64,${imageBase64}`
+                }
               },
             ],
           },
         ],
-        max_tokens: 2000,
+        maxTokens: 2000,
         temperature: 0.1,
-      }),
-    });
+      });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('OpenRouter API error:', response.status, errorText);
+      const content = response.choices[0]?.message?.content as string;
+      if (!content) {
+        throw new Error('No se pudo obtener respuesta de la IA');
+      }
+
+      // Parse JSON response
+      const extractedData = JSON.parse(content);
       
-      if (response.status === 429) {
+      return {
+        buildingName: extractedData.buildingName || '',
+        period: extractedData.period || '',
+        unit: extractedData.unit || '',
+        totalAmount: extractedData.totalAmount || 0,
+        categories: extractedData.categories || [],
+      };
+    } catch (error: any) {
+      console.error('OpenRouter API error:', error);
+      
+      if ('status' in error && (error as any).status === 429) {
         throw new Error('Límite de solicitudes excedido. Por favor, intentá de nuevo en unos minutos.');
       }
-      if (response.status === 402) {
+      if ('status' in error && (error as any).status === 402) {
         throw new Error('Créditos insuficientes en OpenRouter. Por favor, agregá créditos a tu cuenta.');
       }
       
       throw new Error('Error al procesar el documento con IA');
     }
-
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('No se pudo obtener respuesta de la IA');
-    }
-
-    // Parse the JSON response
-    let extractedData: AIExtractedData;
-    try {
-      const cleanedContent = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-      extractedData = JSON.parse(cleanedContent);
-
-      // Validate required fields
-      if (!extractedData.buildingName || !extractedData.period || !extractedData.categories) {
-        throw new Error('Datos incompletos en la respuesta de la IA');
-      }
-    } catch (parseError) {
-      console.error('Error parsing AI response:', parseError, 'Content:', content);
-      throw new Error('Error al interpretar los datos de la expensa');
-    }
-
-    return extractedData;
   }
 }
