@@ -1,0 +1,135 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from "recharts";
+import { BarChart3 } from "lucide-react";
+
+interface CategoryComparison {
+  name: string;
+  leftAmount: number;
+  rightAmount: number;
+  diff: number;
+  changePercent: number | null;
+}
+
+interface ComparisonChartProps {
+  data: CategoryComparison[];
+  leftLabel: string;
+  rightLabel: string;
+}
+
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat('es-AR', {
+    style: 'currency',
+    currency: 'ARS',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+};
+
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const left = payload.find((p: any) => p.dataKey === "leftAmount");
+    const right = payload.find((p: any) => p.dataKey === "rightAmount");
+    const diff = right && left ? right.value - left.value : 0;
+    const changePercent = left?.value > 0 ? ((right?.value - left?.value) / left?.value) * 100 : 0;
+
+    return (
+      <div className="bg-popover border border-border rounded-lg p-3 shadow-lg">
+        <p className="font-semibold mb-2">{label}</p>
+        {left && (
+          <p className="text-sm text-muted-foreground">
+            Base: <span className="font-medium text-foreground">{formatCurrency(left.value)}</span>
+          </p>
+        )}
+        {right && (
+          <p className="text-sm text-muted-foreground">
+            Comparar: <span className="font-medium text-foreground">{formatCurrency(right.value)}</span>
+          </p>
+        )}
+        <div className={`text-sm font-medium mt-2 ${diff > 0 ? "text-status-attention" : diff < 0 ? "text-status-ok" : "text-muted-foreground"}`}>
+          Diferencia: {diff > 0 ? "+" : ""}{formatCurrency(diff)} ({changePercent > 0 ? "+" : ""}{changePercent.toFixed(1)}%)
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+export const ComparisonChart = ({ data, leftLabel, rightLabel }: ComparisonChartProps) => {
+  if (!data.length) return null;
+
+  // Take top 8 categories by amount for better visualization
+  const chartData = data.slice(0, 8).map(cat => ({
+    name: cat.name.length > 12 ? cat.name.substring(0, 12) + "..." : cat.name,
+    fullName: cat.name,
+    leftAmount: cat.leftAmount,
+    rightAmount: cat.rightAmount,
+    diff: cat.diff,
+  }));
+
+  return (
+    <Card className="animate-fade-in-up">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
+          <BarChart3 className="w-5 h-5 text-primary" />
+          Comparación Visual
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="h-[350px] w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart
+              data={chartData}
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              barCategoryGap="20%"
+            >
+              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+              <XAxis 
+                dataKey="name" 
+                tick={{ fontSize: 11 }}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                className="fill-muted-foreground"
+              />
+              <YAxis 
+                tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
+                className="fill-muted-foreground"
+                tick={{ fontSize: 11 }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Legend 
+                wrapperStyle={{ paddingTop: 16 }}
+                formatter={(value) => (
+                  <span className="text-sm text-foreground">
+                    {value === "leftAmount" ? leftLabel : rightLabel}
+                  </span>
+                )}
+              />
+              <Bar 
+                dataKey="leftAmount" 
+                name="leftAmount"
+                radius={[4, 4, 0, 0]}
+                className="fill-secondary"
+              />
+              <Bar 
+                dataKey="rightAmount" 
+                name="rightAmount"
+                radius={[4, 4, 0, 0]}
+              >
+                {chartData.map((entry, index) => (
+                  <Cell 
+                    key={`cell-${index}`} 
+                    className={entry.diff > 0 ? "fill-status-attention" : entry.diff < 0 ? "fill-status-ok" : "fill-primary"}
+                  />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <p className="text-xs text-muted-foreground text-center mt-2">
+          Las barras naranjas indican aumento, las verdes disminución respecto al análisis base
+        </p>
+      </CardContent>
+    </Card>
+  );
+};
