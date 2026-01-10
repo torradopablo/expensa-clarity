@@ -13,6 +13,16 @@ import {
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -30,7 +40,8 @@ import {
   Filter,
   X,
   CalendarIcon,
-  ArrowLeftRight
+  ArrowLeftRight,
+  Trash2
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -110,11 +121,56 @@ const Historial = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
   
+  // Delete confirmation state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [analysisToDelete, setAnalysisToDelete] = useState<Analysis | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   // Filter states
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
   const [periodFilter, setPeriodFilter] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState<Date | undefined>();
   const [dateTo, setDateTo] = useState<Date | undefined>();
+
+  const handleDeleteClick = (analysis: Analysis, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setAnalysisToDelete(analysis);
+    setDeleteDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!analysisToDelete) return;
+    
+    setIsDeleting(true);
+    try {
+      // First delete related categories
+      const { error: categoriesError } = await supabase
+        .from("expense_categories")
+        .delete()
+        .eq("analysis_id", analysisToDelete.id);
+
+      if (categoriesError) throw categoriesError;
+
+      // Then delete the analysis
+      const { error: analysisError } = await supabase
+        .from("expense_analyses")
+        .delete()
+        .eq("id", analysisToDelete.id);
+
+      if (analysisError) throw analysisError;
+
+      setAnalyses(prev => prev.filter(a => a.id !== analysisToDelete.id));
+      toast.success("Análisis eliminado correctamente");
+    } catch (error: any) {
+      console.error("Error deleting analysis:", error);
+      toast.error("Error al eliminar el análisis");
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+      setAnalysisToDelete(null);
+    }
+  };
 
   const toggleSelection = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
@@ -454,10 +510,22 @@ const Historial = () => {
                                 </p>
                               </div>
                             </div>
-                            <Badge variant="ok" className="flex-shrink-0">
-                              <CheckCircle2 className="w-3 h-3 mr-1" />
-                              Completo
-                            </Badge>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                              {!selectionMode && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  onClick={(e) => handleDeleteClick(analysis, e)}
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </Button>
+                              )}
+                              <Badge variant="ok">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Completo
+                              </Badge>
+                            </div>
                           </div>
                         </div>
                         <div className="flex items-center justify-between sm:justify-center gap-4 p-5 sm:p-6 bg-muted/30 sm:w-48 border-t sm:border-t-0 sm:border-l border-border">
@@ -526,6 +594,34 @@ const Historial = () => {
           )}
         </div>
       </main>
+
+      {/* Delete confirmation dialog */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar este análisis?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {analysisToDelete && (
+                <>
+                  Vas a eliminar el análisis de <strong>{analysisToDelete.building_name || "Edificio"}</strong> del período <strong>{analysisToDelete.period}</strong>.
+                  <br /><br />
+                  Esta acción no se puede deshacer. Se eliminarán todos los datos y categorías asociadas.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? "Eliminando..." : "Sí, eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
