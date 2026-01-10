@@ -99,8 +99,27 @@ interface Analysis {
   previous_total: number | null;
   status: string;
   created_at: string;
+  scanned_at: string | null;
   notes: string | null;
 }
+
+const formatDate = (dateString: string) => {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(dateString));
+};
+
+const formatShortDate = (dateString: string) => {
+  return new Intl.DateTimeFormat('es-AR', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(dateString));
+};
 
 const AnalysisPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -217,6 +236,12 @@ const AnalysisPage = () => {
                       {analysis.unit && (
                         <p className="text-muted-foreground">{analysis.unit}</p>
                       )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                        {analysis.scanned_at && (
+                          <span>📄 Escaneado: {formatShortDate(analysis.scanned_at)}</span>
+                        )}
+                        <span>📅 Procesado: {formatShortDate(analysis.created_at)}</span>
+                      </div>
                     </div>
                     <Badge variant={attentionItems > 0 ? "attention" : "ok"} className="text-sm px-3 py-1">
                       {attentionItems > 0 ? (

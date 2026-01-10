@@ -91,7 +91,9 @@ Tu trabajo es extraer y estructurar los datos de una liquidación de expensas.
 DEBES responder SOLO con un JSON válido con esta estructura exacta:
 {
   "building_name": "nombre del edificio o consorcio",
-  "period": "mes y año de la expensa",
+  "period": "Mes Año",
+  "period_month": número del mes (1-12),
+  "period_year": año (ej: 2024),
   "unit": "número de unidad funcional",
   "total_amount": número total en pesos,
   "categories": [
@@ -104,6 +106,12 @@ DEBES responder SOLO con un JSON válido con esta estructura exacta:
     }
   ]
 }
+
+IMPORTANTE sobre el período:
+- "period" debe ser el mes y año en formato legible, ej: "Enero 2024", "Diciembre 2023"
+- "period_month" debe ser el número del mes (1=Enero, 12=Diciembre)
+- "period_year" debe ser el año completo (ej: 2024)
+- Buscá en el documento frases como "Expensas de", "Período", "Mes de", "Liquidación de" para identificar el período
 
 Categorías comunes: Encargado, Servicios públicos, Agua y cloacas, Mantenimiento, Seguro del edificio, Administración, Ascensores, Limpieza, Expensas extraordinarias.
 
@@ -178,6 +186,7 @@ Usa español argentino simple, evita jerga contable.`
         total_amount: extractedData.total_amount,
         file_url: filePath,
         status: "completed",
+        scanned_at: new Date().toISOString(),
       })
       .eq("id", analysisId);
 
