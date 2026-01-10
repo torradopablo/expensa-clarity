@@ -41,7 +41,8 @@ import {
   X,
   CalendarIcon,
   ArrowLeftRight,
-  Trash2
+  Trash2,
+  LineChart
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -308,30 +309,38 @@ const Historial = () => {
                 </p>
               </div>
             </div>
-            {analyses.length >= 2 && (
-              <div className="flex items-center gap-2">
-                {selectionMode ? (
-                  <>
-                    <Button variant="ghost" size="sm" onClick={cancelSelection}>
-                      Cancelar
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      onClick={handleCompare}
-                      disabled={selectedIds.size !== 2}
-                    >
+            <div className="flex items-center gap-2 flex-wrap">
+              <Button variant="outline" size="sm" asChild>
+                <Link to="/evolucion">
+                  <LineChart className="w-4 h-4 mr-2" />
+                  Ver evolución
+                </Link>
+              </Button>
+              {analyses.length >= 2 && (
+                <>
+                  {selectionMode ? (
+                    <>
+                      <Button variant="ghost" size="sm" onClick={cancelSelection}>
+                        Cancelar
+                      </Button>
+                      <Button 
+                        size="sm" 
+                        onClick={handleCompare}
+                        disabled={selectedIds.size !== 2}
+                      >
+                        <ArrowLeftRight className="w-4 h-4 mr-2" />
+                        Comparar ({selectedIds.size}/2)
+                      </Button>
+                    </>
+                  ) : (
+                    <Button variant="outline" size="sm" onClick={() => setSelectionMode(true)}>
                       <ArrowLeftRight className="w-4 h-4 mr-2" />
-                      Comparar ({selectedIds.size}/2)
+                      Comparar
                     </Button>
-                  </>
-                ) : (
-                  <Button variant="outline" size="sm" onClick={() => setSelectionMode(true)}>
-                    <ArrowLeftRight className="w-4 h-4 mr-2" />
-                    Comparar
-                  </Button>
-                )}
-              </div>
-            )}
+                  )}
+                </>
+              )}
+            </div>
           </div>
 
           {/* Filters Section */}
