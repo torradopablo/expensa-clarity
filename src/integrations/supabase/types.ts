@@ -24,6 +24,7 @@ export type Database = {
           payment_id: string | null
           period: string
           previous_total: number | null
+          scanned_at: string | null
           status: string
           total_amount: number
           unit: string | null
@@ -39,6 +40,7 @@ export type Database = {
           payment_id?: string | null
           period: string
           previous_total?: number | null
+          scanned_at?: string | null
           status?: string
           total_amount: number
           unit?: string | null
@@ -54,6 +56,7 @@ export type Database = {
           payment_id?: string | null
           period?: string
           previous_total?: number | null
+          scanned_at?: string | null
           status?: string
           total_amount?: number
           unit?: string | null
