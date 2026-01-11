@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { 
@@ -10,39 +11,115 @@ import {
   BarChart3,
   Download,
   Users,
-  LineChart
+  LineChart,
+  Menu,
+  X
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
-const Header = () => (
-  <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-    <div className="container flex items-center justify-between h-16">
-      <Link to="/" className="flex items-center gap-2">
-        <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-          <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-        </div>
-        <span className="text-xl font-semibold">ExpensaCheck</span>
-      </Link>
-      <nav className="hidden md:flex items-center gap-8">
-        <a href="#como-funciona" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          Cómo funciona
-        </a>
-        <a href="#beneficios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          Beneficios
-        </a>
-        <a href="#precios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          Precios
-        </a>
-        <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-          Mi historial
+const Header = () => {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  return (
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
+      <div className="container flex items-center justify-between h-16">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
+            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
+          </div>
+          <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
-      </nav>
-      <Button asChild size="default">
-        <Link to="/analizar">Analizar expensas</Link>
-      </Button>
-    </div>
-  </header>
-);
+        
+        {/* Desktop Navigation */}
+        <nav className="hidden md:flex items-center gap-8">
+          <a href="#como-funciona" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Cómo funciona
+          </a>
+          <a href="#beneficios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Beneficios
+          </a>
+          <a href="#precios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Precios
+          </a>
+          <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            Mi historial
+          </Link>
+        </nav>
+
+        <div className="flex items-center gap-2">
+          {/* Mobile Menu Button */}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="md:hidden"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </Button>
+          
+          <Button asChild size="default" className="hidden sm:inline-flex">
+            <Link to="/analizar">Analizar expensas</Link>
+          </Button>
+        </div>
+      </div>
+
+      {/* Mobile Navigation Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-background border-b border-border">
+          <nav className="container py-4 flex flex-col gap-3">
+            <a 
+              href="#como-funciona" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Cómo funciona
+            </a>
+            <a 
+              href="#beneficios" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Beneficios
+            </a>
+            <a 
+              href="#precios" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Precios
+            </a>
+            <Link 
+              to="/historial" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Mi historial
+            </Link>
+            <Link 
+              to="/comparar" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Comparar períodos
+            </Link>
+            <Link 
+              to="/evolucion" 
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              onClick={() => setMobileMenuOpen(false)}
+            >
+              Evolución
+            </Link>
+            <Button asChild size="default" className="mt-2 w-full">
+              <Link to="/analizar" onClick={() => setMobileMenuOpen(false)}>
+                Analizar expensas
+              </Link>
+            </Button>
+          </nav>
+        </div>
+      )}
+    </header>
+  );
+};
 
 const HeroSection = () => (
   <section className="pt-32 pb-20 bg-gradient-soft">
