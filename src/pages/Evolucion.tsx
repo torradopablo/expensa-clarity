@@ -21,7 +21,6 @@ import {
   Building,
   Calendar,
   RefreshCw,
-  Download,
   Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -36,7 +35,6 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
-import { generateEvolutionPdf } from "@/lib/generatePdf";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -585,26 +583,6 @@ const Evolucion = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              {selectedBuilding !== "all" && chartData.length >= 2 && stats && (
-                <Button 
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    generateEvolutionPdf(
-                      selectedBuilding,
-                      chartData,
-                      comparisonData,
-                      stats,
-                      deviation || undefined,
-                      aiAnalysis
-                    );
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  <span className="hidden sm:inline">Descargar PDF</span>
-                  <span className="sm:hidden">PDF</span>
-                </Button>
-              )}
               <Button variant="ghost" asChild size="sm">
                 <Link to="/historial">
                   <ArrowLeft className="w-4 h-4 mr-2" />
