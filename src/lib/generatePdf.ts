@@ -544,13 +544,13 @@ const generateComparisonSuggestions = (
 
   // Overall analysis
   if (totalChangePercent > 15) {
-    suggestions.push("📈 Se observa un incremento significativo en el total. Te recomendamos revisar las categorías con mayor variación y consultar con la administración sobre posibles gastos extraordinarios.");
+    suggestions.push("ALERTA: Se observa un incremento significativo en el total. Te recomendamos revisar las categorias con mayor variacion y consultar con la administracion sobre posibles gastos extraordinarios.");
   } else if (totalChangePercent > 5) {
-    suggestions.push("📊 Hay un incremento moderado en tus expensas. Los aumentos pueden deberse a ajustes inflacionarios normales de servicios y sueldos.");
+    suggestions.push("NOTA: Hay un incremento moderado en tus expensas. Los aumentos pueden deberse a ajustes inflacionarios normales de servicios y sueldos.");
   } else if (totalChangePercent < -5) {
-    suggestions.push("✅ ¡Buenas noticias! Tus expensas disminuyeron. Esto puede indicar una gestión eficiente o la finalización de gastos extraordinarios.");
+    suggestions.push("POSITIVO: Buenas noticias! Tus expensas disminuyeron. Esto puede indicar una gestion eficiente o la finalizacion de gastos extraordinarios.");
   } else {
-    suggestions.push("➡️ Tus expensas se mantienen estables entre ambos períodos, lo cual indica consistencia en los gastos del edificio.");
+    suggestions.push("ESTABLE: Tus expensas se mantienen estables entre ambos periodos, lo cual indica consistencia en los gastos del edificio.");
   }
 
   // Find top increases
@@ -561,7 +561,7 @@ const generateComparisonSuggestions = (
 
   if (bigIncreases.length > 0) {
     const catNames = bigIncreases.map(c => c.name).join(", ");
-    suggestions.push(`⚠️ Las categorías con mayor aumento son: ${catNames}. Verificá si corresponden a aumentos tarifarios o gastos puntuales.`);
+    suggestions.push(`ATENCION: Las categorias con mayor aumento son: ${catNames}. Verifica si corresponden a aumentos tarifarios o gastos puntuales.`);
   }
 
   // Find decreases
@@ -572,12 +572,12 @@ const generateComparisonSuggestions = (
 
   if (bigDecreases.length > 0) {
     const catNames = bigDecreases.map(c => c.name).join(", ");
-    suggestions.push(`💚 Bajaron significativamente: ${catNames}. Puede indicar renegociación de contratos o reducción de consumo.`);
+    suggestions.push(`AHORRO: Bajaron significativamente: ${catNames}. Puede indicar renegociacion de contratos o reduccion de consumo.`);
   }
 
   // Actionable recommendations
   if (totalChangePercent > 10) {
-    suggestions.push("💡 Sugerencia: Solicitá el detalle de gastos extraordinarios a la administración y verificá que coincidan con las actas de consorcio.");
+    suggestions.push("SUGERENCIA: Solicita el detalle de gastos extraordinarios a la administracion y verifica que coincidan con las actas de consorcio.");
   }
 
   return suggestions;
@@ -676,7 +676,7 @@ export const generateAnalysisPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📊 Comparativa mes actual vs anterior", margin, yPos);
+    doc.text("Comparativa mes actual vs anterior", margin, yPos);
     yPos += 8;
     
     const chartHeight = drawComparisonBarChart(doc, margin, yPos, pageWidth - margin * 2, categories, 6);
@@ -693,7 +693,7 @@ export const generateAnalysisPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📈 Contexto económico y comparativo", margin, yPos);
+    doc.text("Contexto economico y comparativo", margin, yPos);
     yPos += 10;
     
     const contextWidth = (pageWidth - margin * 2 - 5) / 2;
@@ -733,7 +733,7 @@ export const generateAnalysisPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📊 Distribución del gasto por categoría", margin, yPos);
+    doc.text("Distribucion del gasto por categoria", margin, yPos);
     yPos += 8;
     
     const chartHeight = drawHorizontalBarChart(doc, margin, yPos, pageWidth - margin * 2, categories, 6);
@@ -753,10 +753,9 @@ export const generateAnalysisPdf = (
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
   
-  const statusIcon = attentionItems > 0 ? "⚠️" : "✅";
   const statusMessage = attentionItems > 0 
-    ? `${statusIcon} Se detectaron ${attentionItems} categoría(s) con aumentos significativos que requieren revisión`
-    : `${statusIcon} Todas las categorías están dentro de los rangos esperados - sin anomalías detectadas`;
+    ? `ATENCION: Se detectaron ${attentionItems} categoria(s) con aumentos significativos que requieren revision`
+    : `OK: Todas las categorias estan dentro de los rangos esperados - sin anomalias detectadas`;
   
   doc.text(statusMessage, margin + 5, yPos + 13);
   yPos += 30;
@@ -782,7 +781,7 @@ export const generateAnalysisPdf = (
       cat.previous_amount ? formatCurrency(cat.previous_amount) : "-",
       diff !== null ? (diff > 0 ? "+" : "") + formatCurrency(diff) : "-",
       change !== null ? `${change > 0 ? "+" : ""}${change.toFixed(1)}%` : "-",
-      cat.status === "ok" ? "✓ OK" : "⚠ Revisar"
+      cat.status === "ok" ? "OK" : "Revisar"
     ];
   });
 
@@ -846,7 +845,7 @@ export const generateAnalysisPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("🔍 Observaciones detalladas", margin, finalY);
+    doc.text("Observaciones detalladas", margin, finalY);
     finalY += 10;
 
     itemsWithExplanation.forEach(cat => {
@@ -907,7 +906,7 @@ export const generateAnalysisPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📝 Notas personales", margin, finalY);
+    doc.text("Notas personales", margin, finalY);
     finalY += 8;
     
     doc.setFillColor(...COLORS.bgBlue);
@@ -1019,7 +1018,7 @@ export const generateEvolutionPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📈 Gráfico de evolución histórica", margin, yPos);
+    doc.text("Grafico de evolucion historica", margin, yPos);
     yPos += 8;
     
     const chartData = evolutionData.map(d => ({ period: d.period, value: d.total }));
@@ -1037,7 +1036,7 @@ export const generateEvolutionPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📊 Comparativa de rendimiento", margin, yPos);
+    doc.text("Comparativa de rendimiento", margin, yPos);
     yPos += 10;
     
     const halfWidth = (pageWidth - margin * 2 - 5) / 2;
@@ -1100,7 +1099,7 @@ export const generateEvolutionPdf = (
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("📋 Evolución histórica detallada", margin, yPos);
+  doc.text("Evolucion historica detallada", margin, yPos);
   yPos += 10;
   
   // Prepare table data with comparison
@@ -1175,7 +1174,7 @@ export const generateEvolutionPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("🤖 Análisis inteligente", margin, finalY);
+    doc.text("Analisis inteligente", margin, finalY);
     finalY += 10;
     
     doc.setFillColor(...COLORS.bgBlue);
@@ -1204,37 +1203,37 @@ export const generateEvolutionPdf = (
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("💡 Resumen ejecutivo", margin, finalY);
+  doc.text("Resumen ejecutivo", margin, finalY);
   finalY += 10;
   
   const insights = [];
   
   // Trend insight
   if (stats.changePercent > 5) {
-    insights.push(`📈 Tendencia alcista: El último período subió ${stats.changePercent.toFixed(1)}% respecto al anterior.`);
+    insights.push(`TENDENCIA ALCISTA: El ultimo periodo subio ${stats.changePercent.toFixed(1)}% respecto al anterior.`);
   } else if (stats.changePercent < -5) {
-    insights.push(`📉 Tendencia bajista: El último período bajó ${Math.abs(stats.changePercent).toFixed(1)}% respecto al anterior.`);
+    insights.push(`TENDENCIA BAJISTA: El ultimo periodo bajo ${Math.abs(stats.changePercent).toFixed(1)}% respecto al anterior.`);
   } else {
-    insights.push(`➡️ Tendencia estable: Variación del ${Math.abs(stats.changePercent).toFixed(1)}% en el último período.`);
+    insights.push(`ESTABLE: Variacion del ${Math.abs(stats.changePercent).toFixed(1)}% en el ultimo periodo.`);
   }
   
   // Range insight
   const range = stats.max - stats.min;
   const rangePercent = (range / stats.avg) * 100;
-  insights.push(`📊 Rango de variación: ${formatCurrency(range)} (${rangePercent.toFixed(0)}% sobre el promedio).`);
+  insights.push(`RANGO: Variacion de ${formatCurrency(range)} (${rangePercent.toFixed(0)}% sobre el promedio).`);
   
   // Deviation insights
   if (deviation) {
     if (deviation.fromInflation > 10) {
-      insights.push(`⚠️ Alerta: Tus expensas crecieron significativamente más que la inflación.`);
+      insights.push(`ALERTA: Tus expensas crecieron significativamente mas que la inflacion.`);
     } else if (deviation.fromInflation < -10) {
-      insights.push(`✅ Positivo: Tus expensas crecieron menos que la inflación.`);
+      insights.push(`POSITIVO: Tus expensas crecieron menos que la inflacion.`);
     }
     
     if (deviation.fromBuildings > 10) {
-      insights.push(`⚠️ Tus expensas evolucionaron por encima del promedio de edificios similares.`);
+      insights.push(`ATENCION: Tus expensas evolucionaron por encima del promedio de edificios similares.`);
     } else if (deviation.fromBuildings < -10) {
-      insights.push(`✅ Tus expensas evolucionaron por debajo del promedio de edificios similares.`);
+      insights.push(`POSITIVO: Tus expensas evolucionaron por debajo del promedio de edificios similares.`);
     }
   }
   
@@ -1387,23 +1386,22 @@ export const generateComparisonPdf = (
   doc.setTextColor(...(isIncrease ? COLORS.warning : COLORS.success));
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  const summaryIcon = isIncrease ? "📈" : totalDiff < 0 ? "📉" : "➡️";
   const summaryText = isIncrease 
-    ? `${summaryIcon} Aumento de ${formatCurrency(totalDiff)} (+${totalChangePercent.toFixed(1)}%) entre ambos períodos`
+    ? `AUMENTO: ${formatCurrency(totalDiff)} (+${totalChangePercent.toFixed(1)}%) entre ambos periodos`
     : totalDiff < 0 
-      ? `${summaryIcon} Reducción de ${formatCurrency(Math.abs(totalDiff))} (${totalChangePercent.toFixed(1)}%) entre ambos períodos`
-      : `${summaryIcon} Sin cambios significativos entre ambos períodos`;
+      ? `REDUCCION: ${formatCurrency(Math.abs(totalDiff))} (${totalChangePercent.toFixed(1)}%) entre ambos periodos`
+      : `ESTABLE: Sin cambios significativos entre ambos periodos`;
   doc.text(summaryText, margin + 8, yPos + 16);
   
   yPos += 35;
   
   // ========== COMPARISON CHART ==========
   if (categories.length > 0) {
-    doc.setTextColor(...COLORS.text);
-    doc.setFontSize(14);
-    doc.setFont("helvetica", "bold");
-    doc.text("📊 Comparación visual por categoría", margin, yPos);
-    yPos += 10;
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("Comparacion visual por categoria", margin, yPos);
+  yPos += 10;
     
     const chartHeight = drawSideBySideComparisonChart(
       doc, margin, yPos, pageWidth - margin * 2, 
@@ -1424,7 +1422,7 @@ export const generateComparisonPdf = (
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("📋 Detalle por categoría", margin, yPos);
+  doc.text("Detalle por categoria", margin, yPos);
   yPos += 10;
   
   const tableData = categories.map(cat => [
@@ -1490,7 +1488,7 @@ export const generateComparisonPdf = (
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("💡 Análisis y recomendaciones", margin, finalY);
+  doc.text("Analisis y recomendaciones", margin, finalY);
   finalY += 10;
   
   // Generate suggestions
@@ -1534,7 +1532,7 @@ export const generateComparisonPdf = (
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("⚡ Cambios significativos", margin, finalY);
+    doc.text("Cambios significativos", margin, finalY);
     finalY += 10;
     
     significantChanges.slice(0, 5).forEach(cat => {
