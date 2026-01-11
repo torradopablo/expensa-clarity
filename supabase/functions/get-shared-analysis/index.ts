@@ -225,17 +225,47 @@ Deno.serve(async (req) => {
         buildingsMap.set(bt.period, (bt as any).normalizedPercent || 0);
       }
       
+      // Get sorted periods from historical data to calculate cumulative inflation
+      const sortedPeriods = historicalData.map(h => ({
+        period: h.period,
+        yearMonth: periodToYearMonth(h.period)
+      }));
+      
+      // Calculate cumulative inflation from base period
+      const baseYearMonth = sortedPeriods[0]?.yearMonth;
+      let cumulativeInflation = 0;
+      const cumulativeInflationMap = new Map<string, number>();
+      
+      if (inflationData && baseYearMonth) {
+        // Sort inflation data chronologically
+        const sortedInflation = [...inflationData].sort((a, b) => a.period.localeCompare(b.period));
+        
+        // Find base index
+        const baseIdx = sortedInflation.findIndex(inf => inf.period >= baseYearMonth);
+        
+        if (baseIdx >= 0) {
+          cumulativeInflationMap.set(sortedInflation[baseIdx].period, 0); // base period = 0%
+          
+          for (let i = baseIdx + 1; i < sortedInflation.length; i++) {
+            // Cumulative: (1 + prev) * (1 + current/100) - 1
+            const monthlyRate = sortedInflation[i].value / 100;
+            cumulativeInflation = ((1 + cumulativeInflation / 100) * (1 + monthlyRate) - 1) * 100;
+            cumulativeInflationMap.set(sortedInflation[i].period, cumulativeInflation);
+          }
+        }
+      }
+      
       for (const hist of historicalData) {
         const userPercent = baseTotal > 0 ? ((hist.total_amount - baseTotal) / baseTotal) * 100 : 0;
         const yearMonth = periodToYearMonth(hist.period);
-        const inflationInfo = inflationMap.get(yearMonth);
+        const cumulativeInflationPercent = cumulativeInflationMap.get(yearMonth) ?? null;
         const buildingsPercent = buildingsMap.get(hist.period) ?? null;
         
         evolutionData.push({
           period: hist.period,
           userPercent: parseFloat(userPercent.toFixed(1)),
-          inflationPercent: inflationInfo?.value ?? null,
-          inflationEstimated: inflationInfo?.isEstimated ?? false,
+          inflationPercent: cumulativeInflationPercent !== null ? parseFloat(cumulativeInflationPercent.toFixed(1)) : null,
+          inflationEstimated: inflationMap.get(yearMonth)?.isEstimated ?? false,
           buildingsPercent: buildingsPercent !== null ? parseFloat(buildingsPercent.toFixed(1)) : null
         });
       }

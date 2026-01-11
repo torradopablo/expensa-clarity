@@ -10,10 +10,9 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { 
+import {
   CheckCircle2, 
   ArrowLeft,
-  Download,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -43,7 +42,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { generateAnalysisPdf } from "@/lib/generatePdf";
 import { TrendChart } from "@/components/TrendChart";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
@@ -158,17 +156,11 @@ const formatShortDate = (dateString: string) => {
   }).format(new Date(dateString));
 };
 
-interface HistoricalDataPoint {
-  period: string;
-  total_amount: number;
-}
-
 const AnalysisPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
-  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [sharedLink, setSharedLink] = useState<string | null>(null);
@@ -205,24 +197,6 @@ const AnalysisPage = () => {
         if (categoriesError) throw categoriesError;
         setCategories(categoriesData || []);
 
-        // Fetch historical data for PDF
-        if (analysisData.building_name) {
-          const { data: histData, error: histError } = await supabase
-            .from("expense_analyses")
-            .select("period, total_amount, created_at, period_date")
-            .eq("building_name", analysisData.building_name)
-            .order("period_date", { ascending: true, nullsFirst: false });
-
-          if (!histError && histData) {
-            const sortedData = histData.sort((a, b) => {
-              if (a.period_date && b.period_date) {
-                return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
-              }
-              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-            });
-            setHistoricalData(sortedData.map(d => ({ period: d.period, total_amount: d.total_amount })));
-          }
-        }
 
         // Check for existing shared link
         const { data: existingLink } = await supabase
@@ -392,15 +366,6 @@ Analizá tu expensa en ExpensaCheck`;
     toast.success("Enlace copiado al portapapeles");
   };
 
-  const handleDownloadPdf = () => {
-    generateAnalysisPdf(
-      analysis, 
-      categories, 
-      undefined, 
-      undefined, 
-      historicalData.length >= 2 ? historicalData : undefined
-    );
-  };
 
   return (
     <TooltipProvider delayDuration={200}>
@@ -454,13 +419,6 @@ Analizá tu expensa en ExpensaCheck`;
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
-                <Button 
-                  variant="outline" 
-                  onClick={handleDownloadPdf}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Descargar PDF
-                </Button>
               </div>
             </div>
 
