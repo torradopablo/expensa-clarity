@@ -23,6 +23,7 @@ export type Database = {
           notes: string | null
           payment_id: string | null
           period: string
+          period_date: string | null
           previous_total: number | null
           scanned_at: string | null
           status: string
@@ -39,6 +40,7 @@ export type Database = {
           notes?: string | null
           payment_id?: string | null
           period: string
+          period_date?: string | null
           previous_total?: number | null
           scanned_at?: string | null
           status?: string
@@ -55,6 +57,7 @@ export type Database = {
           notes?: string | null
           payment_id?: string | null
           period?: string
+          period_date?: string | null
           previous_total?: number | null
           scanned_at?: string | null
           status?: string
