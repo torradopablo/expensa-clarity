@@ -20,10 +20,12 @@ import {
   Shield,
   LogOut,
   ArrowLeftRight,
-  AlertTriangle
+  AlertTriangle,
+  Download
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { generateComparisonPdf } from "@/lib/generatePdf";
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -279,6 +281,21 @@ const CompararPage = () => {
                 Volver al historial
               </Link>
             </Button>
+            {leftAnalysis && rightAnalysis && (
+              <Button 
+                variant="outline"
+                onClick={() => generateComparisonPdf({
+                  leftAnalysis,
+                  rightAnalysis,
+                  categories: categoryComparison,
+                  totalDiff,
+                  totalChangePercent
+                })}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Descargar PDF
+              </Button>
+            )}
           </div>
 
           <h1 className="text-3xl font-bold mb-2">Comparar Análisis</h1>
