@@ -37,8 +37,10 @@ import {
   X,
   ArrowLeftRight,
   Trash2,
-  LineChart
+  LineChart,
+  Search
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
@@ -140,7 +142,8 @@ const Historial = () => {
   const [analysisToDelete, setAnalysisToDelete] = useState<Analysis | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Filter states - now using month/year instead of date range
+  // Filter states
+  const [searchQuery, setSearchQuery] = useState<string>("");
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
   const [monthFilter, setMonthFilter] = useState<string>("all");
   const [yearFilter, setYearFilter] = useState<string>("all");
@@ -267,6 +270,17 @@ const Historial = () => {
   // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
     const filtered = analyses.filter(analysis => {
+      // Search query filter
+      if (searchQuery.trim()) {
+        const query = searchQuery.toLowerCase().trim();
+        const buildingMatch = analysis.building_name?.toLowerCase().includes(query);
+        const periodMatch = analysis.period.toLowerCase().includes(query);
+        const unitMatch = analysis.unit?.toLowerCase().includes(query);
+        if (!buildingMatch && !periodMatch && !unitMatch) {
+          return false;
+        }
+      }
+
       // Building filter
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
@@ -295,11 +309,12 @@ const Historial = () => {
       const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
       return dateB - dateA; // Descending order (newest first)
     });
-  }, [analyses, buildingFilter, monthFilter, yearFilter]);
+  }, [analyses, searchQuery, buildingFilter, monthFilter, yearFilter]);
 
-  const hasActiveFilters = buildingFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
+  const hasActiveFilters = searchQuery.trim() !== "" || buildingFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
 
   const clearFilters = () => {
+    setSearchQuery("");
     setBuildingFilter("all");
     setMonthFilter("all");
     setYearFilter("all");
@@ -402,17 +417,39 @@ const Historial = () => {
             </div>
           </div>
 
-          {/* Filters Section */}
+          {/* Search and Filters Section */}
           {analyses.length > 0 && (
             <Card variant="soft" className="mb-6 animate-fade-in-up">
               <CardContent className="p-4">
+                {/* Search bar */}
+                <div className="relative mb-4">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Buscar por edificio, período o unidad..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9 h-10"
+                  />
+                  {searchQuery && (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
+                      onClick={() => setSearchQuery("")}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+
                 <div className="flex items-center gap-2 mb-3">
                   <Filter className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Filtros</span>
                   {hasActiveFilters && (
                     <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 px-2 ml-auto">
                       <X className="w-3 h-3 mr-1" />
-                      Limpiar
+                      Limpiar todo
                     </Button>
                   )}
                 </div>
