@@ -186,11 +186,87 @@ Usa español argentino simple, evita jerga contable.`
       }
     }
 
+    // Normalize building name by matching against existing building names from user's previous analyses
+    let normalizedBuildingName = extractedData.building_name;
+    
+    if (normalizedBuildingName) {
+      // Fetch all unique building names from user's previous analyses
+      const { data: existingAnalyses } = await supabase
+        .from("expense_analyses")
+        .select("building_name")
+        .eq("user_id", userId)
+        .neq("id", analysisId)
+        .not("building_name", "is", null);
+
+      if (existingAnalyses && existingAnalyses.length > 0) {
+        // Get unique building names
+        const existingBuildingNames = [...new Set(
+          existingAnalyses
+            .map(a => a.building_name)
+            .filter((name): name is string => name !== null)
+        )];
+
+        // Normalize function for comparison
+        const normalizeForComparison = (str: string): string => {
+          return str
+            .toLowerCase()
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "") // Remove accents
+            .replace(/[^a-z0-9]/g, "") // Remove non-alphanumeric
+            .trim();
+        };
+
+        const extractedNormalized = normalizeForComparison(normalizedBuildingName);
+
+        // Find a matching existing building name
+        const matchingBuilding = existingBuildingNames.find(existingName => {
+          const existingNormalized = normalizeForComparison(existingName);
+          
+          // Exact match after normalization
+          if (extractedNormalized === existingNormalized) {
+            return true;
+          }
+          
+          // One contains the other (handles abbreviations like "Edif." vs "Edificio")
+          if (extractedNormalized.includes(existingNormalized) || existingNormalized.includes(extractedNormalized)) {
+            // Only match if substantial overlap (at least 60% of shorter string)
+            const shorter = Math.min(extractedNormalized.length, existingNormalized.length);
+            const longer = Math.max(extractedNormalized.length, existingNormalized.length);
+            if (shorter / longer > 0.5) {
+              return true;
+            }
+          }
+
+          // Levenshtein-like similarity for typos
+          // Simple check: if difference is just 1-2 chars and length is similar
+          if (Math.abs(extractedNormalized.length - existingNormalized.length) <= 2) {
+            let differences = 0;
+            const maxLen = Math.max(extractedNormalized.length, existingNormalized.length);
+            for (let i = 0; i < maxLen; i++) {
+              if (extractedNormalized[i] !== existingNormalized[i]) {
+                differences++;
+              }
+            }
+            if (differences <= 2 && maxLen > 5) {
+              return true;
+            }
+          }
+
+          return false;
+        });
+
+        if (matchingBuilding) {
+          console.log(`Building name normalized: "${normalizedBuildingName}" -> "${matchingBuilding}"`);
+          normalizedBuildingName = matchingBuilding;
+        }
+      }
+    }
+
     // Update the analysis record with extracted data
     const { error: updateError } = await supabase
       .from("expense_analyses")
       .update({
-        building_name: extractedData.building_name,
+        building_name: normalizedBuildingName,
         period: extractedData.period,
         period_date: periodDate,
         unit: extractedData.unit,
