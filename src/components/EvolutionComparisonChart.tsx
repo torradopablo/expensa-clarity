@@ -132,14 +132,14 @@ export const EvolutionComparisonChart = ({
               />
               <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
               
-              {/* User's building - Blue */}
+              {/* User's building - Primary color to match other charts */}
               <Line
                 type="monotone"
                 dataKey="userPercent"
                 name="Tu edificio"
-                stroke="#2563eb"
+                stroke="hsl(var(--primary))"
                 strokeWidth={3}
-                dot={{ fill: "#2563eb", strokeWidth: 0, r: 4 }}
+                dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />
               
