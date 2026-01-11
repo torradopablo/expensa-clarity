@@ -221,15 +221,51 @@ const AnalysisPage = () => {
       ? `⚠️ ${attentionItems} punto(s) a revisar` 
       : "✅ Todo en orden";
     
+    // Find categories with biggest changes
+    const sortedByChange = [...categories]
+      .filter(c => c.previous_amount)
+      .map(c => ({
+        name: c.name,
+        change: calculateChange(c.current_amount, c.previous_amount) || 0,
+        current: c.current_amount,
+        previous: c.previous_amount!,
+        status: c.status
+      }))
+      .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
+
+    const topChanges = sortedByChange.slice(0, 3);
+    const difference = analysis.previous_total 
+      ? analysis.total_amount - analysis.previous_total 
+      : null;
+
+    let detailText = "";
+    if (topChanges.length > 0) {
+      detailText = "\n📋 *Principales variaciones:*\n" + topChanges.map(c => 
+        `• ${c.name}: ${c.change > 0 ? "+" : ""}${c.change.toFixed(1)}% (${formatCurrency(c.current)})`
+      ).join("\n");
+    }
+
+    const attentionCategories = categories.filter(c => c.status === "attention");
+    let attentionText = "";
+    if (attentionCategories.length > 0) {
+      attentionText = "\n\n🔍 *Puntos de atención:*\n" + attentionCategories.map(c => 
+        `• ${c.name}`
+      ).join("\n");
+    }
+
     return `📊 *Análisis de Expensas - ExpensaCheck*
 
 🏢 ${analysis.building_name || "Mi edificio"}
 📅 Período: ${analysis.period}
-💰 Total: ${formatCurrency(analysis.total_amount)}
-${analysis.previous_total ? `📈 Variación: ${totalChange > 0 ? "+" : ""}${totalChange.toFixed(1)}% vs mes anterior` : ""}
+
+💰 *Total: ${formatCurrency(analysis.total_amount)}*
+${analysis.previous_total ? `📈 Mes anterior: ${formatCurrency(analysis.previous_total)}
+💵 Diferencia: ${difference && difference > 0 ? "+" : ""}${difference ? formatCurrency(difference) : "-"} (${totalChange && totalChange > 0 ? "+" : ""}${totalChange?.toFixed(1) || 0}%)` : ""}
 
 ${statusText}
+${detailText}${attentionText}
 
+---
 Analizá tu expensa en ExpensaCheck`;
   };
 
