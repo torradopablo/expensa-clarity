@@ -8,7 +8,9 @@ import {
   ArrowRight,
   Upload,
   BarChart3,
-  Download
+  Download,
+  Users,
+  LineChart
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
@@ -49,15 +51,15 @@ const HeroSection = () => (
         <div className="space-y-8 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-soft text-primary text-sm font-medium">
             <Shield className="w-4 h-4" />
-            Transparencia y tranquilidad en tus expensas
+            Análisis inteligente con datos reales del mercado
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
             Entendé tus expensas{" "}
-            <span className="text-gradient">sin complicaciones</span>
+            <span className="text-gradient">con contexto real</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl">
-            Subí tu liquidación de expensas y recibí un análisis claro y visual. 
-            Detectamos aumentos inusuales y te explicamos todo en español simple.
+            Subí tu liquidación y compará tus expensas con una <strong>comunidad de edificios</strong> similares 
+            y el <strong>contexto inflacionario del país</strong>. Sabé si pagás lo justo, respaldado por datos reales.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Button asChild variant="hero" size="xl">
@@ -70,7 +72,28 @@ const HeroSection = () => (
               <Link to="/ejemplo">Ver ejemplo de análisis</Link>
             </Button>
           </div>
-          <div className="flex items-center gap-6 pt-4">
+          {/* Value proposition badges */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
+            <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
+              <div className="w-8 h-8 rounded-full bg-secondary-soft flex items-center justify-center flex-shrink-0">
+                <Users className="w-4 h-4 text-secondary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Comunidad de edificios</p>
+                <p className="text-xs text-muted-foreground">Compará con edificios similares</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
+              <div className="w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
+                <LineChart className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">Contexto inflacionario</p>
+                <p className="text-xs text-muted-foreground">Datos actualizados del país</p>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-6 pt-2">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <CheckCircle2 className="w-4 h-4 text-primary" />
               Sin suscripción
@@ -98,8 +121,8 @@ const HeroSection = () => (
                   <TrendingUp className="w-5 h-5 text-status-ok" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium">Análisis completo</p>
-                  <p className="text-xs text-muted-foreground">En menos de 1 minuto</p>
+                  <p className="text-sm font-medium">Análisis con contexto</p>
+                  <p className="text-xs text-muted-foreground">Comunidad + Inflación</p>
                 </div>
               </div>
             </div>
@@ -119,13 +142,13 @@ const HowItWorksSection = () => {
     },
     {
       icon: BarChart3,
-      title: "Análisis automático",
-      description: "Nuestro sistema extrae los datos y los compara con meses anteriores."
+      title: "Análisis con contexto real",
+      description: "Comparamos tus gastos con nuestra comunidad de edificios y los índices de inflación del país."
     },
     {
       icon: Download,
-      title: "Recibí tu reporte",
-      description: "Obtené un informe visual con alertas claras y explicaciones sencillas."
+      title: "Reporte inteligente",
+      description: "Recibí un informe que te dice si pagás lo justo, basado en datos reales del mercado."
     }
   ];
 
@@ -135,7 +158,7 @@ const HowItWorksSection = () => {
         <div className="text-center space-y-4 mb-16">
           <h2 className="text-3xl md:text-4xl font-bold">¿Cómo funciona?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            En tres simples pasos, pasás de la confusión a la claridad total sobre tus expensas.
+            En tres simples pasos, obtené un análisis respaldado por datos de la comunidad y el contexto económico.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
@@ -166,24 +189,24 @@ const HowItWorksSection = () => {
 const BenefitsSection = () => {
   const benefits = [
     {
-      icon: Shield,
-      title: "Transparencia total",
-      description: "Sabé exactamente a dónde va cada peso de tus expensas."
+      icon: Users,
+      title: "Referencia de la comunidad",
+      description: "Compará tus expensas con edificios similares de nuestra base de datos."
+    },
+    {
+      icon: LineChart,
+      title: "Contexto inflacionario",
+      description: "Analizamos si los aumentos están alineados con la inflación del país."
     },
     {
       icon: TrendingUp,
-      title: "Detectá aumentos inusuales",
-      description: "Te alertamos cuando algo subió más de lo esperado."
+      title: "Detectá desvíos reales",
+      description: "Te alertamos cuando algo subió más que el promedio del mercado."
     },
     {
       icon: FileText,
       title: "Explicaciones claras",
       description: "Sin jerga contable. Todo explicado en palabras simples."
-    },
-    {
-      icon: CheckCircle2,
-      title: "Sin compromiso",
-      description: "Pagás solo cuando querés analizar. Sin suscripciones."
     }
   ];
 
@@ -193,8 +216,37 @@ const BenefitsSection = () => {
         <div className="text-center space-y-4 mb-16">
           <h2 className="text-3xl md:text-4xl font-bold">¿Por qué ExpensaCheck?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Diseñado para darte tranquilidad, no más preocupaciones.
+            Análisis inteligente respaldado por datos reales de la comunidad y el contexto económico argentino.
           </p>
+        </div>
+        {/* Community & Inflation highlight */}
+        <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-md mb-10 border border-primary/20">
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
+                <Users className="w-6 h-6 text-secondary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Comunidad de edificios</h3>
+                <p className="text-sm text-muted-foreground">
+                  Tu análisis se contrasta con una base de datos de edificios reales, 
+                  dándote un punto de referencia concreto para saber si tus expensas están dentro de lo normal.
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-4">
+              <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center flex-shrink-0">
+                <LineChart className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-semibold mb-2">Índices de inflación actualizados</h3>
+                <p className="text-sm text-muted-foreground">
+                  Usamos datos oficiales de inflación de Argentina para contextualizar cada aumento. 
+                  Así sabés si es esperable o si hay algo que revisar.
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {benefits.map((benefit, index) => (
@@ -239,11 +291,11 @@ const PricingSection = () => (
           </div>
           <ul className="space-y-4 text-left mb-8">
             {[
-              "Extracción automática de datos",
-              "Comparación con meses anteriores",
-              "Detección de aumentos inusuales",
+              "Comparación con comunidad de edificios",
+              "Contexto de inflación argentina",
+              "Detección de desvíos vs. mercado",
               "Reporte visual descargable",
-              "Explicaciones en español simple"
+              "Explicaciones claras en español"
             ].map((feature, index) => (
               <li key={index} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
