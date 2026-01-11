@@ -246,38 +246,48 @@ const PaymentStep = ({
   onBack, 
   onNext,
   isProcessing,
-  isDevMode = false
+  isFreeAnalysis = false,
+  isFirstAnalysis = false
 }: { 
   onBack: () => void;
   onNext: () => void;
   isProcessing: boolean;
-  isDevMode?: boolean;
+  isFreeAnalysis?: boolean;
+  isFirstAnalysis?: boolean;
 }) => {
-  // isDevMode is true for both dev mode AND free trial users
-  const isFreeMode = isDevMode;
-  
   return (
     <div className="max-w-lg mx-auto animate-fade-in-up">
       <Card variant="elevated">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            {isFreeMode ? "Análisis gratuito" : "Confirmar pago"}
+            {isFreeAnalysis 
+              ? (isFirstAnalysis ? "¡Tu primer análisis es gratis!" : "Análisis gratuito")
+              : "Confirmar pago"
+            }
           </CardTitle>
           <CardDescription>
-            {isFreeMode 
-              ? "Tu análisis es gratis"
+            {isFreeAnalysis 
+              ? (isFirstAnalysis 
+                  ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $500 ARS."
+                  : "Tu análisis es gratis"
+                )
               : "Pago único y seguro con Mercado Pago"
             }
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {isFreeMode && (
+          {isFreeAnalysis && (
             <div className="bg-status-ok-bg border border-status-ok/30 rounded-xl p-4 flex items-start gap-3">
               <CheckCircle2 className="w-5 h-5 text-status-ok mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-status-ok">Análisis gratuito</p>
+                <p className="text-sm font-medium text-status-ok">
+                  {isFirstAnalysis ? "🎉 Promoción: primer análisis gratis" : "Análisis gratuito"}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  Tenés acceso a análisis sin costo.
+                  {isFirstAnalysis 
+                    ? "Aprovechá esta oportunidad para conocer nuestro servicio."
+                    : "Tenés acceso a análisis sin costo."
+                  }
                 </p>
               </div>
             </div>
@@ -286,21 +296,21 @@ const PaymentStep = ({
           <div className="bg-muted/50 rounded-xl p-6 space-y-4">
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Análisis de expensa</span>
-              <span className={`font-medium ${isFreeMode ? "line-through text-muted-foreground" : ""}`}>
+              <span className={`font-medium ${isFreeAnalysis ? "line-through text-muted-foreground" : ""}`}>
                 $500 ARS
               </span>
             </div>
             <div className="border-t border-border pt-4">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total</span>
-                <span className={`text-2xl font-bold ${isFreeMode ? "text-status-ok" : "text-primary"}`}>
-                  {isFreeMode ? "GRATIS" : "$500 ARS"}
+                <span className={`text-2xl font-bold ${isFreeAnalysis ? "text-status-ok" : "text-primary"}`}>
+                  {isFreeAnalysis ? "GRATIS" : "$500 ARS"}
                 </span>
               </div>
             </div>
           </div>
 
-          {!isFreeMode && (
+          {!isFreeAnalysis && (
             <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
               <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
               <div>
@@ -344,7 +354,7 @@ const PaymentStep = ({
                 </>
               ) : (
                 <>
-                  {isFreeMode ? "Continuar" : "Pagar con Mercado Pago"}
+                  {isFreeAnalysis ? "Analizar gratis" : "Pagar con Mercado Pago"}
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
@@ -479,7 +489,9 @@ const Analizar = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-  const [isFreeUser, setIsFreeUser] = useState(false);
+  const [isFreeAnalysis, setIsFreeAnalysis] = useState(false);
+  const [isFirstAnalysis, setIsFirstAnalysis] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
   // Check for payment callback
   useEffect(() => {
@@ -499,8 +511,8 @@ const Analizar = () => {
   }, [searchParams]);
 
   useEffect(() => {
-    // Check auth state
-    const checkAuth = async () => {
+    // Check auth state and user's analysis history
+    const checkAuthAndAnalyses = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate("/auth");
@@ -516,11 +528,26 @@ const Analizar = () => {
         .single();
 
       if (profile?.free_analysis) {
-        setIsFreeUser(true);
+        setIsFreeAnalysis(true);
+      } else {
+        // Check if this is the user's first analysis (promo: first one is free)
+        const { count } = await supabase
+          .from("expense_analyses")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .eq("status", "completed");
+
+        // If no completed analyses, first one is free
+        if (count === 0) {
+          setIsFirstAnalysis(true);
+          setIsFreeAnalysis(true);
+        }
       }
+      
+      setIsLoading(false);
     };
 
-    checkAuth();
+    checkAuthAndAnalyses();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
@@ -537,8 +564,22 @@ const Analizar = () => {
         .single();
 
       if (profile?.free_analysis) {
-        setIsFreeUser(true);
+        setIsFreeAnalysis(true);
+      } else {
+        // Check if this is the user's first analysis
+        const { count } = await supabase
+          .from("expense_analyses")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", session.user.id)
+          .eq("status", "completed");
+
+        if (count === 0) {
+          setIsFirstAnalysis(true);
+          setIsFreeAnalysis(true);
+        }
       }
+      
+      setIsLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -595,9 +636,8 @@ const Analizar = () => {
     }
   };
 
-  // Check if payments are disabled for development or user has free analysis
-  const isDevMode = import.meta.env.VITE_SKIP_PAYMENT === "true";
-  const skipPayment = isDevMode || isFreeUser;
+  // Free analysis if: user has free_analysis flag OR this is their first analysis (promo)
+  const skipPayment = isFreeAnalysis;
 
   const handlePaymentOrSkip = async () => {
     if (skipPayment) {
@@ -605,7 +645,11 @@ const Analizar = () => {
       setIsProcessing(true);
       setShowPaymentSuccess(true);
       setCurrentStep(3);
-      toast.info(isFreeUser ? "Usuario de prueba: análisis gratuito" : "Modo desarrollo: pago omitido");
+      if (isFirstAnalysis) {
+        toast.success("¡Tu primer análisis es gratis! 🎉");
+      } else {
+        toast.info("Análisis gratuito");
+      }
     } else {
       await handlePayment();
     }
@@ -678,7 +722,8 @@ const Analizar = () => {
               onBack={() => setCurrentStep(1)}
               onNext={handlePaymentOrSkip}
               isProcessing={isProcessing}
-              isDevMode={skipPayment}
+              isFreeAnalysis={isFreeAnalysis}
+              isFirstAnalysis={isFirstAnalysis}
             />
           )}
           
