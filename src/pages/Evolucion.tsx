@@ -455,15 +455,21 @@ const Evolucion = () => {
     }
   }, [analyses.length, loadComparisonData]);
 
-  // Calculate deviation when comparison data changes
+  // Calculate deviation when comparison data changes - automatically, without needing AI analysis
   useEffect(() => {
     if (comparisonData.length >= 2) {
       const last = comparisonData[comparisonData.length - 1];
-      const fromInflation = last.inflationPercent !== null 
-        ? last.userPercent - last.inflationPercent 
+      
+      // Find the last data point with valid inflation data (not null)
+      const lastWithInflation = [...comparisonData].reverse().find(d => d.inflationPercent !== null);
+      const fromInflation = lastWithInflation 
+        ? lastWithInflation.userPercent - lastWithInflation.inflationPercent! 
         : 0;
-      const fromBuildings = last.buildingsPercent !== null 
-        ? last.userPercent - last.buildingsPercent 
+      
+      // Find the last data point with valid buildings data (not null)
+      const lastWithBuildings = [...comparisonData].reverse().find(d => d.buildingsPercent !== null);
+      const fromBuildings = lastWithBuildings 
+        ? lastWithBuildings.userPercent - lastWithBuildings.buildingsPercent! 
         : 0;
       
       setDeviation({
