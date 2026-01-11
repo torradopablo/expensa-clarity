@@ -41,6 +41,7 @@ import { generateAnalysisPdf } from "@/lib/generatePdf";
 import { TrendChart } from "@/components/TrendChart";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
+import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -478,6 +479,17 @@ Analizá tu expensa en ExpensaCheck`;
           {categories.length > 0 && (
             <div className="mb-8">
               <TrendChart categories={categories} period={analysis.period} />
+            </div>
+          )}
+
+          {/* Historical Evolution Chart */}
+          {analysis.building_name && (
+            <div className="mb-8">
+              <HistoricalEvolutionChart
+                buildingName={analysis.building_name}
+                currentAnalysisId={analysis.id}
+                currentPeriod={analysis.period}
+              />
             </div>
           )}
 
