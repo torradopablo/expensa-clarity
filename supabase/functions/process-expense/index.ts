@@ -106,6 +106,9 @@ DEBES responder SOLO con un JSON válido con esta estructura exacta:
     }
   ],
   "building_profile": {
+    "country": "país (generalmente Argentina)",
+    "province": "provincia o estado (ej: Buenos Aires, Córdoba, Santa Fe, CABA)",
+    "city": "ciudad (ej: Capital Federal, La Plata, Rosario)",
     "neighborhood": "barrio o localidad si aparece en la dirección",
     "zone": "CABA|GBA Norte|GBA Oeste|GBA Sur|Interior" (inferir de la dirección),
     "unit_count_range": "1-10|11-30|31-50|51-100|100+" (estimar por contexto: si hay muchas UFs mencionadas, encargado, ascensor, etc),
@@ -123,6 +126,9 @@ IMPORTANTE sobre el período:
 
 IMPORTANTE sobre building_profile:
 - Extraé toda la información que puedas inferir del documento
+- El país casi siempre es Argentina, pero verificá si hay alguna referencia a otro país
+- La provincia suele ser Buenos Aires, CABA, Córdoba, Santa Fe, etc. - Inferí de la dirección o datos del consorcio
+- La ciudad puede ser Capital Federal, La Plata, Rosario, etc. - En CABA usá "Capital Federal"
 - El barrio/localidad suele aparecer en la dirección del consorcio
 - Si ves gastos de pileta, seguridad 24hs, mantenimiento de SUM, etc., incluí esos amenities
 - Si no podés inferir un campo, dejalo como null
@@ -324,7 +330,7 @@ Usa español argentino simple, evita jerga contable.`
       // Check if a profile already exists for this building and user
       const { data: existingProfile } = await supabase
         .from("building_profiles")
-        .select("id, neighborhood, zone, unit_count_range, age_category, has_amenities, amenities")
+        .select("id, country, province, city, neighborhood, zone, unit_count_range, age_category, has_amenities, amenities")
         .eq("user_id", userId)
         .eq("building_name", normalizedBuildingName)
         .single();
@@ -333,6 +339,15 @@ Usa español argentino simple, evita jerga contable.`
         // Update only if extracted data is more complete (don't overwrite existing with nulls)
         const updates: Record<string, any> = {};
         
+        if (profileData.country && !existingProfile.country) {
+          updates.country = profileData.country;
+        }
+        if (profileData.province && !existingProfile.province) {
+          updates.province = profileData.province;
+        }
+        if (profileData.city && !existingProfile.city) {
+          updates.city = profileData.city;
+        }
         if (profileData.neighborhood && !existingProfile.neighborhood) {
           updates.neighborhood = profileData.neighborhood;
         }
@@ -376,6 +391,9 @@ Usa español argentino simple, evita jerga contable.`
           .insert({
             user_id: userId,
             building_name: normalizedBuildingName,
+            country: profileData.country || "Argentina",
+            province: profileData.province || null,
+            city: profileData.city || null,
             neighborhood: profileData.neighborhood || null,
             zone: profileData.zone || null,
             unit_count_range: profileData.unit_count_range || null,
