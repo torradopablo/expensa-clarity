@@ -128,15 +128,15 @@ const HeroSection = () => (
         <div className="space-y-8 animate-fade-in-up">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-soft text-primary text-sm font-medium">
             <Shield className="w-4 h-4" />
-            Análisis inteligente con datos reales del mercado
+            Para propietarios y administradores
           </div>
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
-            Entendé tus expensas{" "}
-            <span className="text-gradient">con contexto real</span>
+            Expensas claras,{" "}
+            <span className="text-gradient">decisiones informadas</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl">
-            Subí tu liquidación y compará tus expensas con una <strong>comunidad de edificios</strong> similares 
-            y el <strong>contexto inflacionario del país</strong>. Sabé si pagás lo justo, respaldado por datos reales.
+            Ya seas propietario o administrador, analizá expensas comparándolas con una <strong>comunidad de edificios</strong> y el <strong>contexto inflacionario</strong>. 
+            Ideal para entender tus gastos o presentar informes claros en reuniones de consorcio.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
             <Button asChild variant="hero" size="xl">
@@ -153,20 +153,20 @@ const HeroSection = () => (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
             <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
               <div className="w-8 h-8 rounded-full bg-secondary-soft flex items-center justify-center flex-shrink-0">
-                <Users className="w-4 h-4 text-secondary" />
+                <FileText className="w-4 h-4 text-secondary" />
               </div>
               <div>
-                <p className="text-sm font-medium">Comunidad de edificios</p>
-                <p className="text-xs text-muted-foreground">Compará con edificios similares</p>
+                <p className="text-sm font-medium">Propietarios</p>
+                <p className="text-xs text-muted-foreground">Entendé si pagás lo justo</p>
               </div>
             </div>
             <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
               <div className="w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
-                <LineChart className="w-4 h-4 text-primary" />
+                <BarChart3 className="w-4 h-4 text-primary" />
               </div>
               <div>
-                <p className="text-sm font-medium">Contexto inflacionario</p>
-                <p className="text-xs text-muted-foreground">Datos actualizados del país</p>
+                <p className="text-sm font-medium">Administradores</p>
+                <p className="text-xs text-muted-foreground">Informes listos para presentar</p>
               </div>
             </div>
           </div>
@@ -214,18 +214,18 @@ const HowItWorksSection = () => {
   const steps = [
     {
       icon: Upload,
-      title: "Subí tu expensa",
-      description: "Arrastrá o seleccioná el PDF o imagen de tu liquidación mensual de expensas."
+      title: "Subí la expensa",
+      description: "Cargá el PDF o imagen de la liquidación. Funciona para tu edificio o los que administrás."
     },
     {
       icon: BarChart3,
-      title: "Análisis con contexto real",
-      description: "Comparamos tus gastos con nuestra comunidad de edificios y los índices de inflación del país."
+      title: "Análisis automático",
+      description: "Comparamos los gastos con edificios similares y la inflación del país para darte contexto real."
     },
     {
       icon: Download,
-      title: "Reporte inteligente",
-      description: "Recibí un informe que te dice si pagás lo justo, basado en datos reales del mercado."
+      title: "Informe listo",
+      description: "Recibí un reporte claro, ideal para revisar vos mismo o presentar en reuniones de consorcio."
     }
   ];
 
@@ -235,7 +235,7 @@ const HowItWorksSection = () => {
         <div className="text-center space-y-4 mb-16">
           <h2 className="text-3xl md:text-4xl font-bold">¿Cómo funciona?</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            En tres simples pasos, obtené un análisis respaldado por datos de la comunidad y el contexto económico.
+            Tres pasos simples para propietarios que quieren entender o administradores que necesitan presentar.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-8">
@@ -267,23 +267,23 @@ const BenefitsSection = () => {
   const pillars = [
     {
       icon: Users,
-      title: "Comunidad de edificios",
-      description: "Compará con edificios similares al tuyo",
-      detail: "Tu expensa se contrasta con nuestra base de datos de edificios reales para darte un punto de referencia concreto.",
+      title: "Referencia de mercado",
+      description: "Comparación con edificios similares",
+      detail: "Contrastamos con una comunidad real de edificios para saber si los valores están en línea con el mercado.",
       color: "secondary"
     },
     {
       icon: LineChart,
-      title: "Contexto inflacionario",
-      description: "Datos oficiales de inflación argentina",
-      detail: "Analizamos si los aumentos están alineados con la inflación del país o si hay algo fuera de lo normal.",
+      title: "Contexto económico",
+      description: "Inflación y aumentos justificados",
+      detail: "Verificamos si los incrementos tienen sentido según la inflación del país o si requieren atención.",
       color: "primary"
     },
     {
       icon: TrendingUp,
-      title: "Tu histórico de expensas",
-      description: "Evolución de tus propios gastos",
-      detail: "Seguí mes a mes cómo evolucionan tus expensas y detectá patrones o desvíos en tu edificio.",
+      title: "Historial del edificio",
+      description: "Evolución mes a mes",
+      detail: "Seguimiento de cómo evolucionan los gastos, ideal para detectar tendencias y explicarlas en reuniones.",
       color: "accent"
     }
   ];
@@ -292,9 +292,9 @@ const BenefitsSection = () => {
     <section id="beneficios" className="py-20 bg-gradient-soft">
       <div className="container">
         <div className="text-center space-y-4 mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">Análisis con triple contexto</h2>
+          <h2 className="text-3xl md:text-4xl font-bold">Información respaldada por datos</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Tu expensa comparada con la comunidad, la inflación del país y tu propio historial.
+            Análisis que sirve para entender tus gastos o para presentar informes claros en el consorcio.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-6">
@@ -333,7 +333,7 @@ const PricingSection = () => (
           </div>
           <h2 className="text-3xl font-bold mb-2">Pago por análisis</h2>
           <p className="text-muted-foreground mb-8">
-            Simple y transparente. Pagás solo cuando lo necesitás.
+            Ideal para propietarios o administradores. Pagás solo cuando lo necesitás.
           </p>
           <div className="mb-8">
             <span className="text-5xl font-bold">$1.500</span>
@@ -341,11 +341,11 @@ const PricingSection = () => (
           </div>
           <ul className="space-y-4 text-left mb-8">
             {[
-              "Comparación con comunidad de edificios",
-              "Contexto de inflación argentina",
-              "Detección de desvíos vs. mercado",
-              "Reporte visual descargable",
-              "Explicaciones claras en español"
+              "Comparación con edificios similares",
+              "Contexto inflacionario del país",
+              "Detección de desvíos y anomalías",
+              "Reporte listo para presentar",
+              "Lenguaje claro y profesional"
             ].map((feature, index) => (
               <li key={index} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
