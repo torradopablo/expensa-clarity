@@ -302,6 +302,27 @@ Usa español argentino simple, evita jerga contable.`
       }
     }
 
+    // Delete file from storage after successful processing to save space
+    // The metadata is already saved in the database, we don't need the original file anymore
+    if (filePath) {
+      const { error: deleteFileError } = await supabase.storage
+        .from("expense-files")
+        .remove([filePath]);
+      
+      if (deleteFileError) {
+        console.error("Error deleting file after processing:", deleteFileError);
+        // Don't fail the request, file deletion is not critical
+      } else {
+        console.log("File deleted after successful processing:", filePath);
+        
+        // Update the analysis to clear the file_url since the file no longer exists
+        await supabase
+          .from("expense_analyses")
+          .update({ file_url: null })
+          .eq("id", analysisId);
+      }
+    }
+
     return new Response(
       JSON.stringify({
         success: true,
