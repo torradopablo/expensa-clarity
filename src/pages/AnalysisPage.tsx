@@ -46,6 +46,7 @@ import { TrendChart } from "@/components/TrendChart";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
+import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
 
 
 const iconMap: Record<string, any> = {
@@ -138,6 +139,35 @@ interface Analysis {
   notes: string | null;
 }
 
+interface HistoricalDataPoint {
+  id: string;
+  period: string;
+  total_amount: number;
+  period_date: string | null;
+}
+
+interface EvolutionDataPoint {
+  period: string;
+  userPercent: number;
+  inflationPercent: number | null;
+  inflationEstimated?: boolean;
+  buildingsPercent: number | null;
+}
+
+interface Deviation {
+  fromInflation: number;
+  fromBuildings: number;
+  isSignificant: boolean;
+}
+
+interface BuildingsTrendStats {
+  totalBuildings: number;
+  totalAnalyses: number;
+  periodsCount: number;
+  filtersApplied: boolean;
+  usedFallback?: boolean;
+}
+
 const formatDate = (dateString: string) => {
   return new Intl.DateTimeFormat('es-AR', {
     day: 'numeric',
@@ -161,6 +191,10 @@ const AnalysisPage = () => {
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
+  const [evolutionData, setEvolutionData] = useState<EvolutionDataPoint[]>([]);
+  const [deviation, setDeviation] = useState<Deviation | null>(null);
+  const [buildingsTrendStats, setBuildingsTrendStats] = useState<BuildingsTrendStats | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
   const [sharedLink, setSharedLink] = useState<string | null>(null);
@@ -197,7 +231,6 @@ const AnalysisPage = () => {
         if (categoriesError) throw categoriesError;
         setCategories(categoriesData || []);
 
-
         // Check for existing shared link
         const { data: existingLink } = await supabase
           .from("shared_analysis_links")
@@ -208,6 +241,141 @@ const AnalysisPage = () => {
 
         if (existingLink) {
           setSharedLink(`${window.location.origin}/compartido/${existingLink.token}`);
+        }
+
+        // Fetch historical data and evolution if building name exists
+        if (analysisData?.building_name) {
+          // Fetch historical analyses for this building
+          const { data: historicalAnalyses } = await supabase
+            .from("expense_analyses")
+            .select("id, period, total_amount, period_date")
+            .eq("user_id", session.user.id)
+            .eq("building_name", analysisData.building_name)
+            .order("period_date", { ascending: true, nullsFirst: false });
+
+          if (historicalAnalyses && historicalAnalyses.length > 0) {
+            setHistoricalData(historicalAnalyses);
+
+            // Fetch inflation data
+            const { data: inflationData } = await supabase
+              .from("inflation_data")
+              .select("period, value, is_estimated")
+              .order("period", { ascending: true });
+
+            // Fetch other buildings data for comparison
+            const { data: otherBuildingsData } = await supabase
+              .from("expense_analyses")
+              .select("id, period, total_amount, period_date, building_name, user_id")
+              .neq("building_name", analysisData.building_name)
+              .order("period_date", { ascending: true, nullsFirst: false });
+
+            // Calculate evolution data
+            if (historicalAnalyses.length >= 2) {
+              const baseTotal = historicalAnalyses[0].total_amount;
+              
+              // Create inflation map
+              const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+              if (inflationData) {
+                inflationData.forEach(inf => {
+                  inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
+                });
+              }
+
+              // Calculate cumulative inflation from first period
+              const calculateCumulativeInflation = (targetPeriod: string): { cumulative: number; isEstimated: boolean } | null => {
+                const sortedPeriods = historicalAnalyses.map(h => h.period).sort();
+                const startIndex = 0;
+                const endIndex = sortedPeriods.indexOf(targetPeriod);
+                
+                if (endIndex <= startIndex) return { cumulative: 0, isEstimated: false };
+                
+                let cumulativeInflation = 0;
+                let hasEstimated = false;
+                
+                for (let i = startIndex + 1; i <= endIndex; i++) {
+                  const period = sortedPeriods[i];
+                  const infData = inflationMap.get(period);
+                  if (infData) {
+                    cumulativeInflation = (1 + cumulativeInflation / 100) * (1 + infData.value / 100) * 100 - 100;
+                    if (infData.is_estimated) hasEstimated = true;
+                  }
+                }
+                
+                return { cumulative: cumulativeInflation, isEstimated: hasEstimated };
+              };
+
+              // Calculate other buildings average by period
+              const buildingsAvgByPeriod = new Map<string, number[]>();
+              if (otherBuildingsData) {
+                otherBuildingsData.forEach(b => {
+                  if (!buildingsAvgByPeriod.has(b.period)) {
+                    buildingsAvgByPeriod.set(b.period, []);
+                  }
+                  buildingsAvgByPeriod.get(b.period)!.push(b.total_amount);
+                });
+              }
+
+              // Get first period averages for other buildings
+              const firstPeriod = historicalAnalyses[0].period;
+              const firstPeriodOtherBuildings = buildingsAvgByPeriod.get(firstPeriod);
+              const baseOtherBuildings = firstPeriodOtherBuildings && firstPeriodOtherBuildings.length > 0
+                ? firstPeriodOtherBuildings.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildings.length
+                : null;
+
+              const evolution: EvolutionDataPoint[] = historicalAnalyses.map((h) => {
+                const userPercent = ((h.total_amount - baseTotal) / baseTotal) * 100;
+                const inflationResult = calculateCumulativeInflation(h.period);
+                
+                let buildingsPercent: number | null = null;
+                if (baseOtherBuildings) {
+                  const periodBuildings = buildingsAvgByPeriod.get(h.period);
+                  if (periodBuildings && periodBuildings.length > 0) {
+                    const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length;
+                    buildingsPercent = ((avgThisPeriod - baseOtherBuildings) / baseOtherBuildings) * 100;
+                  }
+                }
+
+                return {
+                  period: h.period,
+                  userPercent,
+                  inflationPercent: inflationResult?.cumulative || null,
+                  inflationEstimated: inflationResult?.isEstimated,
+                  buildingsPercent
+                };
+              });
+
+              setEvolutionData(evolution);
+
+              // Calculate deviation for latest period
+              const latestEvolution = evolution[evolution.length - 1];
+              if (latestEvolution) {
+                const fromInflation = latestEvolution.inflationPercent !== null 
+                  ? latestEvolution.userPercent - latestEvolution.inflationPercent 
+                  : 0;
+                const fromBuildings = latestEvolution.buildingsPercent !== null 
+                  ? latestEvolution.userPercent - latestEvolution.buildingsPercent 
+                  : 0;
+                
+                setDeviation({
+                  fromInflation,
+                  fromBuildings,
+                  isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
+                });
+              }
+
+              // Set buildings trend stats
+              if (otherBuildingsData) {
+                const uniqueBuildings = new Set(otherBuildingsData.map(b => b.building_name));
+                const uniquePeriods = new Set(otherBuildingsData.map(b => b.period));
+                setBuildingsTrendStats({
+                  totalBuildings: uniqueBuildings.size,
+                  totalAnalyses: otherBuildingsData.length,
+                  periodsCount: uniquePeriods.size,
+                  filtersApplied: false
+                });
+              }
+            }
+          }
         }
       } catch (error: any) {
         console.error("Error fetching analysis:", error);
@@ -568,20 +736,32 @@ Analizá tu expensa en ExpensaCheck`;
             </div>
           )}
 
-          {/* Trend Chart */}
-          {categories.length > 0 && (
+          {/* Trend Chart - Comparison with previous period by category */}
+          {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
             <div className="mb-8">
               <TrendChart categories={categories} period={analysis.period} />
             </div>
           )}
 
-          {/* Historical Evolution Chart */}
+          {/* Historical Evolution Chart - Absolute values */}
           {analysis.building_name && (
             <div className="mb-8">
               <HistoricalEvolutionChart
                 buildingName={analysis.building_name}
                 currentAnalysisId={analysis.id}
                 currentPeriod={analysis.period}
+              />
+            </div>
+          )}
+
+          {/* Evolution Comparison Chart - Percentage with inflation and other buildings */}
+          {evolutionData.length >= 2 && (
+            <div className="mb-8">
+              <EvolutionComparisonChart
+                data={evolutionData}
+                buildingName={analysis.building_name || "Este edificio"}
+                deviation={deviation || undefined}
+                buildingsTrendStats={buildingsTrendStats}
               />
             </div>
           )}
