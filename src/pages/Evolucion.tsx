@@ -141,12 +141,29 @@ interface BuildingsTrendData {
   count: number;
 }
 
+interface BuildingProfile {
+  id: string;
+  building_name: string;
+  unit_count_range: string | null;
+  age_category: string | null;
+  zone: string | null;
+  has_amenities: boolean | null;
+}
+
 interface ComparisonDataPoint {
   period: string;
   userPercent: number;
   inflationPercent: number | null;
   inflationEstimated?: boolean;
   buildingsPercent: number | null;
+}
+
+interface BuildingsTrendStats {
+  totalBuildings: number;
+  totalAnalyses: number;
+  periodsCount: number;
+  filtersApplied: boolean;
+  usedFallback?: boolean;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -173,6 +190,8 @@ const Evolucion = () => {
   // New states for comparison data
   const [inflationData, setInflationData] = useState<InflationData[]>([]);
   const [buildingsTrend, setBuildingsTrend] = useState<BuildingsTrendData[]>([]);
+  const [buildingsTrendStats, setBuildingsTrendStats] = useState<BuildingsTrendStats | null>(null);
+  const [buildingProfile, setBuildingProfile] = useState<BuildingProfile | null>(null);
   const [isLoadingComparison, setIsLoadingComparison] = useState(false);
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
@@ -336,9 +355,44 @@ const Evolucion = () => {
     }
   }, []);
 
-  // Fetch buildings trend
-  const fetchBuildingsTrend = useCallback(async () => {
+  // Fetch building profile for the selected building
+  const fetchBuildingProfile = useCallback(async (buildingName: string) => {
+    if (buildingName === "all") {
+      setBuildingProfile(null);
+      return null;
+    }
+
     try {
+      const { data, error } = await supabase
+        .from("building_profiles")
+        .select("id, building_name, unit_count_range, age_category, zone, has_amenities")
+        .ilike("building_name", buildingName)
+        .maybeSingle();
+
+      if (error) throw error;
+      setBuildingProfile(data);
+      return data;
+    } catch (error) {
+      console.error("Error fetching building profile:", error);
+      setBuildingProfile(null);
+      return null;
+    }
+  }, []);
+
+  // Fetch buildings trend with optional profile filters
+  const fetchBuildingsTrend = useCallback(async (profile?: BuildingProfile | null) => {
+    try {
+      // Build filters from profile if available
+      const filters: Record<string, any> = {};
+      if (profile) {
+        if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
+        if (profile.age_category) filters.age_category = profile.age_category;
+        if (profile.zone) filters.zone = profile.zone;
+        if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
+      }
+
+      const hasFilters = Object.keys(filters).length > 0;
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
         {
@@ -347,6 +401,10 @@ const Evolucion = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
+          body: JSON.stringify({ 
+            filters: hasFilters ? filters : undefined,
+            fallbackIfEmpty: true  // Request fallback to all buildings if no matches
+          }),
         }
       );
 
@@ -354,6 +412,7 @@ const Evolucion = () => {
         const result = await response.json();
         if (result.data) {
           setBuildingsTrend(result.data);
+          setBuildingsTrendStats(result.stats || null);
         }
       }
     } catch (error) {
@@ -406,12 +465,24 @@ const Evolucion = () => {
     }
   }, [comparisonData, selectedBuilding]);
 
-  // Load comparison data
-  const loadComparisonData = useCallback(async () => {
+  // Load comparison data with profile-based filtering
+  const loadComparisonData = useCallback(async (buildingName?: string) => {
     setIsLoadingComparison(true);
-    await Promise.all([fetchInflationData(), fetchBuildingsTrend()]);
+    
+    // Fetch building profile first if a building is selected
+    let profile: BuildingProfile | null = null;
+    if (buildingName && buildingName !== "all") {
+      profile = await fetchBuildingProfile(buildingName);
+    }
+    
+    // Fetch inflation and buildings trend (with profile filters if available)
+    await Promise.all([
+      fetchInflationData(), 
+      fetchBuildingsTrend(profile)
+    ]);
+    
     setIsLoadingComparison(false);
-  }, [fetchInflationData, fetchBuildingsTrend]);
+  }, [fetchInflationData, fetchBuildingsTrend, fetchBuildingProfile]);
 
   useEffect(() => {
     const fetchAnalyses = async () => {
@@ -448,12 +519,12 @@ const Evolucion = () => {
     fetchAnalyses();
   }, [navigate, searchParams]);
 
-  // Load comparison data when analyses are loaded
+  // Load comparison data when analyses are loaded or building changes
   useEffect(() => {
     if (analyses.length > 0) {
-      loadComparisonData();
+      loadComparisonData(selectedBuilding);
     }
-  }, [analyses.length, loadComparisonData]);
+  }, [analyses.length, selectedBuilding, loadComparisonData]);
 
   // Calculate deviation when comparison data changes - automatically, without needing AI analysis
   useEffect(() => {
@@ -683,6 +754,7 @@ const Evolucion = () => {
                     deviation={deviation || undefined}
                     analysis={aiAnalysis}
                     isLoadingAnalysis={isLoadingAnalysis}
+                    buildingsTrendStats={buildingsTrendStats}
                   />
                   
                   {/* AI Analysis Button */}

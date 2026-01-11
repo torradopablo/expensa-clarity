@@ -24,10 +24,12 @@ serve(async (req) => {
       zone?: string;
       has_amenities?: boolean;
     } | null = null;
+    let fallbackIfEmpty = false;
 
     try {
       const body = await req.json();
       filters = body.filters || null;
+      fallbackIfEmpty = body.fallbackIfEmpty === true;
     } catch {
       // No body or invalid JSON, proceed without filters
     }
@@ -50,8 +52,12 @@ serve(async (req) => {
 
     // If filters are provided, fetch building profiles and filter analyses
     let filteredAnalyses = allAnalyses || [];
+    let usedFallback = false;
+    let filtersApplied = false;
 
     if (filters && Object.keys(filters).length > 0) {
+      filtersApplied = true;
+      
       // Get all building profiles that match the filters
       let profilesQuery = supabase.from("building_profiles").select("id, building_name");
 
@@ -79,12 +85,31 @@ serve(async (req) => {
 
       // Filter analyses to only include those with matching building profiles
       if (matchingBuildingNames.size > 0) {
-        filteredAnalyses = filteredAnalyses.filter(analysis => {
+        const filteredByProfile = filteredAnalyses.filter(analysis => {
           const normalizedName = analysis.building_name?.toLowerCase().trim();
           return normalizedName && matchingBuildingNames.has(normalizedName);
         });
+        
+        // Check if we have enough data after filtering (at least 2 buildings with 2+ periods)
+        const buildingsInFiltered = new Set(filteredByProfile.map(a => a.building_name)).size;
+        const periodsInFiltered = new Set(filteredByProfile.map(a => a.period)).size;
+        
+        if (buildingsInFiltered >= 2 && periodsInFiltered >= 2) {
+          filteredAnalyses = filteredByProfile;
+        } else if (fallbackIfEmpty) {
+          // Not enough data with filters, use all analyses as fallback
+          usedFallback = true;
+          console.log(`Fallback to all buildings: only ${buildingsInFiltered} buildings and ${periodsInFiltered} periods matched filters`);
+        } else {
+          // Return empty if no fallback requested
+          filteredAnalyses = filteredByProfile;
+        }
+      } else if (fallbackIfEmpty) {
+        // No matching profiles found, use fallback
+        usedFallback = true;
+        console.log("Fallback to all buildings: no matching profiles found");
       } else {
-        // No matching profiles found, return empty data
+        // No matching profiles and no fallback, return empty
         filteredAnalyses = [];
       }
     }
@@ -150,7 +175,8 @@ serve(async (req) => {
           totalBuildings,
           totalAnalyses,
           periodsCount: trendData.length,
-          filtersApplied: filters ? Object.keys(filters).length > 0 : false
+          filtersApplied,
+          usedFallback
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
