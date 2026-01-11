@@ -211,6 +211,107 @@ export const generateAnalysisPdf = (analysis: Analysis, categories: Category[]) 
     yPos += 38;
   }
 
+  // Bar chart comparing categories
+  const categoriesWithPrevious = categories.filter(c => c.previous_amount !== null);
+  if (categoriesWithPrevious.length > 0) {
+    // Check if we need a new page for the chart
+    if (yPos > 180) {
+      doc.addPage();
+      yPos = 20;
+    }
+
+    doc.setTextColor(...textColor);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("Comparación visual por categoría", margin, yPos);
+    yPos += 10;
+
+    const chartWidth = pageWidth - (margin * 2);
+    const chartHeight = 60;
+    const maxCategories = Math.min(categoriesWithPrevious.length, 6); // Show max 6 categories
+    const topCategories = [...categoriesWithPrevious]
+      .sort((a, b) => b.current_amount - a.current_amount)
+      .slice(0, maxCategories);
+
+    // Find max value for scaling
+    const maxValue = Math.max(
+      ...topCategories.map(c => Math.max(c.current_amount, c.previous_amount || 0))
+    );
+
+    const barGroupWidth = chartWidth / maxCategories;
+    const barWidth = (barGroupWidth - 10) / 2;
+    const chartStartX = margin;
+    const chartStartY = yPos + chartHeight;
+
+    // Draw chart background
+    doc.setFillColor(248, 250, 252);
+    doc.roundedRect(margin - 5, yPos - 5, chartWidth + 10, chartHeight + 35, 3, 3, 'F');
+
+    // Draw bars for each category
+    topCategories.forEach((cat, index) => {
+      const groupX = chartStartX + (index * barGroupWidth) + 5;
+      
+      // Previous month bar (lighter color)
+      const prevHeight = ((cat.previous_amount || 0) / maxValue) * chartHeight;
+      doc.setFillColor(180, 200, 220); // Light blue-gray
+      doc.rect(groupX, chartStartY - prevHeight, barWidth, prevHeight, 'F');
+      
+      // Current month bar
+      const currHeight = (cat.current_amount / maxValue) * chartHeight;
+      const isAttention = cat.status === "attention";
+      if (isAttention) {
+        doc.setFillColor(...warningColor);
+      } else {
+        doc.setFillColor(...primaryColor);
+      }
+      doc.rect(groupX + barWidth + 2, chartStartY - currHeight, barWidth, currHeight, 'F');
+      
+      // Category label (truncated)
+      doc.setTextColor(...textColor);
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "normal");
+      const label = cat.name.length > 10 ? cat.name.substring(0, 9) + "…" : cat.name;
+      doc.text(label, groupX + barWidth, chartStartY + 8, { align: "center" });
+      
+      // Change percentage
+      const change = calculateChange(cat.current_amount, cat.previous_amount);
+      if (change !== null) {
+        doc.setFontSize(5);
+        doc.setTextColor(...(change > 10 ? warningColor : change > 0 ? mutedColor : successColor));
+        doc.text(
+          `${change > 0 ? "+" : ""}${change.toFixed(0)}%`,
+          groupX + barWidth,
+          chartStartY + 13,
+          { align: "center" }
+        );
+      }
+    });
+
+    // Legend
+    const legendY = chartStartY + 18;
+    doc.setFontSize(7);
+    
+    // Previous month legend
+    doc.setFillColor(180, 200, 220);
+    doc.rect(margin, legendY, 8, 4, 'F');
+    doc.setTextColor(...mutedColor);
+    doc.text("Mes anterior", margin + 10, legendY + 3);
+    
+    // Current month legend
+    doc.setFillColor(...primaryColor);
+    doc.rect(margin + 45, legendY, 8, 4, 'F');
+    doc.setTextColor(...textColor);
+    doc.text("Mes actual", margin + 55, legendY + 3);
+    
+    // Attention legend
+    doc.setFillColor(...warningColor);
+    doc.rect(margin + 85, legendY, 8, 4, 'F');
+    doc.setTextColor(...warningColor);
+    doc.text("A revisar", margin + 95, legendY + 3);
+
+    yPos = legendY + 15;
+  }
+
   // Categories table
   doc.setTextColor(...textColor);
   doc.setFontSize(14);
