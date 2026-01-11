@@ -107,6 +107,7 @@ interface Analysis {
   previous_total: number | null;
   status: string;
   created_at: string;
+  file_url: string | null;
 }
 
 // Month names in Spanish
@@ -156,7 +157,25 @@ const Historial = () => {
     
     setIsDeleting(true);
     try {
-      // First delete related categories
+      // First delete the file from storage if it exists
+      if (analysisToDelete.file_url) {
+        // Extract file path from the URL
+        // URL format: https://xxx.supabase.co/storage/v1/object/public/expense-files/user_id/filename
+        const urlParts = analysisToDelete.file_url.split('/expense-files/');
+        if (urlParts.length > 1) {
+          const filePath = urlParts[1];
+          const { error: storageError } = await supabase.storage
+            .from('expense-files')
+            .remove([filePath]);
+          
+          if (storageError) {
+            console.error("Error deleting file from storage:", storageError);
+            // Continue with deletion even if file removal fails
+          }
+        }
+      }
+
+      // Delete related categories
       const { error: categoriesError } = await supabase
         .from("expense_categories")
         .delete()
