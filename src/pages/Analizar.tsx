@@ -252,104 +252,109 @@ const PaymentStep = ({
   onNext: () => void;
   isProcessing: boolean;
   isDevMode?: boolean;
-}) => (
-  <div className="max-w-lg mx-auto animate-fade-in-up">
-    <Card variant="elevated">
-      <CardHeader className="text-center">
-        <CardTitle className="text-2xl">
-          {isDevMode ? "Modo desarrollo" : "Confirmar pago"}
-        </CardTitle>
-        <CardDescription>
-          {isDevMode 
-            ? "El pago está deshabilitado en modo desarrollo"
-            : "Pago único y seguro con Mercado Pago"
-          }
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {isDevMode && (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-500 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium text-amber-500">Modo desarrollo activo</p>
-              <p className="text-xs text-muted-foreground">
-                Variable VITE_SKIP_PAYMENT=true detectada. El pago se omitirá.
-              </p>
+}) => {
+  // isDevMode is true for both dev mode AND free trial users
+  const isFreeMode = isDevMode;
+  
+  return (
+    <div className="max-w-lg mx-auto animate-fade-in-up">
+      <Card variant="elevated">
+        <CardHeader className="text-center">
+          <CardTitle className="text-2xl">
+            {isFreeMode ? "Análisis gratuito" : "Confirmar pago"}
+          </CardTitle>
+          <CardDescription>
+            {isFreeMode 
+              ? "Tu análisis es gratis"
+              : "Pago único y seguro con Mercado Pago"
+            }
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {isFreeMode && (
+            <div className="bg-status-ok-bg border border-status-ok/30 rounded-xl p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-status-ok mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-status-ok">Análisis gratuito</p>
+                <p className="text-xs text-muted-foreground">
+                  Tenés acceso a análisis sin costo.
+                </p>
+              </div>
             </div>
-          </div>
-        )}
+          )}
 
-        <div className="bg-muted/50 rounded-xl p-6 space-y-4">
-          <div className="flex justify-between items-center">
-            <span className="text-muted-foreground">Análisis de expensa</span>
-            <span className={`font-medium ${isDevMode ? "line-through text-muted-foreground" : ""}`}>
-              $500 ARS
-            </span>
-          </div>
-          <div className="border-t border-border pt-4">
+          <div className="bg-muted/50 rounded-xl p-6 space-y-4">
             <div className="flex justify-between items-center">
-              <span className="font-semibold">Total</span>
-              <span className={`text-2xl font-bold ${isDevMode ? "text-status-ok" : "text-primary"}`}>
-                {isDevMode ? "GRATIS" : "$500 ARS"}
+              <span className="text-muted-foreground">Análisis de expensa</span>
+              <span className={`font-medium ${isFreeMode ? "line-through text-muted-foreground" : ""}`}>
+                $500 ARS
               </span>
             </div>
-          </div>
-        </div>
-
-        {!isDevMode && (
-          <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
-            <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
-              <p className="text-xs text-muted-foreground">
-                Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
-              </p>
+            <div className="border-t border-border pt-4">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold">Total</span>
+                <span className={`text-2xl font-bold ${isFreeMode ? "text-status-ok" : "text-primary"}`}>
+                  {isFreeMode ? "GRATIS" : "$500 ARS"}
+                </span>
+              </div>
             </div>
           </div>
-        )}
 
-        <ul className="space-y-3">
-          {[
-            "Extracción automática de datos con IA",
-            "Detección de aumentos inusuales",
-            "Explicaciones claras en español",
-            "Reporte descargable en PDF"
-          ].map((item, index) => (
-            <li key={index} className="flex items-center gap-2 text-sm">
-              <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-              <span>{item}</span>
-            </li>
-          ))}
-        </ul>
-        
-        <div className="flex justify-between items-center pt-4">
-          <Button variant="ghost" onClick={onBack} disabled={isProcessing}>
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Volver
-          </Button>
-          <Button 
-            variant="hero" 
-            size="lg"
-            onClick={onNext}
-            disabled={isProcessing}
-          >
-            {isProcessing ? (
-              <>
-                <Loader2 className="w-4 h-4 animate-spin" />
-                {isDevMode ? "Procesando..." : "Conectando..."}
-              </>
-            ) : (
-              <>
-                {isDevMode ? "Continuar sin pago" : "Pagar con Mercado Pago"}
-                <ArrowRight className="w-4 h-4" />
-              </>
-            )}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  </div>
-);
+          {!isFreeMode && (
+            <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
+              <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
+                <p className="text-xs text-muted-foreground">
+                  Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <ul className="space-y-3">
+            {[
+              "Extracción automática de datos con IA",
+              "Detección de aumentos inusuales",
+              "Explicaciones claras en español",
+              "Reporte descargable en PDF"
+            ].map((item, index) => (
+              <li key={index} className="flex items-center gap-2 text-sm">
+                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
+                <span>{item}</span>
+              </li>
+            ))}
+          </ul>
+          
+          <div className="flex justify-between items-center pt-4">
+            <Button variant="ghost" onClick={onBack} disabled={isProcessing}>
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Volver
+            </Button>
+            <Button 
+              variant="hero" 
+              size="lg"
+              onClick={onNext}
+              disabled={isProcessing}
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Procesando...
+                </>
+              ) : (
+                <>
+                  {isFreeMode ? "Continuar" : "Pagar con Mercado Pago"}
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
 
 const ProcessingStep = () => (
   <div className="max-w-lg mx-auto text-center animate-fade-in-up">
@@ -474,6 +479,7 @@ const Analizar = () => {
   const [analysisId, setAnalysisId] = useState<string | null>(null);
   const [user, setUser] = useState<any>(null);
   const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+  const [isFreeUser, setIsFreeUser] = useState(false);
 
   // Check for payment callback
   useEffect(() => {
@@ -494,20 +500,45 @@ const Analizar = () => {
 
   useEffect(() => {
     // Check auth state
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       if (!session) {
         navigate("/auth");
         return;
       }
       setUser(session.user);
-    });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      // Check if user has free_analysis flag
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("free_analysis")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (profile?.free_analysis) {
+        setIsFreeUser(true);
+      }
+    };
+
+    checkAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (!session) {
         navigate("/auth");
         return;
       }
       setUser(session.user);
+
+      // Check if user has free_analysis flag
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("free_analysis")
+        .eq("user_id", session.user.id)
+        .single();
+
+      if (profile?.free_analysis) {
+        setIsFreeUser(true);
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -564,16 +595,17 @@ const Analizar = () => {
     }
   };
 
-  // Check if payments are disabled for development
+  // Check if payments are disabled for development or user has free analysis
   const isDevMode = import.meta.env.VITE_SKIP_PAYMENT === "true";
+  const skipPayment = isDevMode || isFreeUser;
 
   const handlePaymentOrSkip = async () => {
-    if (isDevMode) {
+    if (skipPayment) {
       // Skip payment and process directly
       setIsProcessing(true);
       setShowPaymentSuccess(true);
       setCurrentStep(3);
-      toast.info("Modo desarrollo: pago omitido");
+      toast.info(isFreeUser ? "Usuario de prueba: análisis gratuito" : "Modo desarrollo: pago omitido");
     } else {
       await handlePayment();
     }
@@ -646,7 +678,7 @@ const Analizar = () => {
               onBack={() => setCurrentStep(1)}
               onNext={handlePaymentOrSkip}
               isProcessing={isProcessing}
-              isDevMode={isDevMode}
+              isDevMode={skipPayment}
             />
           )}
           
