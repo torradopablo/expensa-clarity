@@ -4,6 +4,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { 
   CheckCircle2, 
   ArrowLeft,
@@ -202,55 +208,67 @@ const AnalysisPage = () => {
   const attentionItems = categories.filter(c => c.status === "attention").length;
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
-      <Header />
-      <main className="pt-24 pb-20">
-        <div className="container max-w-4xl">
-          <div className="flex items-center justify-between mb-8">
-            <Button variant="ghost" asChild>
-              <Link to="/">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver al inicio
-              </Link>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => generateAnalysisPdf(analysis, categories)}
-            >
-              <Download className="w-4 h-4 mr-2" />
-              Descargar PDF
-            </Button>
-          </div>
+    <TooltipProvider delayDuration={200}>
+      <div className="min-h-screen bg-gradient-soft">
+        <Header />
+        <main className="pt-24 pb-20">
+          <div className="container max-w-4xl">
+            <div className="flex items-center justify-between mb-8">
+              <Button variant="ghost" asChild>
+                <Link to="/">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  Volver al inicio
+                </Link>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => generateAnalysisPdf(analysis, categories)}
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Descargar PDF
+              </Button>
+            </div>
 
-          {/* Summary Card */}
-          <Card variant="glass" className="mb-8 animate-fade-in-up">
-            <CardContent className="p-6 md:p-8">
-              <div className="grid md:grid-cols-3 gap-6">
-                <div className="md:col-span-2 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="text-sm text-muted-foreground">
-                        {analysis.building_name || "Edificio"}
-                      </p>
-                      <h1 className="text-2xl md:text-3xl font-bold">{analysis.period}</h1>
-                      {analysis.unit && (
-                        <p className="text-muted-foreground">{analysis.unit}</p>
-                      )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
-                        {analysis.scanned_at && (
-                          <span>📄 Escaneado: {formatShortDate(analysis.scanned_at)}</span>
+            {/* Summary Card */}
+            <Card variant="glass" className="mb-8 animate-fade-in-up">
+              <CardContent className="p-6 md:p-8">
+                <div className="grid md:grid-cols-3 gap-6">
+                  <div className="md:col-span-2 space-y-4">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-muted-foreground">
+                          {analysis.building_name || "Edificio"}
+                        </p>
+                        <h1 className="text-2xl md:text-3xl font-bold">{analysis.period}</h1>
+                        {analysis.unit && (
+                          <p className="text-muted-foreground">{analysis.unit}</p>
                         )}
-                        <span>📅 Procesado: {formatShortDate(analysis.created_at)}</span>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
+                          {analysis.scanned_at && (
+                            <span>📄 Escaneado: {formatShortDate(analysis.scanned_at)}</span>
+                          )}
+                          <span>📅 Procesado: {formatShortDate(analysis.created_at)}</span>
+                        </div>
                       </div>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Badge variant={attentionItems > 0 ? "attention" : "ok"} className="text-sm px-3 py-1 cursor-help transition-transform hover:scale-105">
+                            {attentionItems > 0 ? (
+                              <><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />{attentionItems} puntos a revisar</>
+                            ) : (
+                              <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Todo en orden</>
+                            )}
+                          </Badge>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" className="max-w-xs">
+                          {attentionItems > 0 ? (
+                            <p>Hay {attentionItems} categorías con aumentos mayores al promedio que vale la pena revisar.</p>
+                          ) : (
+                            <p>Todas las categorías tienen variaciones dentro de lo esperado.</p>
+                          )}
+                        </TooltipContent>
+                      </Tooltip>
                     </div>
-                    <Badge variant={attentionItems > 0 ? "attention" : "ok"} className="text-sm px-3 py-1">
-                      {attentionItems > 0 ? (
-                        <><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />{attentionItems} puntos a revisar</>
-                      ) : (
-                        <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Todo en orden</>
-                      )}
-                    </Badge>
-                  </div>
                   <p className="text-muted-foreground text-sm max-w-lg">
                     {attentionItems > 0
                       ? "Tu expensa de este mes tiene algunos aumentos que merecen atención. A continuación te explicamos cada uno en detalle."
@@ -309,9 +327,23 @@ const AnalysisPage = () => {
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h3 className="font-semibold">{category.name}</h3>
-                                  <Badge variant={category.status as any}>
-                                    {category.status === "ok" ? "OK" : "Revisar"}
-                                  </Badge>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Badge 
+                                        variant={category.status as any}
+                                        className="cursor-help transition-transform hover:scale-105"
+                                      >
+                                        {category.status === "ok" ? "OK" : "Revisar"}
+                                      </Badge>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top" className="max-w-xs">
+                                      {category.status === "ok" ? (
+                                        <p>✅ Este gasto está dentro de los parámetros normales.</p>
+                                      ) : (
+                                        <p>⚠️ Este gasto tuvo un aumento significativo. Te recomendamos verificarlo con la administración.</p>
+                                      )}
+                                    </TooltipContent>
+                                  </Tooltip>
                                 </div>
                                 <p className="text-sm text-muted-foreground">
                                   {category.explanation || "Sin observaciones"}
@@ -397,6 +429,7 @@ const AnalysisPage = () => {
         </div>
       </main>
     </div>
+  </TooltipProvider>
   );
 };
 
