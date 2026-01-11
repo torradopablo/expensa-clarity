@@ -13,7 +13,10 @@ import {
   Users,
   LineChart,
   Menu,
-  X
+  X,
+  Home,
+  Briefcase,
+  Building2
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
@@ -318,6 +321,92 @@ const BenefitsSection = () => {
   );
 };
 
+const UseCasesSection = () => {
+  const useCases = [
+    {
+      icon: Home,
+      role: "Propietario",
+      title: "Entendé si pagás lo justo",
+      scenarios: [
+        "Recibiste un aumento y querés saber si es razonable",
+        "Querés comparar con otros edificios de la zona",
+        "Necesitás datos para cuestionar un gasto en asamblea",
+        "Querés llevar un control histórico de tus expensas"
+      ]
+    },
+    {
+      icon: Briefcase,
+      role: "Administrador",
+      title: "Informes claros para el consorcio",
+      scenarios: [
+        "Presentar informes profesionales en reuniones",
+        "Justificar aumentos con datos de mercado e inflación",
+        "Mostrar la evolución histórica de los gastos",
+        "Anticipar preguntas de propietarios con información respaldada"
+      ]
+    },
+    {
+      icon: Building2,
+      role: "Consorcista activo",
+      title: "Participá con información",
+      scenarios: [
+        "Llevar datos concretos a las asambleas",
+        "Comparar gestiones de diferentes administradores",
+        "Detectar gastos inusuales antes que otros",
+        "Proponer mejoras basadas en evidencia"
+      ]
+    }
+  ];
+
+  return (
+    <section id="casos-de-uso" className="py-20">
+      <div className="container">
+        <div className="text-center space-y-4 mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold">¿Para quién es ExpensaCheck?</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto">
+            Distintos perfiles, un mismo objetivo: claridad sobre los gastos del edificio.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-3 gap-6">
+          {useCases.map((useCase, index) => (
+            <div 
+              key={index}
+              className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-sm hover:shadow-soft-md transition-all animate-fade-in-up border border-border/50"
+              style={{ animationDelay: `${index * 0.1}s` }}
+            >
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
+                  <useCase.icon className="w-6 h-6 text-primary" />
+                </div>
+                <div>
+                  <span className="text-xs font-medium text-primary uppercase tracking-wide">{useCase.role}</span>
+                  <h3 className="text-lg font-semibold">{useCase.title}</h3>
+                </div>
+              </div>
+              <ul className="space-y-3">
+                {useCase.scenarios.map((scenario, idx) => (
+                  <li key={idx} className="flex items-start gap-2">
+                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
+                    <span className="text-sm text-muted-foreground">{scenario}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div className="text-center mt-10">
+          <Button asChild variant="outline" size="lg">
+            <Link to="/analizar">
+              Probá con tu expensa
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </Link>
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+};
+
 const PricingSection = () => (
   <section id="precios" className="py-20">
     <div className="container">
@@ -407,6 +496,7 @@ const Index = () => {
         <HeroSection />
         <HowItWorksSection />
         <BenefitsSection />
+        <UseCasesSection />
         <PricingSection />
       </main>
       <Footer />
