@@ -22,6 +22,14 @@ interface TrendDataPoint {
   buildingsPercent: number | null;
 }
 
+interface BuildingsTrendStats {
+  totalBuildings: number;
+  totalAnalyses: number;
+  periodsCount: number;
+  filtersApplied: boolean;
+  usedFallback?: boolean;
+}
+
 interface EvolutionComparisonChartProps {
   data: TrendDataPoint[];
   buildingName: string;
@@ -32,6 +40,7 @@ interface EvolutionComparisonChartProps {
   };
   analysis?: string | null;
   isLoadingAnalysis?: boolean;
+  buildingsTrendStats?: BuildingsTrendStats | null;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -62,7 +71,8 @@ export const EvolutionComparisonChart = ({
   buildingName, 
   deviation, 
   analysis, 
-  isLoadingAnalysis 
+  isLoadingAnalysis,
+  buildingsTrendStats
 }: EvolutionComparisonChartProps) => {
   const hasInflationData = data.some(d => d.inflationPercent !== null);
   const hasBuildingsData = data.some(d => d.buildingsPercent !== null);
@@ -97,6 +107,29 @@ export const EvolutionComparisonChart = ({
             <CardDescription>
               Comparación normalizada desde el primer período
             </CardDescription>
+            {buildingsTrendStats && hasBuildingsData && (
+              <div className="flex items-center gap-2 mt-2">
+                <Badge 
+                  variant="outline" 
+                  className={`text-xs ${
+                    buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback 
+                      ? "border-primary/50 text-primary bg-primary/10" 
+                      : "border-muted-foreground/30"
+                  }`}
+                >
+                  <Info className="w-3 h-3 mr-1" />
+                  {buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback 
+                    ? `Comparando con ${buildingsTrendStats.totalBuildings} edificios similares`
+                    : `Comparando con ${buildingsTrendStats.totalBuildings} edificios totales`
+                  }
+                </Badge>
+                {buildingsTrendStats.usedFallback && buildingsTrendStats.filtersApplied && (
+                  <span className="text-xs text-muted-foreground">
+                    (sin suficientes datos similares)
+                  </span>
+                )}
+              </div>
+            )}
           </div>
           {alertLevel ? (
             <Badge 
