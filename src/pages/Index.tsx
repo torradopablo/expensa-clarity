@@ -277,15 +277,15 @@ const Footer = () => (
           © 2024 ExpensaCheck. Claridad y tranquilidad para tus expensas.
         </p>
         <div className="flex items-center gap-6">
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/terminos" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Términos
-          </a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link to="/privacidad" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Privacidad
-          </a>
-          <a href="#" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          </Link>
+          <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Contacto
-          </a>
+          </Link>
         </div>
       </div>
     </div>
