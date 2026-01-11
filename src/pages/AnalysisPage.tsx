@@ -42,7 +42,7 @@ import { TrendChart } from "@/components/TrendChart";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
-import { BuildingProfileForm } from "@/components/BuildingProfileForm";
+
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -488,15 +488,6 @@ Analizá tu expensa en ExpensaCheck`;
             </div>
           )}
 
-          {/* Building Profile Form */}
-          {analysis.building_name && (
-            <div className="mb-8">
-              <BuildingProfileForm 
-                buildingName={analysis.building_name}
-                onSave={() => toast.success("Perfil guardado. Ahora las comparaciones serán más precisas.")}
-              />
-            </div>
-          )}
 
           {/* Analysis Notes */}
           <div className="mb-8">
