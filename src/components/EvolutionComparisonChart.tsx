@@ -68,16 +68,24 @@ export const EvolutionComparisonChart = ({
   const hasBuildingsData = data.some(d => d.buildingsPercent !== null);
   const hasEstimatedData = data.some(d => d.inflationEstimated);
 
+  // Alert only when user's expenses are ABOVE benchmarks (bad)
   const alertLevel = useMemo(() => {
     if (!deviation) return null;
-    const maxDeviation = Math.max(
-      Math.abs(deviation.fromInflation),
-      Math.abs(deviation.fromBuildings)
+    // Only alert when expenses are growing FASTER than benchmarks
+    const maxPositiveDeviation = Math.max(
+      deviation.fromInflation,
+      deviation.fromBuildings
     );
-    if (maxDeviation > 15) return "critical";
-    if (maxDeviation > 10) return "high";
-    if (maxDeviation > 5) return "medium";
+    if (maxPositiveDeviation > 15) return "critical";
+    if (maxPositiveDeviation > 10) return "high";
+    if (maxPositiveDeviation > 5) return "medium";
     return null;
+  }, [deviation]);
+
+  // Check if user is doing well (at or below benchmarks)
+  const isPerformingWell = useMemo(() => {
+    if (!deviation) return false;
+    return deviation.fromInflation <= 0 && deviation.fromBuildings <= 0;
   }, [deviation]);
 
   return (
@@ -90,16 +98,24 @@ export const EvolutionComparisonChart = ({
               Comparación normalizada desde el primer período
             </CardDescription>
           </div>
-          {alertLevel && (
+          {alertLevel ? (
             <Badge 
-              variant={alertLevel === "critical" ? "destructive" : alertLevel === "high" ? "destructive" : "secondary"}
+              variant="destructive"
               className="flex items-center gap-1"
             >
               <AlertTriangle className="w-3 h-3" />
               {alertLevel === "critical" ? "Desvío crítico" : 
                alertLevel === "high" ? "Desvío alto" : "Desvío moderado"}
             </Badge>
-          )}
+          ) : isPerformingWell ? (
+            <Badge 
+              variant="secondary"
+              className="flex items-center gap-1 bg-status-ok-bg text-status-ok border-status-ok/30"
+            >
+              <TrendingDown className="w-3 h-3" />
+              Dentro de parámetros
+            </Badge>
+          ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -185,14 +201,17 @@ export const EvolutionComparisonChart = ({
         {/* Deviation indicators */}
         {deviation && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+            {/* vs Inflation card */}
             <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              Math.abs(deviation.fromInflation) > 5 
-                ? "bg-status-attention-bg" 
-                : "bg-muted"
+              deviation.fromInflation > 5 
+                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+                : deviation.fromInflation <= 0
+                  ? "bg-status-ok-bg border border-status-ok/30"
+                  : "bg-muted"
             }`}>
               {deviation.fromInflation > 5 ? (
-                <TrendingUp className="w-5 h-5 text-status-attention" />
-              ) : deviation.fromInflation < -5 ? (
+                <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
+              ) : deviation.fromInflation <= 0 ? (
                 <TrendingDown className="w-5 h-5 text-status-ok" />
               ) : (
                 <div className="w-5 h-5 rounded-full bg-muted-foreground/20" />
@@ -200,21 +219,25 @@ export const EvolutionComparisonChart = ({
               <div>
                 <p className="text-xs text-muted-foreground">vs Inflación</p>
                 <p className={`font-semibold ${
-                  deviation.fromInflation > 5 ? "text-status-attention" :
-                  deviation.fromInflation < -5 ? "text-status-ok" : ""
+                  deviation.fromInflation > 5 ? "text-red-600 dark:text-red-400" :
+                  deviation.fromInflation <= 0 ? "text-status-ok" : ""
                 }`}>
                   {deviation.fromInflation > 0 ? "+" : ""}{deviation.fromInflation.toFixed(1)} pp
+                  {deviation.fromInflation <= 0 && " ✓"}
                 </p>
               </div>
             </div>
+            {/* vs Other buildings card */}
             <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              Math.abs(deviation.fromBuildings) > 5 
-                ? "bg-status-attention-bg" 
-                : "bg-muted"
+              deviation.fromBuildings > 5 
+                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+                : deviation.fromBuildings <= 0
+                  ? "bg-status-ok-bg border border-status-ok/30"
+                  : "bg-muted"
             }`}>
               {deviation.fromBuildings > 5 ? (
-                <TrendingUp className="w-5 h-5 text-status-attention" />
-              ) : deviation.fromBuildings < -5 ? (
+                <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
+              ) : deviation.fromBuildings <= 0 ? (
                 <TrendingDown className="w-5 h-5 text-status-ok" />
               ) : (
                 <div className="w-5 h-5 rounded-full bg-muted-foreground/20" />
@@ -222,10 +245,11 @@ export const EvolutionComparisonChart = ({
               <div>
                 <p className="text-xs text-muted-foreground">vs Otros edificios</p>
                 <p className={`font-semibold ${
-                  deviation.fromBuildings > 5 ? "text-status-attention" :
-                  deviation.fromBuildings < -5 ? "text-status-ok" : ""
+                  deviation.fromBuildings > 5 ? "text-red-600 dark:text-red-400" :
+                  deviation.fromBuildings <= 0 ? "text-status-ok" : ""
                 }`}>
                   {deviation.fromBuildings > 0 ? "+" : ""}{deviation.fromBuildings.toFixed(1)} pp
+                  {deviation.fromBuildings <= 0 && " ✓"}
                 </p>
               </div>
             </div>
