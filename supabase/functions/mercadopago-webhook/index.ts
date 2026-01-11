@@ -6,6 +6,96 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Verify MercadoPago webhook signature
+async function verifyWebhookSignature(
+  req: Request,
+  body: string
+): Promise<boolean> {
+  const WEBHOOK_SECRET = Deno.env.get("MERCADOPAGO_WEBHOOK_SECRET");
+  
+  // If no secret is configured, log warning but allow (for backwards compatibility during setup)
+  if (!WEBHOOK_SECRET) {
+    console.warn("MERCADOPAGO_WEBHOOK_SECRET not configured - signature verification skipped");
+    return true;
+  }
+
+  const xSignature = req.headers.get("x-signature");
+  const xRequestId = req.headers.get("x-request-id");
+
+  if (!xSignature || !xRequestId) {
+    console.error("Missing signature headers", { xSignature: !!xSignature, xRequestId: !!xRequestId });
+    return false;
+  }
+
+  // Parse the x-signature header (format: ts=TIMESTAMP,v1=HASH)
+  const signatureParts = xSignature.split(",");
+  const tsMatch = signatureParts.find(p => p.startsWith("ts="));
+  const v1Match = signatureParts.find(p => p.startsWith("v1="));
+
+  if (!tsMatch || !v1Match) {
+    console.error("Invalid signature format");
+    return false;
+  }
+
+  const ts = tsMatch.replace("ts=", "");
+  const receivedHash = v1Match.replace("v1=", "");
+
+  // Check timestamp to prevent replay attacks (allow 5 minutes tolerance)
+  const timestamp = parseInt(ts, 10);
+  const now = Math.floor(Date.now() / 1000);
+  if (Math.abs(now - timestamp) > 300) {
+    console.error("Webhook timestamp too old or in future", { timestamp, now });
+    return false;
+  }
+
+  // Get data.id from URL params for signature
+  const url = new URL(req.url);
+  const dataId = url.searchParams.get("data.id") || url.searchParams.get("id") || "";
+
+  // Build the manifest string as per MercadoPago docs
+  // manifest = id:{data.id};request-id:{x-request-id};ts:{ts};
+  const manifest = `id:${dataId};request-id:${xRequestId};ts:${ts};`;
+
+  // Create HMAC-SHA256 hash
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(WEBHOOK_SECRET),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+
+  const signature = await crypto.subtle.sign("HMAC", key, encoder.encode(manifest));
+  const computedHash = Array.from(new Uint8Array(signature))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("");
+
+  const isValid = computedHash === receivedHash;
+  if (!isValid) {
+    console.error("Webhook signature mismatch", { manifest, receivedHash, computedHash });
+  }
+
+  return isValid;
+}
+
+// Track processed webhook IDs to prevent replay attacks (in-memory, resets on function restart)
+const processedWebhooks = new Set<string>();
+const MAX_PROCESSED_WEBHOOKS = 10000;
+
+function isWebhookProcessed(id: string): boolean {
+  return processedWebhooks.has(id);
+}
+
+function markWebhookProcessed(id: string): void {
+  if (processedWebhooks.size >= MAX_PROCESSED_WEBHOOKS) {
+    // Clear oldest entries (simple approach - clear half)
+    const entries = Array.from(processedWebhooks);
+    entries.slice(0, MAX_PROCESSED_WEBHOOKS / 2).forEach(e => processedWebhooks.delete(e));
+  }
+  processedWebhooks.add(id);
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
@@ -13,16 +103,37 @@ serve(async (req) => {
   }
 
   try {
+    // Read body for signature verification
+    const bodyText = await req.text();
+    
+    // Log webhook attempt for security monitoring
+    console.log("Webhook attempt:", {
+      method: req.method,
+      hasXSignature: !!req.headers.get("x-signature"),
+      hasXRequestId: !!req.headers.get("x-request-id"),
+      url: req.url,
+    });
+
+    // Verify webhook signature
+    const isValidSignature = await verifyWebhookSignature(req, bodyText);
+    if (!isValidSignature) {
+      console.error("Invalid webhook signature - rejecting request");
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Mercado Pago sends notifications as query params for IPN
     const url = new URL(req.url);
     const topic = url.searchParams.get("topic") || url.searchParams.get("type");
     const id = url.searchParams.get("id") || url.searchParams.get("data.id");
 
-    // Also check body for webhook notifications
+    // Parse body for webhook notifications
     let body: any = {};
-    if (req.method === "POST") {
+    if (req.method === "POST" && bodyText) {
       try {
-        body = await req.json();
+        body = JSON.parse(bodyText);
       } catch {
         // Body might be empty for some webhook types
       }
@@ -37,6 +148,16 @@ serve(async (req) => {
     if (!notificationType || !resourceId) {
       return new Response(
         JSON.stringify({ message: "Notification received but no action needed" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check for duplicate/replay attacks
+    const webhookKey = `${notificationType}:${resourceId}`;
+    if (isWebhookProcessed(webhookKey)) {
+      console.log("Duplicate webhook detected, skipping:", webhookKey);
+      return new Response(
+        JSON.stringify({ message: "Already processed" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -89,9 +210,20 @@ serve(async (req) => {
 
       if (!analysisId) {
         console.log("No external_reference found in payment");
+        markWebhookProcessed(webhookKey);
         return new Response(
           JSON.stringify({ message: "No analysis ID found" }),
           { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate analysisId format (should be a UUID)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (!uuidRegex.test(analysisId)) {
+        console.error("Invalid analysisId format:", analysisId);
+        return new Response(
+          JSON.stringify({ error: "Invalid analysis ID format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -131,6 +263,7 @@ serve(async (req) => {
       }
 
       console.log(`Analysis ${analysisId} updated to status: ${newStatus}`);
+      markWebhookProcessed(webhookKey);
 
       return new Response(
         JSON.stringify({ success: true, status: newStatus }),
@@ -153,18 +286,24 @@ serve(async (req) => {
         const order = await orderResponse.json();
         console.log("Merchant order:", order.id, "status:", order.status);
         
-        // Check if order is fully paid
+        // Validate external_reference format
         if (order.status === "closed" && order.external_reference) {
-          const { error } = await supabase
-            .from("expense_analyses")
-            .update({ status: "paid" })
-            .eq("id", order.external_reference);
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+          if (uuidRegex.test(order.external_reference)) {
+            const { error } = await supabase
+              .from("expense_analyses")
+              .update({ status: "paid" })
+              .eq("id", order.external_reference);
 
-          if (error) {
-            console.error("Error updating from merchant order:", error);
+            if (error) {
+              console.error("Error updating from merchant order:", error);
+            }
+          } else {
+            console.error("Invalid external_reference format in merchant order:", order.external_reference);
           }
         }
       }
+      markWebhookProcessed(webhookKey);
     }
 
     return new Response(
