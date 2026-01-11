@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -20,21 +20,21 @@ import {
   LineChart,
   Building,
   Calendar,
+  RefreshCw,
+  Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import {
-  LineChart as RechartsLineChart,
-  Line,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Legend,
-  Area,
-  AreaChart,
 } from "recharts";
+import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -85,6 +85,32 @@ const formatShortCurrency = (amount: number) => {
   return `$${amount}`;
 };
 
+// Spanish month mapping
+const monthsEs: Record<string, number> = {
+  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+};
+
+const parseSpanishPeriod = (period: string): Date | null => {
+  const parts = period.toLowerCase().trim().split(/\s+/);
+  if (parts.length >= 2) {
+    const month = monthsEs[parts[0]];
+    if (month !== undefined) {
+      const year = parseInt(parts[1]) || new Date().getFullYear();
+      return new Date(year, month, 1);
+    }
+  }
+  return null;
+};
+
+const periodToYYYYMM = (period: string): string | null => {
+  const date = parseSpanishPeriod(period);
+  if (date) {
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+  return null;
+};
+
 interface Analysis {
   id: string;
   building_name: string | null;
@@ -98,6 +124,27 @@ interface ChartData {
   period: string;
   total: number;
   id: string;
+}
+
+interface InflationData {
+  period: string;
+  value: number;
+  is_estimated: boolean;
+}
+
+interface BuildingsTrendData {
+  period: string;
+  average: number;
+  normalizedPercent: number;
+  count: number;
+}
+
+interface ComparisonDataPoint {
+  period: string;
+  userPercent: number;
+  inflationPercent: number | null;
+  inflationEstimated?: boolean;
+  buildingsPercent: number | null;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -120,6 +167,18 @@ const Evolucion = () => {
   const [selectedBuilding, setSelectedBuilding] = useState<string>(
     searchParams.get("edificio") || "all"
   );
+  
+  // New states for comparison data
+  const [inflationData, setInflationData] = useState<InflationData[]>([]);
+  const [buildingsTrend, setBuildingsTrend] = useState<BuildingsTrendData[]>([]);
+  const [isLoadingComparison, setIsLoadingComparison] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
+  const [isLoadingAnalysis, setIsLoadingAnalysis] = useState(false);
+  const [deviation, setDeviation] = useState<{
+    fromInflation: number;
+    fromBuildings: number;
+    isSignificant: boolean;
+  } | null>(null);
 
   // Get unique buildings
   const buildings = useMemo(() => {
@@ -135,25 +194,13 @@ const Evolucion = () => {
       filtered = analyses.filter(a => a.building_name === selectedBuilding);
     }
 
-    // Sort by period (try to parse month/year)
     const sorted = [...filtered].sort((a, b) => {
-      // Try to extract date from period like "Enero 2024"
-      const monthsEs: Record<string, number> = {
-        enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-        julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-      };
-      
-      const parseDate = (period: string) => {
-        const parts = period.toLowerCase().split(' ');
-        if (parts.length >= 2) {
-          const month = monthsEs[parts[0]] ?? 0;
-          const year = parseInt(parts[1]) || 2024;
-          return new Date(year, month);
-        }
-        return new Date(a.created_at);
-      };
-
-      return parseDate(a.period).getTime() - parseDate(b.period).getTime();
+      const dateA = parseSpanishPeriod(a.period);
+      const dateB = parseSpanishPeriod(b.period);
+      if (dateA && dateB) {
+        return dateA.getTime() - dateB.getTime();
+      }
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
     return sorted.map(a => ({
@@ -162,6 +209,51 @@ const Evolucion = () => {
       id: a.id,
     }));
   }, [analyses, selectedBuilding]);
+
+  // Create comparison chart data
+  const comparisonData = useMemo((): ComparisonDataPoint[] => {
+    if (chartData.length === 0) return [];
+
+    const baseUserValue = chartData[0].total;
+    const inflationMap = new Map(inflationData.map(d => [d.period, d]));
+    const buildingsMap = new Map(buildingsTrend.map(d => [d.period, d]));
+
+    // Find base inflation value for the first user period
+    const firstUserPeriodYYYYMM = periodToYYYYMM(chartData[0].period);
+    const baseInflation = firstUserPeriodYYYYMM ? inflationMap.get(firstUserPeriodYYYYMM) : null;
+    
+    // Find base buildings value
+    const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
+
+    return chartData.map((item, index) => {
+      const userPercent = index === 0 ? 0 : ((item.total - baseUserValue) / baseUserValue) * 100;
+      
+      const periodYYYYMM = periodToYYYYMM(item.period);
+      const inflationItem = periodYYYYMM ? inflationMap.get(periodYYYYMM) : null;
+      
+      let inflationPercent: number | null = null;
+      let inflationEstimated = false;
+      
+      if (inflationItem && baseInflation) {
+        inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+        inflationEstimated = inflationItem.is_estimated;
+      }
+
+      const buildingsItem = buildingsMap.get(item.period);
+      let buildingsPercent: number | null = null;
+      if (buildingsItem && baseBuildingsData) {
+        buildingsPercent = buildingsItem.normalizedPercent - (baseBuildingsData.normalizedPercent || 0);
+      }
+
+      return {
+        period: item.period,
+        userPercent,
+        inflationPercent,
+        inflationEstimated,
+        buildingsPercent,
+      };
+    });
+  }, [chartData, inflationData, buildingsTrend]);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -183,6 +275,8 @@ const Evolucion = () => {
 
   const handleBuildingChange = (value: string) => {
     setSelectedBuilding(value);
+    setAiAnalysis(null);
+    setDeviation(null);
     if (value === "all") {
       searchParams.delete("edificio");
     } else {
@@ -190,6 +284,108 @@ const Evolucion = () => {
     }
     setSearchParams(searchParams);
   };
+
+  // Fetch inflation data
+  const fetchInflationData = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-inflation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          setInflationData(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching inflation data:", error);
+    }
+  }, []);
+
+  // Fetch buildings trend
+  const fetchBuildingsTrend = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.data) {
+          setBuildingsTrend(result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching buildings trend:", error);
+    }
+  }, []);
+
+  // Fetch AI analysis
+  const fetchAiAnalysis = useCallback(async () => {
+    if (comparisonData.length < 2 || selectedBuilding === "all") return;
+
+    setIsLoadingAnalysis(true);
+    try {
+      const userTrend = comparisonData.map(d => ({ period: d.period, percent: d.userPercent }));
+      const inflationTrend = comparisonData
+        .filter(d => d.inflationPercent !== null)
+        .map(d => ({ period: d.period, percent: d.inflationPercent! }));
+      const buildingsTrendData = comparisonData
+        .filter(d => d.buildingsPercent !== null)
+        .map(d => ({ period: d.period, percent: d.buildingsPercent! }));
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-deviation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+          },
+          body: JSON.stringify({
+            userTrend,
+            inflationTrend,
+            buildingsTrend: buildingsTrendData,
+            buildingName: selectedBuilding,
+          }),
+        }
+      );
+
+      if (response.ok) {
+        const result = await response.json();
+        setAiAnalysis(result.analysis);
+        setDeviation(result.deviation);
+      } else if (response.status === 429) {
+        toast.error("Límite de análisis alcanzado. Intentá más tarde.");
+      }
+    } catch (error) {
+      console.error("Error fetching AI analysis:", error);
+    } finally {
+      setIsLoadingAnalysis(false);
+    }
+  }, [comparisonData, selectedBuilding]);
+
+  // Load comparison data
+  const loadComparisonData = useCallback(async () => {
+    setIsLoadingComparison(true);
+    await Promise.all([fetchInflationData(), fetchBuildingsTrend()]);
+    setIsLoadingComparison(false);
+  }, [fetchInflationData, fetchBuildingsTrend]);
 
   useEffect(() => {
     const fetchAnalyses = async () => {
@@ -209,7 +405,6 @@ const Evolucion = () => {
         if (error) throw error;
         setAnalyses(data || []);
 
-        // Auto-select first building if coming without param and buildings exist
         if (!searchParams.get("edificio") && data && data.length > 0) {
           const firstBuilding = data.find(a => a.building_name)?.building_name;
           if (firstBuilding) {
@@ -226,6 +421,32 @@ const Evolucion = () => {
 
     fetchAnalyses();
   }, [navigate, searchParams]);
+
+  // Load comparison data when analyses are loaded
+  useEffect(() => {
+    if (analyses.length > 0) {
+      loadComparisonData();
+    }
+  }, [analyses.length, loadComparisonData]);
+
+  // Calculate deviation when comparison data changes
+  useEffect(() => {
+    if (comparisonData.length >= 2) {
+      const last = comparisonData[comparisonData.length - 1];
+      const fromInflation = last.inflationPercent !== null 
+        ? last.userPercent - last.inflationPercent 
+        : 0;
+      const fromBuildings = last.buildingsPercent !== null 
+        ? last.userPercent - last.buildingsPercent 
+        : 0;
+      
+      setDeviation({
+        fromInflation,
+        fromBuildings,
+        isSignificant: Math.abs(fromInflation) > 5 || Math.abs(fromBuildings) > 5,
+      });
+    }
+  }, [comparisonData]);
 
   if (isLoading) {
     return (
@@ -254,7 +475,7 @@ const Evolucion = () => {
               <div>
                 <h1 className="text-2xl font-bold">Evolución de expensas</h1>
                 <p className="text-muted-foreground text-sm">
-                  Seguimiento histórico por edificio
+                  Seguimiento histórico con comparativa de inflación
                 </p>
               </div>
             </div>
@@ -304,6 +525,9 @@ const Evolucion = () => {
                         ))}
                       </SelectContent>
                     </Select>
+                    {isLoadingComparison && (
+                      <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -338,11 +562,11 @@ const Evolucion = () => {
                 </div>
               )}
 
-              {/* Evolution Chart */}
-              {chartData.length > 0 ? (
-                <Card variant="elevated" className="animate-fade-in-up">
+              {/* Evolution Chart (Absolute values) */}
+              {chartData.length > 0 && (
+                <Card variant="elevated" className="animate-fade-in-up mb-6">
                   <CardHeader>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
                         <CardTitle className="text-lg">Evolución del gasto total</CardTitle>
                         <CardDescription>
@@ -375,7 +599,7 @@ const Evolucion = () => {
                     </div>
                   </CardHeader>
                   <CardContent>
-                    <div className="h-[400px] w-full">
+                    <div className="h-[300px] w-full">
                       <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <defs>
@@ -416,11 +640,40 @@ const Evolucion = () => {
                     </div>
                   </CardContent>
                 </Card>
-              ) : (
-                <Card variant="soft" className="animate-fade-in-up">
-                  <CardContent className="p-8 text-center">
+              )}
+
+              {/* Comparison Chart (Normalized %) */}
+              {comparisonData.length >= 2 && selectedBuilding !== "all" && (
+                <div className="mb-6">
+                  <EvolutionComparisonChart
+                    data={comparisonData}
+                    buildingName={selectedBuilding}
+                    deviation={deviation || undefined}
+                    analysis={aiAnalysis}
+                    isLoadingAnalysis={isLoadingAnalysis}
+                  />
+                  
+                  {/* AI Analysis Button */}
+                  {!aiAnalysis && !isLoadingAnalysis && comparisonData.length >= 2 && (
+                    <div className="mt-4 flex justify-center">
+                      <Button
+                        variant="outline"
+                        onClick={fetchAiAnalysis}
+                        className="gap-2"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Obtener análisis inteligente
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedBuilding === "all" && comparisonData.length >= 2 && (
+                <Card variant="soft" className="mb-6 animate-fade-in-up">
+                  <CardContent className="p-6 text-center">
                     <p className="text-muted-foreground">
-                      No hay datos para el edificio seleccionado.
+                      Seleccioná un edificio específico para ver la comparación con inflación y otros edificios.
                     </p>
                   </CardContent>
                 </Card>
@@ -428,7 +681,7 @@ const Evolucion = () => {
 
               {/* Period List */}
               {chartData.length > 0 && (
-                <Card variant="soft" className="mt-6 animate-fade-in-up">
+                <Card variant="soft" className="animate-fade-in-up">
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <Calendar className="w-5 h-5" />

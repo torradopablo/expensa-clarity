@@ -8,3 +8,12 @@ verify_jwt = false
 
 [functions.mercadopago-webhook]
 verify_jwt = false
+
+[functions.fetch-inflation]
+verify_jwt = false
+
+[functions.get-buildings-trend]
+verify_jwt = false
+
+[functions.analyze-deviation]
+verify_jwt = false

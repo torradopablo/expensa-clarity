@@ -109,6 +109,33 @@ export type Database = {
           },
         ]
       }
+      inflation_data: {
+        Row: {
+          created_at: string
+          id: string
+          is_estimated: boolean
+          period: string
+          updated_at: string
+          value: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_estimated?: boolean
+          period: string
+          updated_at?: string
+          value: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_estimated?: boolean
+          period?: string
+          updated_at?: string
+          value?: number
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
