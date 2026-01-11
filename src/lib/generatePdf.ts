@@ -30,8 +30,8 @@ interface InflationContext {
 interface CommunityContext {
   averageTotal: number | null;
   buildingsCount: number;
-  userVsAverage: number | null; // percentage difference
-  percentileRank?: number; // where the user stands (e.g., top 30%)
+  userVsAverage: number | null;
+  percentileRank?: number;
 }
 
 interface EvolutionData {
@@ -52,6 +52,32 @@ interface EvolutionStats {
   min: number;
   max: number;
   changePercent: number;
+}
+
+interface CategoryComparison {
+  name: string;
+  leftAmount: number;
+  rightAmount: number;
+  diff: number;
+  changePercent: number | null;
+}
+
+interface ComparisonAnalysis {
+  leftAnalysis: {
+    id: string;
+    building_name: string | null;
+    period: string;
+    total_amount: number;
+  };
+  rightAnalysis: {
+    id: string;
+    building_name: string | null;
+    period: string;
+    total_amount: number;
+  };
+  categories: CategoryComparison[];
+  totalDiff: number;
+  totalChangePercent: number;
 }
 
 const formatCurrency = (amount: number) => {
@@ -90,6 +116,7 @@ const COLORS = {
   bgAmber: [254, 243, 199] as [number, number, number],
   bgGreen: [240, 253, 244] as [number, number, number],
   white: [255, 255, 255] as [number, number, number],
+  secondary: [100, 116, 139] as [number, number, number],
 };
 
 // Helper to add page footer
@@ -192,6 +219,284 @@ const drawHorizontalBarChart = (
   return topCategories.length * (barHeight + gap);
 };
 
+// Draw comparison bar chart (current vs previous)
+const drawComparisonBarChart = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  categories: Category[],
+  maxCategories: number = 6
+): number => {
+  const topCategories = [...categories]
+    .filter(c => c.previous_amount !== null && c.previous_amount > 0)
+    .sort((a, b) => b.current_amount - a.current_amount)
+    .slice(0, maxCategories);
+
+  if (topCategories.length === 0) return 0;
+
+  const maxValue = Math.max(
+    ...topCategories.map(c => Math.max(c.current_amount, c.previous_amount || 0))
+  );
+  const barHeight = 10;
+  const categoryHeight = 28;
+  const chartWidth = width - 80;
+
+  topCategories.forEach((cat, index) => {
+    const catY = y + index * categoryHeight;
+    
+    // Category name
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    const truncatedName = cat.name.length > 12 ? cat.name.substring(0, 11) + "…" : cat.name;
+    doc.text(truncatedName, x, catY + 8);
+    
+    // Previous bar (gray/muted)
+    const prevWidth = ((cat.previous_amount || 0) / maxValue) * chartWidth;
+    doc.setFillColor(200, 200, 210);
+    doc.roundedRect(x + 45, catY + 2, prevWidth, barHeight, 1, 1, 'F');
+    
+    // Current bar (colored based on change)
+    const currWidth = (cat.current_amount / maxValue) * chartWidth;
+    const change = calculateChange(cat.current_amount, cat.previous_amount);
+    const isUp = change && change > 0;
+    doc.setFillColor(...(isUp ? COLORS.warning : COLORS.success));
+    doc.roundedRect(x + 45, catY + 13, currWidth, barHeight, 1, 1, 'F');
+    
+    // Values
+    doc.setFontSize(6);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(...COLORS.muted);
+    doc.text(formatCurrency(cat.previous_amount || 0), x + 47 + Math.max(prevWidth, 25), catY + 9);
+    
+    doc.setTextColor(...(isUp ? COLORS.warning : COLORS.success));
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(cat.current_amount), x + 47 + Math.max(currWidth, 25), catY + 20);
+    
+    // Change percentage
+    if (change !== null) {
+      doc.setFontSize(7);
+      doc.text(`${change > 0 ? "+" : ""}${change.toFixed(0)}%`, x + width - 15, catY + 14, { align: "right" });
+    }
+  });
+
+  // Legend
+  const legendY = y + topCategories.length * categoryHeight + 5;
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  
+  doc.setFillColor(200, 200, 210);
+  doc.rect(x, legendY, 8, 5, 'F');
+  doc.setTextColor(...COLORS.muted);
+  doc.text("Mes anterior", x + 10, legendY + 4);
+  
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(x + 50, legendY, 8, 5, 'F');
+  doc.text("Mes actual", x + 60, legendY + 4);
+
+  return topCategories.length * categoryHeight + 15;
+};
+
+// Draw side-by-side comparison bar chart for comparing two periods
+const drawSideBySideComparisonChart = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  categories: CategoryComparison[],
+  leftLabel: string,
+  rightLabel: string,
+  maxCategories: number = 8
+): number => {
+  const topCategories = categories.slice(0, maxCategories);
+  if (topCategories.length === 0) return 0;
+
+  const maxValue = Math.max(
+    ...topCategories.map(c => Math.max(c.leftAmount, c.rightAmount))
+  );
+  const barHeight = 8;
+  const categoryHeight = 24;
+  const chartWidth = width - 70;
+
+  topCategories.forEach((cat, index) => {
+    const catY = y + index * categoryHeight;
+    
+    // Category name
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    const truncatedName = cat.name.length > 12 ? cat.name.substring(0, 11) + "…" : cat.name;
+    doc.text(truncatedName, x, catY + 10);
+    
+    // Left bar (base - gray/secondary)
+    const leftWidth = Math.max((cat.leftAmount / maxValue) * chartWidth, 2);
+    doc.setFillColor(...COLORS.secondary);
+    doc.roundedRect(x + 45, catY + 2, leftWidth, barHeight, 1, 1, 'F');
+    
+    // Right bar (compare - colored based on change)
+    const rightWidth = Math.max((cat.rightAmount / maxValue) * chartWidth, 2);
+    const isUp = cat.diff > 0;
+    const isDown = cat.diff < 0;
+    doc.setFillColor(...(isUp ? COLORS.warning : isDown ? COLORS.success : COLORS.primary));
+    doc.roundedRect(x + 45, catY + 11, rightWidth, barHeight, 1, 1, 'F');
+    
+    // Change indicator
+    if (cat.changePercent !== null) {
+      doc.setFontSize(7);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...(isUp ? COLORS.warning : isDown ? COLORS.success : COLORS.muted));
+      const changeText = `${cat.changePercent > 0 ? "+" : ""}${cat.changePercent.toFixed(0)}%`;
+      doc.text(changeText, x + width - 5, catY + 10, { align: "right" });
+    }
+  });
+
+  // Legend
+  const legendY = y + topCategories.length * categoryHeight + 3;
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "normal");
+  
+  doc.setFillColor(...COLORS.secondary);
+  doc.rect(x, legendY, 8, 5, 'F');
+  doc.setTextColor(...COLORS.muted);
+  const shortLeftLabel = leftLabel.length > 25 ? leftLabel.substring(0, 24) + "..." : leftLabel;
+  doc.text(shortLeftLabel, x + 10, legendY + 4);
+  
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(x + 85, legendY, 8, 5, 'F');
+  const shortRightLabel = rightLabel.length > 25 ? rightLabel.substring(0, 24) + "..." : rightLabel;
+  doc.text(shortRightLabel, x + 95, legendY + 4);
+
+  return topCategories.length * categoryHeight + 15;
+};
+
+// Draw line/area chart for evolution data
+const drawEvolutionChart = (
+  doc: jsPDF,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  data: { period: string; value: number; label?: string }[],
+  showAverage: boolean = true
+): number => {
+  if (data.length < 2) return 0;
+
+  const padding = 35;
+  const chartX = x + padding;
+  const chartY = y;
+  const chartWidth = width - padding - 10;
+  const chartHeight = height - 25;
+
+  const values = data.map(d => d.value);
+  const minValue = Math.min(...values) * 0.9;
+  const maxValue = Math.max(...values) * 1.1;
+  const range = maxValue - minValue;
+  const average = values.reduce((a, b) => a + b, 0) / values.length;
+
+  // Draw chart background
+  doc.setFillColor(...COLORS.bgLight);
+  doc.roundedRect(chartX, chartY, chartWidth, chartHeight, 2, 2, 'F');
+
+  // Draw grid lines
+  doc.setDrawColor(220, 220, 225);
+  doc.setLineWidth(0.2);
+  for (let i = 0; i <= 4; i++) {
+    const gridY = chartY + (chartHeight / 4) * i;
+    doc.line(chartX, gridY, chartX + chartWidth, gridY);
+    
+    // Y-axis labels
+    const value = maxValue - (range / 4) * i;
+    doc.setFontSize(6);
+    doc.setTextColor(...COLORS.muted);
+    doc.text(formatCurrency(value), x, gridY + 2, { align: "left" });
+  }
+
+  // Draw average line if enabled
+  if (showAverage) {
+    const avgY = chartY + chartHeight - ((average - minValue) / range) * chartHeight;
+    doc.setDrawColor(...COLORS.primary);
+    doc.setLineWidth(0.5);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(chartX, avgY, chartX + chartWidth, avgY);
+    doc.setLineDashPattern([], 0);
+    
+    doc.setFontSize(6);
+    doc.setTextColor(...COLORS.primary);
+    doc.text("Prom.", chartX + chartWidth + 2, avgY + 2);
+  }
+
+  // Draw data line and area
+  const points: { x: number; y: number }[] = [];
+  const stepX = chartWidth / (data.length - 1);
+  
+  data.forEach((d, i) => {
+    const px = chartX + stepX * i;
+    const py = chartY + chartHeight - ((d.value - minValue) / range) * chartHeight;
+    points.push({ x: px, y: py });
+  });
+
+  // Draw area fill
+  doc.setFillColor(59, 130, 246, 0.2);
+  doc.setGState(doc.GState({ opacity: 0.3 }));
+  let areaPath = `M ${points[0].x} ${chartY + chartHeight}`;
+  points.forEach(p => {
+    areaPath += ` L ${p.x} ${p.y}`;
+  });
+  areaPath += ` L ${points[points.length - 1].x} ${chartY + chartHeight} Z`;
+  // Since jsPDF doesn't support path directly, we'll draw filled polygon
+  const polygonPoints: number[][] = [
+    [points[0].x, chartY + chartHeight],
+    ...points.map(p => [p.x, p.y]),
+    [points[points.length - 1].x, chartY + chartHeight]
+  ];
+  
+  doc.setFillColor(200, 220, 255);
+  // Draw as polygon approximation
+  for (let i = 0; i < points.length - 1; i++) {
+    doc.triangle(
+      points[i].x, points[i].y,
+      points[i + 1].x, points[i + 1].y,
+      points[i].x, chartY + chartHeight,
+      'F'
+    );
+    doc.triangle(
+      points[i + 1].x, points[i + 1].y,
+      points[i + 1].x, chartY + chartHeight,
+      points[i].x, chartY + chartHeight,
+      'F'
+    );
+  }
+  doc.setGState(doc.GState({ opacity: 1 }));
+
+  // Draw line
+  doc.setDrawColor(...COLORS.primary);
+  doc.setLineWidth(1);
+  for (let i = 0; i < points.length - 1; i++) {
+    doc.line(points[i].x, points[i].y, points[i + 1].x, points[i + 1].y);
+  }
+
+  // Draw points
+  points.forEach((p, i) => {
+    doc.setFillColor(...COLORS.white);
+    doc.circle(p.x, p.y, 2.5, 'F');
+    doc.setDrawColor(...COLORS.primary);
+    doc.setLineWidth(1);
+    doc.circle(p.x, p.y, 2.5, 'S');
+  });
+
+  // Draw X-axis labels
+  doc.setFontSize(6);
+  doc.setTextColor(...COLORS.muted);
+  data.forEach((d, i) => {
+    const labelX = chartX + stepX * i;
+    const shortPeriod = d.period.length > 8 ? d.period.substring(0, 7) + "." : d.period;
+    doc.text(shortPeriod, labelX, chartY + chartHeight + 8, { align: "center" });
+  });
+
+  return height;
+};
+
 // Draw comparison indicator
 const drawComparisonIndicator = (
   doc: jsPDF,
@@ -228,6 +533,54 @@ const drawComparisonIndicator = (
   doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
   doc.text(statusText, x + 5, y + 31);
+};
+
+// Generate friendly critical analysis suggestions
+const generateComparisonSuggestions = (
+  comparison: ComparisonAnalysis
+): string[] => {
+  const suggestions: string[] = [];
+  const { totalChangePercent, categories } = comparison;
+
+  // Overall analysis
+  if (totalChangePercent > 15) {
+    suggestions.push("📈 Se observa un incremento significativo en el total. Te recomendamos revisar las categorías con mayor variación y consultar con la administración sobre posibles gastos extraordinarios.");
+  } else if (totalChangePercent > 5) {
+    suggestions.push("📊 Hay un incremento moderado en tus expensas. Los aumentos pueden deberse a ajustes inflacionarios normales de servicios y sueldos.");
+  } else if (totalChangePercent < -5) {
+    suggestions.push("✅ ¡Buenas noticias! Tus expensas disminuyeron. Esto puede indicar una gestión eficiente o la finalización de gastos extraordinarios.");
+  } else {
+    suggestions.push("➡️ Tus expensas se mantienen estables entre ambos períodos, lo cual indica consistencia en los gastos del edificio.");
+  }
+
+  // Find top increases
+  const bigIncreases = categories
+    .filter(c => c.changePercent !== null && c.changePercent > 20)
+    .sort((a, b) => (b.changePercent || 0) - (a.changePercent || 0))
+    .slice(0, 3);
+
+  if (bigIncreases.length > 0) {
+    const catNames = bigIncreases.map(c => c.name).join(", ");
+    suggestions.push(`⚠️ Las categorías con mayor aumento son: ${catNames}. Verificá si corresponden a aumentos tarifarios o gastos puntuales.`);
+  }
+
+  // Find decreases
+  const bigDecreases = categories
+    .filter(c => c.changePercent !== null && c.changePercent < -15)
+    .sort((a, b) => (a.changePercent || 0) - (b.changePercent || 0))
+    .slice(0, 2);
+
+  if (bigDecreases.length > 0) {
+    const catNames = bigDecreases.map(c => c.name).join(", ");
+    suggestions.push(`💚 Bajaron significativamente: ${catNames}. Puede indicar renegociación de contratos o reducción de consumo.`);
+  }
+
+  // Actionable recommendations
+  if (totalChangePercent > 10) {
+    suggestions.push("💡 Sugerencia: Solicitá el detalle de gastos extraordinarios a la administración y verificá que coincidan con las actas de consorcio.");
+  }
+
+  return suggestions;
 };
 
 export const generateAnalysisPdf = (
@@ -317,12 +670,30 @@ export const generateAnalysisPdf = (
   
   yPos += 50;
   
-  // ========== CONTEXT SECTION (Inflation & Community) ==========
-  if (inflationContext || communityContext) {
+  // ========== COMPARISON CHART: Current vs Previous ==========
+  const categoriesWithPrevious = categories.filter(c => c.previous_amount !== null && c.previous_amount > 0);
+  if (categoriesWithPrevious.length >= 2) {
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📊 Contexto económico y comparativo", margin, yPos);
+    doc.text("📊 Comparativa mes actual vs anterior", margin, yPos);
+    yPos += 8;
+    
+    const chartHeight = drawComparisonBarChart(doc, margin, yPos, pageWidth - margin * 2, categories, 6);
+    yPos += chartHeight + 5;
+  }
+  
+  // ========== CONTEXT SECTION (Inflation & Community) ==========
+  if (inflationContext || communityContext) {
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("📈 Contexto económico y comparativo", margin, yPos);
     yPos += 10;
     
     const contextWidth = (pageWidth - margin * 2 - 5) / 2;
@@ -352,13 +723,17 @@ export const generateAnalysisPdf = (
     yPos += 45;
   }
   
-  // ========== VISUAL CHART ==========
-  const categoriesWithPrevious = categories.filter(c => c.previous_amount !== null);
-  if (categoriesWithPrevious.length > 0) {
+  // ========== VISUAL CHART: Distribution ==========
+  if (categories.length > 0) {
+    if (yPos > 210) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
-    doc.text("📈 Distribución del gasto por categoría", margin, yPos);
+    doc.text("📊 Distribución del gasto por categoría", margin, yPos);
     yPos += 8;
     
     const chartHeight = drawHorizontalBarChart(doc, margin, yPos, pageWidth - margin * 2, categories, 6);
@@ -366,6 +741,11 @@ export const generateAnalysisPdf = (
   }
   
   // ========== STATUS SUMMARY ==========
+  if (yPos > 250) {
+    doc.addPage();
+    yPos = 20;
+  }
+  
   doc.setFillColor(...(attentionItems > 0 ? COLORS.bgAmber : COLORS.bgGreen));
   doc.roundedRect(margin, yPos, pageWidth - margin * 2, 20, 3, 3, 'F');
   
@@ -633,9 +1013,27 @@ export const generateEvolutionPdf = (
   drawMetricBox(doc, margin + (metricWidth + 5) * 3, yPos, metricWidth, 35, "Máximo", formatCurrency(stats.max), undefined, maxColor);
   
   yPos += 50;
+
+  // ========== EVOLUTION CHART ==========
+  if (evolutionData.length >= 2) {
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("📈 Gráfico de evolución histórica", margin, yPos);
+    yPos += 8;
+    
+    const chartData = evolutionData.map(d => ({ period: d.period, value: d.total }));
+    const chartHeight = drawEvolutionChart(doc, margin, yPos, pageWidth - margin * 2, 60, chartData, true);
+    yPos += chartHeight + 10;
+  }
   
   // ========== DEVIATION SUMMARY ==========
   if (deviation) {
+    if (yPos > 200) {
+      doc.addPage();
+      yPos = 20;
+    }
+    
     doc.setTextColor(...COLORS.text);
     doc.setFontSize(14);
     doc.setFont("helvetica", "bold");
@@ -694,10 +1092,15 @@ export const generateEvolutionPdf = (
   }
   
   // ========== EVOLUTION TABLE ==========
+  if (yPos > 180) {
+    doc.addPage();
+    yPos = 20;
+  }
+  
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(14);
   doc.setFont("helvetica", "bold");
-  doc.text("📈 Evolución histórica detallada", margin, yPos);
+  doc.text("📋 Evolución histórica detallada", margin, yPos);
   yPos += 10;
   
   // Prepare table data with comparison
@@ -877,5 +1280,317 @@ export const generateEvolutionPdf = (
 
   // Save
   const fileName = `ExpensaCheck_Evolucion_${buildingName.replace(/\s+/g, "_")}_${formatDate(new Date().toISOString()).replace(/\s+/g, "_")}.pdf`;
+  doc.save(fileName);
+};
+
+// ========== COMPARISON PDF GENERATOR ==========
+export const generateComparisonPdf = (
+  comparison: ComparisonAnalysis,
+  aiAnalysis?: string | null
+) => {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+  const margin = 15;
+  let yPos = 0;
+
+  const { leftAnalysis, rightAnalysis, categories, totalDiff, totalChangePercent } = comparison;
+
+  // ========== HEADER ==========
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(0, 0, pageWidth, 55, 'F');
+  doc.setFillColor(...COLORS.primaryLight);
+  doc.rect(0, 45, pageWidth, 15, 'F');
+  
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(24);
+  doc.setFont("helvetica", "bold");
+  doc.text("ExpensaCheck", margin, 25);
+  
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "normal");
+  doc.text("Informe Comparativo de Expensas", margin, 40);
+  
+  doc.setFontSize(9);
+  doc.text(`Generado: ${formatDate(new Date().toISOString())}`, pageWidth - margin, 28, { align: "right" });
+  
+  yPos = 70;
+  
+  // ========== COMPARISON HEADER ==========
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(16);
+  doc.setFont("helvetica", "bold");
+  doc.text("Comparación de períodos", margin, yPos);
+  
+  yPos += 15;
+  
+  // Side by side summary
+  const halfWidth = (pageWidth - margin * 2 - 20) / 2;
+  
+  // Left period box
+  doc.setFillColor(...COLORS.bgLight);
+  doc.roundedRect(margin, yPos, halfWidth, 45, 3, 3, 'F');
+  doc.setFillColor(...COLORS.secondary);
+  doc.rect(margin, yPos, 4, 45, 'F');
+  
+  doc.setTextColor(...COLORS.muted);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("PERÍODO BASE", margin + 10, yPos + 10);
+  
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(leftAnalysis.period, margin + 10, yPos + 22);
+  
+  doc.setFontSize(16);
+  doc.text(formatCurrency(leftAnalysis.total_amount), margin + 10, yPos + 38);
+  
+  // Arrow / difference indicator
+  const centerX = pageWidth / 2;
+  doc.setFillColor(...(totalDiff > 0 ? COLORS.warning : totalDiff < 0 ? COLORS.success : COLORS.primary));
+  doc.circle(centerX, yPos + 22, 12, 'F');
+  
+  doc.setTextColor(...COLORS.white);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "bold");
+  const diffSymbol = totalDiff > 0 ? "↑" : totalDiff < 0 ? "↓" : "=";
+  doc.text(diffSymbol, centerX, yPos + 20, { align: "center" });
+  doc.setFontSize(6);
+  doc.text(`${totalChangePercent > 0 ? "+" : ""}${totalChangePercent.toFixed(0)}%`, centerX, yPos + 28, { align: "center" });
+  
+  // Right period box
+  doc.setFillColor(...COLORS.bgLight);
+  doc.roundedRect(margin + halfWidth + 20, yPos, halfWidth, 45, 3, 3, 'F');
+  doc.setFillColor(...(totalDiff > 0 ? COLORS.warning : totalDiff < 0 ? COLORS.success : COLORS.primary));
+  doc.rect(margin + halfWidth + 20, yPos, 4, 45, 'F');
+  
+  doc.setTextColor(...COLORS.muted);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("PERÍODO COMPARADO", margin + halfWidth + 30, yPos + 10);
+  
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(12);
+  doc.setFont("helvetica", "bold");
+  doc.text(rightAnalysis.period, margin + halfWidth + 30, yPos + 22);
+  
+  doc.setFontSize(16);
+  doc.text(formatCurrency(rightAnalysis.total_amount), margin + halfWidth + 30, yPos + 38);
+  
+  yPos += 55;
+  
+  // ========== TOTAL DIFFERENCE SUMMARY ==========
+  const isIncrease = totalDiff > 0;
+  doc.setFillColor(...(isIncrease ? COLORS.bgAmber : COLORS.bgGreen));
+  doc.roundedRect(margin, yPos, pageWidth - margin * 2, 25, 3, 3, 'F');
+  
+  doc.setTextColor(...(isIncrease ? COLORS.warning : COLORS.success));
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  const summaryIcon = isIncrease ? "📈" : totalDiff < 0 ? "📉" : "➡️";
+  const summaryText = isIncrease 
+    ? `${summaryIcon} Aumento de ${formatCurrency(totalDiff)} (+${totalChangePercent.toFixed(1)}%) entre ambos períodos`
+    : totalDiff < 0 
+      ? `${summaryIcon} Reducción de ${formatCurrency(Math.abs(totalDiff))} (${totalChangePercent.toFixed(1)}%) entre ambos períodos`
+      : `${summaryIcon} Sin cambios significativos entre ambos períodos`;
+  doc.text(summaryText, margin + 8, yPos + 16);
+  
+  yPos += 35;
+  
+  // ========== COMPARISON CHART ==========
+  if (categories.length > 0) {
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("📊 Comparación visual por categoría", margin, yPos);
+    yPos += 10;
+    
+    const chartHeight = drawSideBySideComparisonChart(
+      doc, margin, yPos, pageWidth - margin * 2, 
+      categories,
+      leftAnalysis.period,
+      rightAnalysis.period,
+      8
+    );
+    yPos += chartHeight + 10;
+  }
+  
+  // ========== DETAILED TABLE ==========
+  if (yPos > 180) {
+    doc.addPage();
+    yPos = 20;
+  }
+  
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("📋 Detalle por categoría", margin, yPos);
+  yPos += 10;
+  
+  const tableData = categories.map(cat => [
+    cat.name,
+    formatCurrency(cat.leftAmount),
+    formatCurrency(cat.rightAmount),
+    (cat.diff > 0 ? "+" : "") + formatCurrency(cat.diff),
+    cat.changePercent !== null ? `${cat.changePercent > 0 ? "+" : ""}${cat.changePercent.toFixed(1)}%` : "-"
+  ]);
+
+  autoTable(doc, {
+    startY: yPos,
+    head: [["Categoría", leftAnalysis.period, rightAnalysis.period, "Diferencia", "Variación"]],
+    body: tableData,
+    margin: { left: margin, right: margin },
+    styles: {
+      fontSize: 9,
+      cellPadding: 5,
+    },
+    headStyles: {
+      fillColor: COLORS.primary,
+      textColor: COLORS.white,
+      fontStyle: "bold",
+    },
+    alternateRowStyles: {
+      fillColor: COLORS.bgLight,
+    },
+    columnStyles: {
+      0: { cellWidth: 45 },
+      1: { halign: "right", cellWidth: 35 },
+      2: { halign: "right", cellWidth: 35 },
+      3: { halign: "right", cellWidth: 32 },
+      4: { halign: "right", cellWidth: 28 },
+    },
+    didParseCell: (data) => {
+      if (data.section === "body" && (data.column.index === 3 || data.column.index === 4)) {
+        const value = data.cell.raw as string;
+        if (value.startsWith("+")) {
+          const numValue = parseFloat(value.replace(/[^0-9.-]/g, ""));
+          if (data.column.index === 4 && numValue > 15) {
+            data.cell.styles.textColor = COLORS.warning;
+            data.cell.styles.fontStyle = "bold";
+          } else if (data.column.index === 3 && numValue > 0) {
+            data.cell.styles.textColor = COLORS.warning;
+          }
+        } else if (value.startsWith("-")) {
+          data.cell.styles.textColor = COLORS.success;
+        }
+      }
+    },
+  });
+
+  let finalY = (doc as any).lastAutoTable.finalY || yPos + 50;
+  
+  // ========== AI ANALYSIS / SUGGESTIONS ==========
+  finalY += 15;
+  
+  if (finalY > 200) {
+    doc.addPage();
+    finalY = 20;
+  }
+  
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(14);
+  doc.setFont("helvetica", "bold");
+  doc.text("💡 Análisis y recomendaciones", margin, finalY);
+  finalY += 10;
+  
+  // Generate suggestions
+  const suggestions = aiAnalysis 
+    ? [aiAnalysis] 
+    : generateComparisonSuggestions(comparison);
+  
+  suggestions.forEach((suggestion, index) => {
+    if (finalY > 260) {
+      doc.addPage();
+      finalY = 20;
+    }
+    
+    doc.setFillColor(...COLORS.bgBlue);
+    const lines = doc.splitTextToSize(suggestion, pageWidth - margin * 2 - 15);
+    const boxHeight = Math.max(18, lines.length * 5 + 12);
+    doc.roundedRect(margin, finalY, pageWidth - margin * 2, boxHeight, 2, 2, 'F');
+    
+    doc.setFillColor(...COLORS.primary);
+    doc.rect(margin, finalY, 3, boxHeight, 'F');
+    
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "normal");
+    doc.text(lines, margin + 8, finalY + 10);
+    
+    finalY += boxHeight + 5;
+  });
+  
+  // ========== SIGNIFICANT CHANGES HIGHLIGHT ==========
+  const significantChanges = categories.filter(c => c.changePercent !== null && Math.abs(c.changePercent) > 20);
+  
+  if (significantChanges.length > 0) {
+    finalY += 10;
+    
+    if (finalY > 230) {
+      doc.addPage();
+      finalY = 20;
+    }
+    
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text("⚡ Cambios significativos", margin, finalY);
+    finalY += 10;
+    
+    significantChanges.slice(0, 5).forEach(cat => {
+      if (finalY > 270) {
+        doc.addPage();
+        finalY = 20;
+      }
+      
+      const isUp = cat.diff > 0;
+      doc.setFillColor(...(isUp ? COLORS.bgAmber : COLORS.bgGreen));
+      doc.roundedRect(margin, finalY, pageWidth - margin * 2, 18, 2, 2, 'F');
+      
+      doc.setFillColor(...(isUp ? COLORS.warning : COLORS.success));
+      doc.rect(margin, finalY, 3, 18, 'F');
+      
+      doc.setTextColor(...COLORS.text);
+      doc.setFontSize(10);
+      doc.setFont("helvetica", "bold");
+      doc.text(cat.name, margin + 8, finalY + 12);
+      
+      doc.setTextColor(...(isUp ? COLORS.warning : COLORS.success));
+      doc.setFontSize(10);
+      const changeText = `${cat.changePercent! > 0 ? "+" : ""}${cat.changePercent!.toFixed(1)}% (${cat.diff > 0 ? "+" : ""}${formatCurrency(cat.diff)})`;
+      doc.text(changeText, pageWidth - margin - 5, finalY + 12, { align: "right" });
+      
+      finalY += 22;
+    });
+  }
+  
+  // ========== DISCLAIMER ==========
+  finalY += 15;
+  if (finalY > 260) {
+    doc.addPage();
+    finalY = 20;
+  }
+  
+  doc.setFillColor(...COLORS.bgLight);
+  doc.roundedRect(margin, finalY, pageWidth - margin * 2, 25, 2, 2, 'F');
+  doc.setTextColor(...COLORS.muted);
+  doc.setFontSize(7);
+  doc.setFont("helvetica", "italic");
+  const disclaimerText = "AVISO LEGAL: Este informe comparativo es orientativo. Las variaciones pueden deberse a factores estacionales, ajustes tarifarios o gastos extraordinarios legítimos. Recomendamos consultar las actas de consorcio para mayor detalle. ExpensaCheck no se responsabiliza por decisiones basadas en este análisis.";
+  const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - margin * 2 - 10);
+  doc.text(disclaimerLines, margin + 5, finalY + 8);
+
+  // ========== PAGE FOOTERS ==========
+  const pageCount = doc.getNumberOfPages();
+  for (let i = 1; i <= pageCount; i++) {
+    doc.setPage(i);
+    addPageFooter(doc, i, pageCount);
+  }
+
+  // Save
+  const leftPeriod = leftAnalysis.period.replace(/\s+/g, "_");
+  const rightPeriod = rightAnalysis.period.replace(/\s+/g, "_");
+  const building = leftAnalysis.building_name?.replace(/\s+/g, "_") || "Edificio";
+  const fileName = `ExpensaCheck_Comparacion_${building}_${leftPeriod}_vs_${rightPeriod}.pdf`;
   doc.save(fileName);
 };
