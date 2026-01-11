@@ -21,7 +21,8 @@ import {
   Zap,
   Users,
   Shield,
-  ArrowRight
+  ArrowRight,
+  History
 } from "lucide-react";
 
 const Header = () => (
@@ -33,9 +34,25 @@ const Header = () => (
         </div>
         <span className="text-xl font-semibold">ExpensaCheck</span>
       </Link>
-      <Button asChild>
-        <Link to="/analizar">Analizar mi expensa</Link>
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button asChild variant="outline" size="sm" className="hidden sm:flex">
+          <Link to="/historial">
+            <History className="w-4 h-4 mr-2" />
+            Ver historial
+          </Link>
+        </Button>
+        <Button asChild variant="ghost" size="icon" className="sm:hidden">
+          <Link to="/historial">
+            <History className="w-4 h-4" />
+          </Link>
+        </Button>
+        <Button asChild size="sm">
+          <Link to="/analizar">
+            <span className="hidden sm:inline">Analizar mi expensa</span>
+            <span className="sm:hidden">Analizar</span>
+          </Link>
+        </Button>
+      </div>
     </div>
   </header>
 );

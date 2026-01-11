@@ -27,7 +27,8 @@ import {
   LogOut,
   Share2,
   MessageCircle,
-  Mail
+  Mail,
+  History
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -71,8 +72,22 @@ const Header = () => {
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         <div className="flex items-center gap-2">
-          <Button asChild>
-            <Link to="/analizar">Analizar otra expensa</Link>
+          <Button asChild variant="outline" size="sm" className="hidden sm:flex">
+            <Link to="/historial">
+              <History className="w-4 h-4 mr-2" />
+              Ver historial
+            </Link>
+          </Button>
+          <Button asChild variant="ghost" size="icon" className="sm:hidden">
+            <Link to="/historial">
+              <History className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button asChild size="sm">
+            <Link to="/analizar">
+              <span className="hidden sm:inline">Analizar otra expensa</span>
+              <span className="sm:hidden">Analizar</span>
+            </Link>
           </Button>
           <Button variant="ghost" size="icon" onClick={handleLogout}>
             <LogOut className="w-4 h-4" />
