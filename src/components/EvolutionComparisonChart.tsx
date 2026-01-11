@@ -132,41 +132,41 @@ export const EvolutionComparisonChart = ({
               />
               <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
               
-              {/* User's building */}
+              {/* User's building - Blue */}
               <Line
                 type="monotone"
                 dataKey="userPercent"
-                name={`Tu edificio`}
-                stroke="hsl(var(--primary))"
+                name="Tu edificio"
+                stroke="#2563eb"
                 strokeWidth={3}
-                dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
+                dot={{ fill: "#2563eb", strokeWidth: 0, r: 4 }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />
               
-              {/* Inflation */}
+              {/* Inflation - Orange/Amber */}
               {hasInflationData && (
                 <Line
                   type="monotone"
                   dataKey="inflationPercent"
                   name="Inflación Argentina"
-                  stroke="hsl(var(--status-attention))"
+                  stroke="#f59e0b"
                   strokeWidth={2}
                   strokeDasharray={hasEstimatedData ? "5 5" : undefined}
-                  dot={{ fill: "hsl(var(--status-attention))", strokeWidth: 0, r: 3 }}
+                  dot={{ fill: "#f59e0b", strokeWidth: 0, r: 3 }}
                   activeDot={{ r: 5, strokeWidth: 0 }}
                   connectNulls
                 />
               )}
               
-              {/* Other buildings average */}
+              {/* Other buildings average - Purple */}
               {hasBuildingsData && (
                 <Line
                   type="monotone"
                   dataKey="buildingsPercent"
                   name="Promedio otros edificios"
-                  stroke="hsl(var(--status-ok))"
+                  stroke="#8b5cf6"
                   strokeWidth={2}
-                  dot={{ fill: "hsl(var(--status-ok))", strokeWidth: 0, r: 3 }}
+                  dot={{ fill: "#8b5cf6", strokeWidth: 0, r: 3 }}
                   activeDot={{ r: 5, strokeWidth: 0 }}
                   connectNulls
                 />
