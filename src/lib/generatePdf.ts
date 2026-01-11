@@ -54,6 +54,11 @@ interface EvolutionStats {
   changePercent: number;
 }
 
+interface HistoricalDataPoint {
+  period: string;
+  total_amount: number;
+}
+
 interface CategoryComparison {
   name: string;
   leftAmount: number;
@@ -587,14 +592,15 @@ export const generateAnalysisPdf = (
   analysis: Analysis, 
   categories: Category[],
   inflationContext?: InflationContext,
-  communityContext?: CommunityContext
+  communityContext?: CommunityContext,
+  historicalData?: HistoricalDataPoint[]
 ) => {
   const doc = new jsPDF();
   const pageWidth = doc.internal.pageSize.getWidth();
   const margin = 15;
   let yPos = 0;
 
-  // ========== PAGE 1: COVER & SUMMARY ==========
+  // ========== PAGE 1: COVER & EXECUTIVE SUMMARY ==========
   
   // Header gradient effect
   doc.setFillColor(...COLORS.primary);
@@ -610,7 +616,7 @@ export const generateAnalysisPdf = (
   
   doc.setFontSize(11);
   doc.setFont("helvetica", "normal");
-  doc.text("Informe Profesional de Análisis de Expensas", margin, 40);
+  doc.text("Informe Completo de Analisis de Expensas", margin, 40);
   
   // Report metadata
   doc.setFontSize(9);
@@ -629,7 +635,7 @@ export const generateAnalysisPdf = (
   doc.setTextColor(...COLORS.muted);
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
-  const buildingInfo = [analysis.building_name || "Edificio", analysis.unit].filter(Boolean).join(" · ");
+  const buildingInfo = [analysis.building_name || "Edificio", analysis.unit].filter(Boolean).join(" - ");
   doc.text(buildingInfo, margin, yPos);
   
   yPos += 15;
@@ -642,7 +648,7 @@ export const generateAnalysisPdf = (
   // Metric 1: Total actual
   drawMetricBox(
     doc, margin, yPos, metricWidth, 35,
-    "Total del período",
+    "Total del periodo",
     formatCurrency(analysis.total_amount),
     undefined,
     COLORS.primary
@@ -652,7 +658,7 @@ export const generateAnalysisPdf = (
   const changeColor = totalChange && totalChange > 0 ? COLORS.warning : COLORS.success;
   drawMetricBox(
     doc, margin + metricWidth + 5, yPos, metricWidth, 35,
-    "Variación vs anterior",
+    "Variacion vs anterior",
     totalChange ? `${totalChange > 0 ? "+" : ""}${totalChange.toFixed(1)}%` : "N/A",
     analysis.previous_total ? `Anterior: ${formatCurrency(analysis.previous_total)}` : undefined,
     changeColor
@@ -662,13 +668,60 @@ export const generateAnalysisPdf = (
   const statusColor = attentionItems > 0 ? COLORS.warning : COLORS.success;
   drawMetricBox(
     doc, margin + (metricWidth + 5) * 2, yPos, metricWidth, 35,
-    "Estado del análisis",
+    "Estado del analisis",
     attentionItems > 0 ? `${attentionItems} a revisar` : "Todo OK",
-    `${categories.length} categorías analizadas`,
+    `${categories.length} categorias analizadas`,
     statusColor
   );
   
   yPos += 50;
+  
+  // ========== EXECUTIVE SUMMARY ==========
+  doc.setFillColor(...COLORS.bgBlue);
+  doc.roundedRect(margin, yPos, pageWidth - margin * 2, 45, 3, 3, 'F');
+  doc.setFillColor(...COLORS.primary);
+  doc.rect(margin, yPos, 4, 45, 'F');
+  
+  doc.setTextColor(...COLORS.primary);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("Resumen Ejecutivo", margin + 10, yPos + 12);
+  
+  doc.setTextColor(...COLORS.text);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  
+  // Build executive summary text
+  let summaryPoints: string[] = [];
+  
+  if (totalChange !== null) {
+    const changeDesc = totalChange > 0 
+      ? `Las expensas aumentaron un ${totalChange.toFixed(1)}% respecto al mes anterior.`
+      : `Las expensas disminuyeron un ${Math.abs(totalChange).toFixed(1)}% respecto al mes anterior.`;
+    summaryPoints.push(changeDesc);
+  }
+  
+  if (attentionItems > 0) {
+    const attentionCategories = categories.filter(c => c.status === "attention").map(c => c.name).slice(0, 3);
+    summaryPoints.push(`${attentionItems} categoria(s) requieren atencion: ${attentionCategories.join(", ")}.`);
+  } else {
+    summaryPoints.push("Todas las categorias estan dentro de los rangos esperados.");
+  }
+  
+  if (inflationContext?.monthlyChange !== null && totalChange !== null) {
+    const vsInflation = totalChange - (inflationContext?.monthlyChange || 0);
+    if (vsInflation > 2) {
+      summaryPoints.push(`El aumento supera la inflacion del periodo por ${vsInflation.toFixed(1)} puntos.`);
+    } else if (vsInflation < -2) {
+      summaryPoints.push(`El aumento esta por debajo de la inflacion por ${Math.abs(vsInflation).toFixed(1)} puntos.`);
+    }
+  }
+  
+  const summaryText = summaryPoints.join(" ");
+  const summaryLines = doc.splitTextToSize(summaryText, pageWidth - margin * 2 - 20);
+  doc.text(summaryLines, margin + 10, yPos + 22);
+  
+  yPos += 55;
   
   // ========== COMPARISON CHART: Current vs Previous ==========
   const categoriesWithPrevious = categories.filter(c => c.previous_amount !== null && c.previous_amount > 0);
@@ -702,10 +755,10 @@ export const generateAnalysisPdf = (
     if (inflationContext && inflationContext.monthlyChange !== null && totalChange !== null) {
       drawComparisonIndicator(
         doc, margin, yPos, contextWidth,
-        "Tu expensa vs inflación del período",
+        "Tu expensa vs inflacion del periodo",
         totalChange,
         inflationContext.monthlyChange,
-        "inflación"
+        "inflacion"
       );
     }
     
@@ -760,7 +813,152 @@ export const generateAnalysisPdf = (
   doc.text(statusMessage, margin + 5, yPos + 13);
   yPos += 30;
   
-  // ========== PAGE 2: DETAILED BREAKDOWN ==========
+  // ========== PAGE 2: HISTORICAL EVOLUTION ==========
+  if (historicalData && historicalData.length >= 2) {
+    doc.addPage();
+    yPos = 20;
+    
+    // Section header
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(16);
+    doc.setFont("helvetica", "bold");
+    doc.text("Evolucion historica del edificio", margin, yPos);
+    yPos += 8;
+    
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Basado en ${historicalData.length} analisis realizados`, margin, yPos);
+    yPos += 15;
+    
+    // Calculate statistics
+    const totals = historicalData.map(d => d.total_amount);
+    const average = totals.reduce((a, b) => a + b, 0) / totals.length;
+    const min = Math.min(...totals);
+    const max = Math.max(...totals);
+    const firstTotal = historicalData[0]?.total_amount || 0;
+    const currentTotal = historicalData[historicalData.length - 1]?.total_amount || 0;
+    const totalEvolution = firstTotal > 0 ? ((currentTotal - firstTotal) / firstTotal) * 100 : 0;
+    
+    // Stats boxes
+    const statWidth = (pageWidth - margin * 2 - 15) / 4;
+    
+    // Average
+    doc.setFillColor(...COLORS.bgLight);
+    doc.roundedRect(margin, yPos, statWidth, 30, 2, 2, 'F');
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(8);
+    doc.text("Promedio historico", margin + 5, yPos + 10);
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(average), margin + 5, yPos + 22);
+    
+    // Min
+    doc.setFillColor(...COLORS.bgGreen);
+    doc.roundedRect(margin + statWidth + 5, yPos, statWidth, 30, 2, 2, 'F');
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Minimo registrado", margin + statWidth + 10, yPos + 10);
+    doc.setTextColor(...COLORS.success);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(min), margin + statWidth + 10, yPos + 22);
+    
+    // Max
+    doc.setFillColor(...COLORS.bgAmber);
+    doc.roundedRect(margin + (statWidth + 5) * 2, yPos, statWidth, 30, 2, 2, 'F');
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Maximo registrado", margin + (statWidth + 5) * 2 + 5, yPos + 10);
+    doc.setTextColor(...COLORS.warning);
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(formatCurrency(max), margin + (statWidth + 5) * 2 + 5, yPos + 22);
+    
+    // Evolution
+    doc.setFillColor(...COLORS.bgBlue);
+    doc.roundedRect(margin + (statWidth + 5) * 3, yPos, statWidth, 30, 2, 2, 'F');
+    doc.setTextColor(...COLORS.muted);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text("Evolucion total", margin + (statWidth + 5) * 3 + 5, yPos + 10);
+    doc.setTextColor(...(totalEvolution > 0 ? COLORS.warning : COLORS.success));
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.text(`${totalEvolution > 0 ? "+" : ""}${totalEvolution.toFixed(1)}%`, margin + (statWidth + 5) * 3 + 5, yPos + 22);
+    
+    yPos += 45;
+    
+    // Draw evolution chart
+    const chartData = historicalData.map(d => ({
+      period: d.period,
+      value: d.total_amount
+    }));
+    
+    drawEvolutionChart(doc, margin, yPos, pageWidth - margin * 2, 80, chartData, true);
+    yPos += 90;
+    
+    // Historical table
+    doc.setTextColor(...COLORS.text);
+    doc.setFontSize(12);
+    doc.setFont("helvetica", "bold");
+    doc.text("Detalle por periodo", margin, yPos);
+    yPos += 8;
+    
+    const histTableData = historicalData.map((item, index) => {
+      const prevItem = index > 0 ? historicalData[index - 1] : null;
+      const change = prevItem ? ((item.total_amount - prevItem.total_amount) / prevItem.total_amount) * 100 : null;
+      const diff = prevItem ? item.total_amount - prevItem.total_amount : null;
+      return [
+        item.period,
+        formatCurrency(item.total_amount),
+        diff !== null ? (diff > 0 ? "+" : "") + formatCurrency(diff) : "-",
+        change !== null ? `${change > 0 ? "+" : ""}${change.toFixed(1)}%` : "-"
+      ];
+    });
+    
+    autoTable(doc, {
+      startY: yPos,
+      head: [["Periodo", "Total", "Diferencia", "Variacion"]],
+      body: histTableData,
+      margin: { left: margin, right: margin },
+      styles: {
+        fontSize: 9,
+        cellPadding: 4,
+      },
+      headStyles: {
+        fillColor: COLORS.primary,
+        textColor: COLORS.white,
+        fontStyle: "bold",
+      },
+      alternateRowStyles: {
+        fillColor: COLORS.bgLight,
+      },
+      columnStyles: {
+        0: { cellWidth: 50 },
+        1: { halign: "right", cellWidth: 45 },
+        2: { halign: "right", cellWidth: 40 },
+        3: { halign: "right", cellWidth: 35 },
+      },
+      didParseCell: (data) => {
+        if (data.section === "body" && data.column.index === 3) {
+          const value = data.cell.raw as string;
+          if (value.startsWith("+") && parseFloat(value) > 5) {
+            data.cell.styles.textColor = COLORS.warning;
+          } else if (value.startsWith("-")) {
+            data.cell.styles.textColor = COLORS.success;
+          }
+        }
+      },
+    });
+    
+    yPos = (doc as any).lastAutoTable.finalY + 15;
+  }
+  
+  // ========== PAGE 3: DETAILED BREAKDOWN ==========
   doc.addPage();
   yPos = 20;
   
@@ -768,7 +966,7 @@ export const generateAnalysisPdf = (
   doc.setTextColor(...COLORS.text);
   doc.setFontSize(16);
   doc.setFont("helvetica", "bold");
-  doc.text("Detalle completo por categoría", margin, yPos);
+  doc.text("Detalle completo por categoria", margin, yPos);
   yPos += 12;
   
   // Categories table
@@ -787,7 +985,7 @@ export const generateAnalysisPdf = (
 
   autoTable(doc, {
     startY: yPos,
-    head: [["Categoría", "Actual", "Anterior", "Diferencia", "Variación", "Estado"]],
+    head: [["Categoria", "Actual", "Anterior", "Diferencia", "Variacion", "Estado"]],
     body: tableData,
     margin: { left: margin, right: margin },
     styles: {
@@ -937,7 +1135,7 @@ export const generateAnalysisPdf = (
   doc.setTextColor(...COLORS.muted);
   doc.setFontSize(7);
   doc.setFont("helvetica", "italic");
-  const disclaimerText = "AVISO LEGAL: Este informe es orientativo y no reemplaza la verificación manual de los documentos originales ni el asesoramiento profesional contable o legal. Los gastos marcados como 'a revisar' no necesariamente son incorrectos. ExpensaCheck no se responsabiliza por decisiones tomadas en base a este análisis.";
+  const disclaimerText = "AVISO LEGAL: Este informe es orientativo y no reemplaza la verificacion manual de los documentos originales ni el asesoramiento profesional contable o legal. Los gastos marcados como 'a revisar' no necesariamente son incorrectos. ExpensaCheck no se responsabiliza por decisiones tomadas en base a este analisis.";
   const disclaimerLines = doc.splitTextToSize(disclaimerText, pageWidth - margin * 2 - 10);
   doc.text(disclaimerLines, margin + 5, finalY + 8);
 
