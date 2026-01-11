@@ -337,12 +337,6 @@ Analizá tu expensa en ExpensaCheck`;
                         {analysis.unit && (
                           <p className="text-muted-foreground">{analysis.unit}</p>
                         )}
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2 text-xs text-muted-foreground">
-                          {analysis.scanned_at && (
-                            <span>📄 Escaneado: {formatShortDate(analysis.scanned_at)}</span>
-                          )}
-                          <span>📅 Procesado: {formatShortDate(analysis.created_at)}</span>
-                        </div>
                       </div>
                       <Tooltip>
                         <TooltipTrigger asChild>
