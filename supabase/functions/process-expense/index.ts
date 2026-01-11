@@ -104,7 +104,15 @@ DEBES responder SOLO con un JSON válido con esta estructura exacta:
       "status": "ok|attention",
       "explanation": "explicación breve en español simple"
     }
-  ]
+  ],
+  "building_profile": {
+    "neighborhood": "barrio o localidad si aparece en la dirección",
+    "zone": "CABA|GBA Norte|GBA Oeste|GBA Sur|Interior" (inferir de la dirección),
+    "unit_count_range": "1-10|11-30|31-50|51-100|100+" (estimar por contexto: si hay muchas UFs mencionadas, encargado, ascensor, etc),
+    "age_category": "Nuevo (0-10 años)|Moderno (10-30 años)|Antiguo (30-50 años)|Histórico (50+ años)" (inferir por gastos de mantenimiento, ascensor viejo, etc),
+    "has_amenities": true/false (si menciona pileta, SUM, gym, parrillas, etc),
+    "amenities": ["pileta", "sum", "gimnasio", "parrillas", "laundry", "seguridad_24h", "cocheras"] (solo los que aparezcan mencionados)
+  }
 }
 
 IMPORTANTE sobre el período:
@@ -113,7 +121,14 @@ IMPORTANTE sobre el período:
 - "period_year" debe ser el año completo (ej: 2024)
 - Buscá en el documento frases como "Expensas de", "Período", "Mes de", "Liquidación de" para identificar el período
 
-Categorías comunes: Encargado, Servicios públicos, Agua y cloacas, Mantenimiento, Seguro del edificio, Administración, Ascensores, Limpieza, Expensas extraordinarias.
+IMPORTANTE sobre building_profile:
+- Extraé toda la información que puedas inferir del documento
+- El barrio/localidad suele aparecer en la dirección del consorcio
+- Si ves gastos de pileta, seguridad 24hs, mantenimiento de SUM, etc., incluí esos amenities
+- Si no podés inferir un campo, dejalo como null
+- unit_count_range: estimá por la cantidad de UFs mencionadas, si hay portero/encargado permanente (sugiere >30 unidades), múltiples ascensores, etc.
+
+Categorías comunes de gastos: Encargado, Servicios públicos, Agua y cloacas, Mantenimiento, Seguro del edificio, Administración, Ascensores, Limpieza, Expensas extraordinarias.
 
 Si hay gastos que parecen inusualmente altos (más del 30% del promedio típico), márcalos con status "attention".
 Usa español argentino simple, evita jerga contable.`
@@ -123,7 +138,7 @@ Usa español argentino simple, evita jerga contable.`
             content: [
               {
                 type: "text",
-                text: "Analizá esta liquidación de expensas y extraé los datos estructurados:"
+                text: "Analizá esta liquidación de expensas y extraé los datos estructurados, incluyendo información del perfil del edificio:"
               },
               {
                 type: "image_url",
@@ -134,7 +149,7 @@ Usa español argentino simple, evita jerga contable.`
             ]
           }
         ],
-        max_tokens: 2000,
+        max_tokens: 2500,
       }),
     });
 
@@ -299,6 +314,81 @@ Usa español argentino simple, evita jerga contable.`
 
       if (catError) {
         console.error("Categories insert error:", catError);
+      }
+    }
+
+    // Update or create building profile with extracted data
+    if (normalizedBuildingName && extractedData.building_profile) {
+      const profileData = extractedData.building_profile;
+      
+      // Check if a profile already exists for this building and user
+      const { data: existingProfile } = await supabase
+        .from("building_profiles")
+        .select("id, neighborhood, zone, unit_count_range, age_category, has_amenities, amenities")
+        .eq("user_id", userId)
+        .eq("building_name", normalizedBuildingName)
+        .single();
+
+      if (existingProfile) {
+        // Update only if extracted data is more complete (don't overwrite existing with nulls)
+        const updates: Record<string, any> = {};
+        
+        if (profileData.neighborhood && !existingProfile.neighborhood) {
+          updates.neighborhood = profileData.neighborhood;
+        }
+        if (profileData.zone && !existingProfile.zone) {
+          updates.zone = profileData.zone;
+        }
+        if (profileData.unit_count_range && !existingProfile.unit_count_range) {
+          updates.unit_count_range = profileData.unit_count_range;
+        }
+        if (profileData.age_category && !existingProfile.age_category) {
+          updates.age_category = profileData.age_category;
+        }
+        if (profileData.has_amenities !== null && profileData.has_amenities !== undefined && !existingProfile.has_amenities) {
+          updates.has_amenities = profileData.has_amenities;
+        }
+        if (profileData.amenities && profileData.amenities.length > 0) {
+          // Merge amenities without duplicates
+          const existingAmenities = existingProfile.amenities || [];
+          const newAmenities = [...new Set([...existingAmenities, ...profileData.amenities])];
+          if (newAmenities.length > existingAmenities.length) {
+            updates.amenities = newAmenities;
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          const { error: profileUpdateError } = await supabase
+            .from("building_profiles")
+            .update(updates)
+            .eq("id", existingProfile.id);
+
+          if (profileUpdateError) {
+            console.error("Error updating building profile:", profileUpdateError);
+          } else {
+            console.log("Building profile updated with extracted data:", updates);
+          }
+        }
+      } else {
+        // Create new profile with extracted data
+        const { error: profileInsertError } = await supabase
+          .from("building_profiles")
+          .insert({
+            user_id: userId,
+            building_name: normalizedBuildingName,
+            neighborhood: profileData.neighborhood || null,
+            zone: profileData.zone || null,
+            unit_count_range: profileData.unit_count_range || null,
+            age_category: profileData.age_category || null,
+            has_amenities: profileData.has_amenities || false,
+            amenities: profileData.amenities || [],
+          });
+
+        if (profileInsertError) {
+          console.error("Error creating building profile:", profileInsertError);
+        } else {
+          console.log("Building profile created from extracted data");
+        }
       }
     }
 
