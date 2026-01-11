@@ -42,7 +42,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { TrendChart } from "@/components/TrendChart";
+import { Sparkles } from "lucide-react";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
@@ -697,6 +697,23 @@ Analizá tu expensa en ExpensaCheck`;
             </CardContent>
           </Card>
 
+          {/* AI Summary */}
+          <Card variant="soft" className="mb-8 animate-fade-in-up border-primary/20 bg-primary/5">
+            <CardContent className="p-4 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                <Sparkles className="w-4 h-4 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium text-primary mb-1">Resumen IA</p>
+                <p className="text-sm text-muted-foreground">
+                  {attentionItems > 0
+                    ? `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. ${attentionItems} categoría${attentionItems > 1 ? 's merecen' : ' merece'} revisión por aumentos significativos.`
+                    : `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. Todos los rubros están dentro de parámetros normales.`}
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Categories Breakdown */}
           {categories.length > 0 && (
             <div className="grid gap-4 mb-8">
@@ -781,12 +798,6 @@ Analizá tu expensa en ExpensaCheck`;
             </div>
           )}
 
-          {/* Trend Chart - Comparison with previous period by category */}
-          {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
-            <div className="mb-8">
-              <TrendChart categories={categories} period={analysis.period} />
-            </div>
-          )}
 
           {/* Visual Comparison Chart - Bar chart comparing with previous period */}
           {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
