@@ -58,6 +58,8 @@ const contactSchema = z.object({
     .trim()
     .min(10, { message: "El mensaje debe tener al menos 10 caracteres" })
     .max(2000, { message: "El mensaje no puede superar los 2000 caracteres" }),
+  // Honeypot field - should remain empty for real users
+  honeypot: z.string().max(0).optional(),
 });
 
 type ContactFormData = z.infer<typeof contactSchema>;
@@ -73,6 +75,7 @@ const Contacto = () => {
       email: "",
       subject: "",
       message: "",
+      honeypot: "", // Honeypot - remains empty for real users
     },
   });
 
@@ -221,6 +224,24 @@ const Contacto = () => {
                               {field.value.length}/2000
                             </span>
                           </div>
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Honeypot field - hidden from real users, bots will fill it */}
+                    <FormField
+                      control={form.control}
+                      name="honeypot"
+                      render={({ field }) => (
+                        <FormItem className="hidden" aria-hidden="true">
+                          <FormLabel>Leave this empty</FormLabel>
+                          <FormControl>
+                            <Input 
+                              {...field} 
+                              tabIndex={-1} 
+                              autoComplete="off"
+                            />
+                          </FormControl>
                         </FormItem>
                       )}
                     />
