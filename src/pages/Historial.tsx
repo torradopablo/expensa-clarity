@@ -264,9 +264,9 @@ const Historial = () => {
     return Array.from(yearsSet).sort((a, b) => b - a);
   }, [analyses]);
 
-  // Filter analyses
+  // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
-    return analyses.filter(analysis => {
+    const filtered = analyses.filter(analysis => {
       // Building filter
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
@@ -287,6 +287,13 @@ const Historial = () => {
       }
       
       return true;
+    });
+
+    // Sort by period_date (newest first), fallback to created_at
+    return filtered.sort((a, b) => {
+      const dateA = a.period_date ? new Date(a.period_date).getTime() : new Date(a.created_at).getTime();
+      const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
+      return dateB - dateA; // Descending order (newest first)
     });
   }, [analyses, buildingFilter, monthFilter, yearFilter]);
 
