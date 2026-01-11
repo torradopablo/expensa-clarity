@@ -17,20 +17,82 @@ serve(async (req) => {
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+    // Parse request body for optional filters
+    let filters: {
+      unit_count_range?: string;
+      age_category?: string;
+      zone?: string;
+      has_amenities?: boolean;
+    } | null = null;
+
+    try {
+      const body = await req.json();
+      filters = body.filters || null;
+    } catch {
+      // No body or invalid JSON, proceed without filters
+    }
+
     // Get all completed analyses from all users (anonymized)
     const { data: allAnalyses, error } = await supabase
       .from("expense_analyses")
-      .select("period, total_amount, building_name, created_at")
+      .select(`
+        period, 
+        total_amount, 
+        building_name, 
+        created_at,
+        building_profile_id
+      `)
       .eq("status", "completed")
       .not("building_name", "is", null)
       .order("created_at", { ascending: true });
 
     if (error) throw error;
 
+    // If filters are provided, fetch building profiles and filter analyses
+    let filteredAnalyses = allAnalyses || [];
+
+    if (filters && Object.keys(filters).length > 0) {
+      // Get all building profiles that match the filters
+      let profilesQuery = supabase.from("building_profiles").select("id, building_name");
+
+      if (filters.unit_count_range) {
+        profilesQuery = profilesQuery.eq("unit_count_range", filters.unit_count_range);
+      }
+      if (filters.age_category) {
+        profilesQuery = profilesQuery.eq("age_category", filters.age_category);
+      }
+      if (filters.zone) {
+        profilesQuery = profilesQuery.eq("zone", filters.zone);
+      }
+      if (filters.has_amenities !== undefined) {
+        profilesQuery = profilesQuery.eq("has_amenities", filters.has_amenities);
+      }
+
+      const { data: matchingProfiles, error: profilesError } = await profilesQuery;
+
+      if (profilesError) throw profilesError;
+
+      // Get building names that match the profile filters
+      const matchingBuildingNames = new Set(
+        (matchingProfiles || []).map(p => p.building_name.toLowerCase().trim())
+      );
+
+      // Filter analyses to only include those with matching building profiles
+      if (matchingBuildingNames.size > 0) {
+        filteredAnalyses = filteredAnalyses.filter(analysis => {
+          const normalizedName = analysis.building_name?.toLowerCase().trim();
+          return normalizedName && matchingBuildingNames.has(normalizedName);
+        });
+      } else {
+        // No matching profiles found, return empty data
+        filteredAnalyses = [];
+      }
+    }
+
     // Group by period and calculate average
     const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();
 
-    for (const analysis of allAnalyses || []) {
+    for (const analysis of filteredAnalyses) {
       const period = analysis.period;
       
       if (!periodMap.has(period)) {
@@ -77,8 +139,8 @@ serve(async (req) => {
     }
 
     // Calculate statistics
-    const totalBuildings = new Set(allAnalyses?.map(a => a.building_name) || []).size;
-    const totalAnalyses = allAnalyses?.length || 0;
+    const totalBuildings = new Set(filteredAnalyses.map(a => a.building_name)).size;
+    const totalAnalyses = filteredAnalyses.length;
 
     return new Response(
       JSON.stringify({ 
@@ -87,7 +149,8 @@ serve(async (req) => {
         stats: {
           totalBuildings,
           totalAnalyses,
-          periodsCount: trendData.length
+          periodsCount: trendData.length,
+          filtersApplied: filters ? Object.keys(filters).length > 0 : false
         }
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
