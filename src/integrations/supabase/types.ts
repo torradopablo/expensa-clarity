@@ -14,9 +14,58 @@ export type Database = {
   }
   public: {
     Tables: {
+      building_profiles: {
+        Row: {
+          age_category: string | null
+          amenities: string[] | null
+          building_name: string
+          city: string | null
+          construction_year: number | null
+          created_at: string
+          has_amenities: boolean | null
+          id: string
+          neighborhood: string | null
+          unit_count_range: string | null
+          updated_at: string
+          user_id: string
+          zone: string | null
+        }
+        Insert: {
+          age_category?: string | null
+          amenities?: string[] | null
+          building_name: string
+          city?: string | null
+          construction_year?: number | null
+          created_at?: string
+          has_amenities?: boolean | null
+          id?: string
+          neighborhood?: string | null
+          unit_count_range?: string | null
+          updated_at?: string
+          user_id: string
+          zone?: string | null
+        }
+        Update: {
+          age_category?: string | null
+          amenities?: string[] | null
+          building_name?: string
+          city?: string | null
+          construction_year?: number | null
+          created_at?: string
+          has_amenities?: boolean | null
+          id?: string
+          neighborhood?: string | null
+          unit_count_range?: string | null
+          updated_at?: string
+          user_id?: string
+          zone?: string | null
+        }
+        Relationships: []
+      }
       expense_analyses: {
         Row: {
           building_name: string | null
+          building_profile_id: string | null
           created_at: string
           file_url: string | null
           id: string
@@ -34,6 +83,7 @@ export type Database = {
         }
         Insert: {
           building_name?: string | null
+          building_profile_id?: string | null
           created_at?: string
           file_url?: string | null
           id?: string
@@ -51,6 +101,7 @@ export type Database = {
         }
         Update: {
           building_name?: string | null
+          building_profile_id?: string | null
           created_at?: string
           file_url?: string | null
           id?: string
@@ -66,7 +117,15 @@ export type Database = {
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "expense_analyses_building_profile_id_fkey"
+            columns: ["building_profile_id"]
+            isOneToOne: false
+            referencedRelation: "building_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       expense_categories: {
         Row: {
