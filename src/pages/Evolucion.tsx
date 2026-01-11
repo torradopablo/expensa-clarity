@@ -215,6 +215,10 @@ const Evolucion = () => {
     if (chartData.length === 0) return [];
 
     const baseUserValue = chartData[0].total;
+    
+    // Prevent division by zero
+    if (baseUserValue === 0) return [];
+    
     const inflationMap = new Map(inflationData.map(d => [d.period, d]));
     const buildingsMap = new Map(buildingsTrend.map(d => [d.period, d]));
 
@@ -226,7 +230,8 @@ const Evolucion = () => {
     const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
 
     return chartData.map((item, index) => {
-      const userPercent = index === 0 ? 0 : ((item.total - baseUserValue) / baseUserValue) * 100;
+      // Calculate user percent change from base
+      const userPercent = ((item.total - baseUserValue) / baseUserValue) * 100;
       
       const periodYYYYMM = periodToYYYYMM(item.period);
       const inflationItem = periodYYYYMM ? inflationMap.get(periodYYYYMM) : null;
