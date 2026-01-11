@@ -221,6 +221,11 @@ const PricingSection = () => (
     <div className="container">
       <div className="max-w-lg mx-auto text-center">
         <div className="bg-card rounded-3xl p-8 md:p-12 shadow-soft-lg animate-scale-in">
+          {/* Promo banner */}
+          <div className="bg-gradient-hero text-primary-foreground rounded-xl p-4 mb-6 animate-pulse-soft">
+            <p className="text-sm font-semibold">🎉 ¡Tu primer análisis es GRATIS!</p>
+            <p className="text-xs opacity-90">Registrate y probá ExpensaCheck sin costo</p>
+          </div>
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-soft text-primary text-sm font-medium mb-6">
             Sin suscripción
           </div>
@@ -229,7 +234,7 @@ const PricingSection = () => (
             Simple y transparente. Pagás solo cuando lo necesitás.
           </p>
           <div className="mb-8">
-            <span className="text-5xl font-bold">$500</span>
+            <span className="text-5xl font-bold">$1.500</span>
             <span className="text-muted-foreground ml-2">ARS / expensa</span>
           </div>
           <ul className="space-y-4 text-left mb-8">

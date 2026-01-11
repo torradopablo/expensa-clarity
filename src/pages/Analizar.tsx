@@ -268,7 +268,7 @@ const PaymentStep = ({
           <CardDescription>
             {isFreeAnalysis 
               ? (isFirstAnalysis 
-                  ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $500 ARS."
+                  ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $1.500 ARS."
                   : "Tu análisis es gratis"
                 )
               : "Pago único y seguro con Mercado Pago"
@@ -297,14 +297,14 @@ const PaymentStep = ({
             <div className="flex justify-between items-center">
               <span className="text-muted-foreground">Análisis de expensa</span>
               <span className={`font-medium ${isFreeAnalysis ? "line-through text-muted-foreground" : ""}`}>
-                $500 ARS
+                $1.500 ARS
               </span>
             </div>
             <div className="border-t border-border pt-4">
               <div className="flex justify-between items-center">
                 <span className="font-semibold">Total</span>
                 <span className={`text-2xl font-bold ${isFreeAnalysis ? "text-status-ok" : "text-primary"}`}>
-                  {isFreeAnalysis ? "GRATIS" : "$500 ARS"}
+                  {isFreeAnalysis ? "GRATIS" : "$1.500 ARS"}
                 </span>
               </div>
             </div>
