@@ -21,10 +21,12 @@ export type Database = {
           building_name: string
           city: string | null
           construction_year: number | null
+          country: string | null
           created_at: string
           has_amenities: boolean | null
           id: string
           neighborhood: string | null
+          province: string | null
           unit_count_range: string | null
           updated_at: string
           user_id: string
@@ -36,10 +38,12 @@ export type Database = {
           building_name: string
           city?: string | null
           construction_year?: number | null
+          country?: string | null
           created_at?: string
           has_amenities?: boolean | null
           id?: string
           neighborhood?: string | null
+          province?: string | null
           unit_count_range?: string | null
           updated_at?: string
           user_id: string
@@ -51,10 +55,12 @@ export type Database = {
           building_name?: string
           city?: string | null
           construction_year?: number | null
+          country?: string | null
           created_at?: string
           has_amenities?: boolean | null
           id?: string
           neighborhood?: string | null
+          province?: string | null
           unit_count_range?: string | null
           updated_at?: string
           user_id?: string
