@@ -242,8 +242,9 @@ const Evolucion = () => {
     const firstUserPeriodYYYYMM = getYYYYMM(chartData[0].periodDate, chartData[0].period);
     const baseInflation = firstUserPeriodYYYYMM ? inflationMap.get(firstUserPeriodYYYYMM) : null;
     
-    // Find base buildings value
+    // Find base buildings value - use period matching for more accurate comparison
     const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
+    const baseNormalizedPercent = baseBuildingsData?.normalizedPercent ?? 0;
 
     return chartData.map((item) => {
       // Calculate user percent change from base
@@ -256,14 +257,18 @@ const Evolucion = () => {
       let inflationEstimated = false;
       
       if (inflationItem && baseInflation) {
+        // Calculate inflation percent change from base (same normalization as user)
         inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
         inflationEstimated = inflationItem.is_estimated;
       }
 
       const buildingsItem = buildingsMap.get(item.period);
       let buildingsPercent: number | null = null;
-      if (buildingsItem && baseBuildingsData) {
-        buildingsPercent = buildingsItem.normalizedPercent - (baseBuildingsData.normalizedPercent || 0);
+      
+      if (buildingsItem && typeof buildingsItem.normalizedPercent === 'number') {
+        // Calculate the relative change from base period
+        // This should give us the % change from the first period, matching userPercent calculation
+        buildingsPercent = buildingsItem.normalizedPercent - baseNormalizedPercent;
       }
 
       return {
