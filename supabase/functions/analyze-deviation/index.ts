@@ -12,17 +12,80 @@ interface AnalysisRequest {
   buildingName: string;
 }
 
+async function callLovableAI(prompt: string, systemPrompt: string): Promise<string> {
+  const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+  if (!LOVABLE_API_KEY) {
+    throw new Error("LOVABLE_API_KEY is not configured");
+  }
+
+  const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${LOVABLE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-3-flash-preview",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt }
+      ],
+      max_tokens: 500,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    throw new Error(`Lovable AI error: ${response.status}`);
+  }
+
+  const aiResponse = await response.json();
+  return aiResponse.choices?.[0]?.message?.content || "";
+}
+
+async function callOpenAI(prompt: string, systemPrompt: string): Promise<string> {
+  const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
+  if (!OPENAI_API_KEY) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
+
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${OPENAI_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: prompt }
+      ],
+      max_completion_tokens: 500,
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    const errorText = await response.text();
+    console.error("OpenAI error:", response.status, errorText);
+    throw new Error(`OpenAI error: ${response.status}`);
+  }
+
+  const aiResponse = await response.json();
+  return aiResponse.choices?.[0]?.message?.content || "";
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) {
-      throw new Error("LOVABLE_API_KEY is not configured");
-    }
-
     const { userTrend, inflationTrend, buildingsTrend, buildingName }: AnalysisRequest = await req.json();
 
     // Calculate deviations
@@ -33,6 +96,8 @@ serve(async (req) => {
     const deviationFromInflation = userLatest - inflationLatest;
     const deviationFromBuildings = userLatest - buildingsLatest;
 
+    const systemPrompt = "Sos un asistente experto en análisis de expensas de consorcios en Argentina. Tus respuestas son concisas, claras y accionables.";
+    
     const prompt = `Sos un experto analista financiero de expensas de consorcios en Argentina. Analiza los siguientes datos de evolución de expensas:
 
 **Edificio analizado:** ${buildingName}
@@ -57,24 +122,20 @@ Proporciona un análisis breve y accionable (máximo 3-4 oraciones) que:
 
 Responde en español argentino, de forma clara y directa.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
-        messages: [
-          { role: "system", content: "Sos un asistente experto en análisis de expensas de consorcios en Argentina. Tus respuestas son concisas, claras y accionables." },
-          { role: "user", content: prompt }
-        ],
-        max_tokens: 500,
-      }),
-    });
-
-    if (!response.ok) {
-      if (response.status === 429) {
+    // Determine which AI provider to use
+    const aiProvider = Deno.env.get("AI_PROVIDER") || "lovable";
+    let analysis: string | null = null;
+    
+    try {
+      if (aiProvider.toLowerCase() === "openai") {
+        console.log("Using OpenAI provider");
+        analysis = await callOpenAI(prompt, systemPrompt);
+      } else {
+        console.log("Using Lovable AI provider");
+        analysis = await callLovableAI(prompt, systemPrompt);
+      }
+    } catch (aiError) {
+      if (aiError instanceof Error && aiError.message === "RATE_LIMIT") {
         return new Response(
           JSON.stringify({ 
             error: "Rate limit exceeded",
@@ -88,11 +149,8 @@ Responde en español argentino, de forma clara y directa.`;
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      throw new Error(`AI gateway error: ${response.status}`);
+      throw aiError;
     }
-
-    const aiResponse = await response.json();
-    const analysis = aiResponse.choices?.[0]?.message?.content || null;
 
     return new Response(
       JSON.stringify({ 
@@ -102,7 +160,8 @@ Responde en español argentino, de forma clara y directa.`;
           fromInflation: deviationFromInflation,
           fromBuildings: deviationFromBuildings,
           isSignificant: Math.abs(deviationFromInflation) > 5 || Math.abs(deviationFromBuildings) > 5
-        }
+        },
+        provider: aiProvider
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
