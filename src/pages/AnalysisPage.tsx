@@ -192,6 +192,7 @@ const AnalysisPage = () => {
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [previousPeriodLabel, setPreviousPeriodLabel] = useState<string | null>(null);
   const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [evolutionData, setEvolutionData] = useState<EvolutionDataPoint[]>([]);
   const [deviation, setDeviation] = useState<Deviation | null>(null);
@@ -230,7 +231,9 @@ const AnalysisPage = () => {
           .order("current_amount", { ascending: false });
 
         if (categoriesError) throw categoriesError;
-        setCategories(categoriesData || []);
+        const rawCategories = (categoriesData || []) as Category[];
+        setCategories(rawCategories);
+        setPreviousPeriodLabel(null);
 
         // Check for existing shared link
         const { data: existingLink } = await supabase
@@ -256,6 +259,47 @@ const AnalysisPage = () => {
 
           if (historicalAnalyses && historicalAnalyses.length > 0) {
             setHistoricalData(historicalAnalyses);
+
+            // Enrich previous-period data for older analyses (when previous_* fields are null)
+            const currentIdx = historicalAnalyses.findIndex((h) => h.id === analysisData.id);
+            const previousAnalysis = currentIdx > 0 ? historicalAnalyses[currentIdx - 1] : null;
+
+            if (previousAnalysis) {
+              setPreviousPeriodLabel(previousAnalysis.period);
+
+              const needsPrevTotal = analysisData.previous_total === null;
+              const needsPrevCategories = rawCategories.some((c) => c.previous_amount === null);
+
+              if (needsPrevTotal || needsPrevCategories) {
+                const { data: prevCats, error: prevCatsError } = await supabase
+                  .from("expense_categories")
+                  .select("name, current_amount")
+                  .eq("analysis_id", previousAnalysis.id);
+
+                if (prevCatsError) throw prevCatsError;
+
+                const normalizeName = (name: string) => name.toLowerCase().trim();
+                const prevMap = new Map<string, number>(
+                  (prevCats || []).map((c) => [normalizeName(c.name), c.current_amount])
+                );
+
+                if (needsPrevCategories) {
+                  const enriched = rawCategories.map((c) => ({
+                    ...c,
+                    previous_amount:
+                      c.previous_amount !== null
+                        ? c.previous_amount
+                        : (prevMap.get(normalizeName(c.name)) ?? null),
+                  }));
+
+                  setCategories(enriched);
+                }
+
+                if (needsPrevTotal) {
+                  setAnalysis({ ...(analysisData as any), previous_total: previousAnalysis.total_amount });
+                }
+              }
+            }
 
             // Fetch inflation data
             const { data: inflationData } = await supabase
@@ -760,7 +804,7 @@ Analizá tu expensa en ExpensaCheck`;
                       : null
                   }))
                   .sort((a, b) => b.rightAmount - a.rightAmount)}
-                leftLabel="Mes anterior"
+                leftLabel={previousPeriodLabel ? previousPeriodLabel : "Mes anterior"}
                 rightLabel={analysis.period}
               />
             </div>
