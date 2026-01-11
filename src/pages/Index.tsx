@@ -264,79 +264,52 @@ const HowItWorksSection = () => {
 };
 
 const BenefitsSection = () => {
-  const benefits = [
+  const pillars = [
     {
       icon: Users,
-      title: "Referencia de la comunidad",
-      description: "Compará tus expensas con edificios similares de nuestra base de datos."
+      title: "Comunidad de edificios",
+      description: "Compará con edificios similares al tuyo",
+      detail: "Tu expensa se contrasta con nuestra base de datos de edificios reales para darte un punto de referencia concreto.",
+      color: "secondary"
     },
     {
       icon: LineChart,
       title: "Contexto inflacionario",
-      description: "Analizamos si los aumentos están alineados con la inflación del país."
+      description: "Datos oficiales de inflación argentina",
+      detail: "Analizamos si los aumentos están alineados con la inflación del país o si hay algo fuera de lo normal.",
+      color: "primary"
     },
     {
       icon: TrendingUp,
-      title: "Detectá desvíos reales",
-      description: "Te alertamos cuando algo subió más que el promedio del mercado."
-    },
-    {
-      icon: FileText,
-      title: "Explicaciones claras",
-      description: "Sin jerga contable. Todo explicado en palabras simples."
+      title: "Tu histórico de expensas",
+      description: "Evolución de tus propios gastos",
+      detail: "Seguí mes a mes cómo evolucionan tus expensas y detectá patrones o desvíos en tu edificio.",
+      color: "accent"
     }
   ];
 
   return (
     <section id="beneficios" className="py-20 bg-gradient-soft">
       <div className="container">
-        <div className="text-center space-y-4 mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold">¿Por qué ExpensaCheck?</h2>
+        <div className="text-center space-y-4 mb-12">
+          <h2 className="text-3xl md:text-4xl font-bold">Análisis con triple contexto</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Análisis inteligente respaldado por datos reales de la comunidad y el contexto económico argentino.
+            Tu expensa comparada con la comunidad, la inflación del país y tu propio historial.
           </p>
         </div>
-        {/* Community & Inflation highlight */}
-        <div className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-md mb-10 border border-primary/20">
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
-                <Users className="w-6 h-6 text-secondary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Comunidad de edificios</h3>
-                <p className="text-sm text-muted-foreground">
-                  Tu análisis se contrasta con una base de datos de edificios reales, 
-                  dándote un punto de referencia concreto para saber si tus expensas están dentro de lo normal.
-                </p>
-              </div>
-            </div>
-            <div className="flex items-start gap-4">
-              <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center flex-shrink-0">
-                <LineChart className="w-6 h-6 text-primary" />
-              </div>
-              <div>
-                <h3 className="text-lg font-semibold mb-2">Índices de inflación actualizados</h3>
-                <p className="text-sm text-muted-foreground">
-                  Usamos datos oficiales de inflación de Argentina para contextualizar cada aumento. 
-                  Así sabés si es esperable o si hay algo que revisar.
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {benefits.map((benefit, index) => (
+        <div className="grid md:grid-cols-3 gap-6">
+          {pillars.map((pillar, index) => (
             <div 
               key={index}
-              className="bg-card rounded-2xl p-6 shadow-soft-sm hover:shadow-soft-md transition-all animate-fade-in-up"
+              className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-md hover:shadow-soft-lg transition-all animate-fade-in-up border border-border/50"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="w-12 h-12 rounded-xl bg-secondary-soft flex items-center justify-center mb-4">
-                <benefit.icon className="w-6 h-6 text-secondary" />
+              <div className={`w-14 h-14 rounded-xl ${pillar.color === 'primary' ? 'bg-primary-soft' : pillar.color === 'secondary' ? 'bg-secondary-soft' : 'bg-accent/10'} flex items-center justify-center mb-5`}>
+                <pillar.icon className={`w-7 h-7 ${pillar.color === 'primary' ? 'text-primary' : pillar.color === 'secondary' ? 'text-secondary' : 'text-accent-foreground'}`} />
               </div>
-              <h3 className="text-lg font-semibold mb-2">{benefit.title}</h3>
-              <p className="text-sm text-muted-foreground">{benefit.description}</p>
+              <h3 className="text-xl font-semibold mb-2">{pillar.title}</h3>
+              <p className="text-sm font-medium text-muted-foreground mb-3">{pillar.description}</p>
+              <p className="text-sm text-muted-foreground/80">{pillar.detail}</p>
             </div>
           ))}
         </div>
