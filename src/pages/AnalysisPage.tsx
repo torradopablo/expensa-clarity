@@ -47,6 +47,7 @@ import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
+import { ComparisonChart } from "@/components/ComparisonChart";
 
 
 const iconMap: Record<string, any> = {
@@ -740,6 +741,28 @@ Analizá tu expensa en ExpensaCheck`;
           {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
             <div className="mb-8">
               <TrendChart categories={categories} period={analysis.period} />
+            </div>
+          )}
+
+          {/* Visual Comparison Chart - Bar chart comparing with previous period */}
+          {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
+            <div className="mb-8">
+              <ComparisonChart
+                data={categories
+                  .filter(c => c.previous_amount !== null)
+                  .map(c => ({
+                    name: c.name,
+                    leftAmount: c.previous_amount || 0,
+                    rightAmount: c.current_amount,
+                    diff: c.current_amount - (c.previous_amount || 0),
+                    changePercent: c.previous_amount 
+                      ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100 
+                      : null
+                  }))
+                  .sort((a, b) => b.rightAmount - a.rightAmount)}
+                leftLabel="Mes anterior"
+                rightLabel={analysis.period}
+              />
             </div>
           )}
 

@@ -28,6 +28,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { TrendChart } from "@/components/TrendChart";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
+import { ComparisonChart } from "@/components/ComparisonChart";
 import {
   AreaChart,
   Area,
@@ -585,6 +586,28 @@ const SharedAnalysis = () => {
             {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
               <div className="mb-8">
                 <TrendChart categories={categories} period={analysis.period} />
+              </div>
+            )}
+
+            {/* Visual Comparison Chart - Bar chart comparing with previous period */}
+            {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
+              <div className="mb-8">
+                <ComparisonChart
+                  data={categories
+                    .filter(c => c.previous_amount !== null)
+                    .map(c => ({
+                      name: c.name,
+                      leftAmount: c.previous_amount || 0,
+                      rightAmount: c.current_amount,
+                      diff: c.current_amount - (c.previous_amount || 0),
+                      changePercent: c.previous_amount 
+                        ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100 
+                        : null
+                    }))
+                    .sort((a, b) => b.rightAmount - a.rightAmount)}
+                  leftLabel="Mes anterior"
+                  rightLabel={analysis.period}
+                />
               </div>
             )}
 
