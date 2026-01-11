@@ -115,6 +115,7 @@ interface Analysis {
   id: string;
   building_name: string | null;
   period: string;
+  period_date: string | null;
   total_amount: number;
   created_at: string;
   scanned_at: string | null;
@@ -122,6 +123,7 @@ interface Analysis {
 
 interface ChartData {
   period: string;
+  periodDate: string | null;
   total: number;
   id: string;
 }
@@ -194,7 +196,11 @@ const Evolucion = () => {
       filtered = analyses.filter(a => a.building_name === selectedBuilding);
     }
 
+    // Sort by period_date if available, otherwise parse period string
     const sorted = [...filtered].sort((a, b) => {
+      if (a.period_date && b.period_date) {
+        return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
+      }
       const dateA = parseSpanishPeriod(a.period);
       const dateB = parseSpanishPeriod(b.period);
       if (dateA && dateB) {
@@ -205,6 +211,7 @@ const Evolucion = () => {
 
     return sorted.map(a => ({
       period: a.period,
+      periodDate: a.period_date,
       total: a.total_amount,
       id: a.id,
     }));
@@ -222,18 +229,27 @@ const Evolucion = () => {
     const inflationMap = new Map(inflationData.map(d => [d.period, d]));
     const buildingsMap = new Map(buildingsTrend.map(d => [d.period, d]));
 
+    // Helper to get YYYY-MM from period_date or parse from period string
+    const getYYYYMM = (periodDate: string | null, period: string): string | null => {
+      if (periodDate) {
+        const date = new Date(periodDate);
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+      }
+      return periodToYYYYMM(period);
+    };
+
     // Find base inflation value for the first user period
-    const firstUserPeriodYYYYMM = periodToYYYYMM(chartData[0].period);
+    const firstUserPeriodYYYYMM = getYYYYMM(chartData[0].periodDate, chartData[0].period);
     const baseInflation = firstUserPeriodYYYYMM ? inflationMap.get(firstUserPeriodYYYYMM) : null;
     
     // Find base buildings value
     const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
 
-    return chartData.map((item, index) => {
+    return chartData.map((item) => {
       // Calculate user percent change from base
       const userPercent = ((item.total - baseUserValue) / baseUserValue) * 100;
       
-      const periodYYYYMM = periodToYYYYMM(item.period);
+      const periodYYYYMM = getYYYYMM(item.periodDate, item.period);
       const inflationItem = periodYYYYMM ? inflationMap.get(periodYYYYMM) : null;
       
       let inflationPercent: number | null = null;
@@ -403,7 +419,7 @@ const Evolucion = () => {
       try {
         const { data, error } = await supabase
           .from("expense_analyses")
-          .select("id, building_name, period, total_amount, created_at, scanned_at")
+          .select("id, building_name, period, period_date, total_amount, created_at, scanned_at")
           .eq("status", "completed")
           .order("created_at", { ascending: true });
 

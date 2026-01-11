@@ -11,8 +11,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,8 +21,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { format } from "date-fns";
-import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { 
@@ -39,7 +35,6 @@ import {
   Plus,
   Filter,
   X,
-  CalendarIcon,
   ArrowLeftRight,
   Trash2,
   LineChart
@@ -106,12 +101,29 @@ interface Analysis {
   id: string;
   building_name: string | null;
   period: string;
+  period_date: string | null;
   unit: string | null;
   total_amount: number;
   previous_total: number | null;
   status: string;
   created_at: string;
 }
+
+// Month names in Spanish
+const MONTHS = [
+  { value: 1, label: "Enero" },
+  { value: 2, label: "Febrero" },
+  { value: 3, label: "Marzo" },
+  { value: 4, label: "Abril" },
+  { value: 5, label: "Mayo" },
+  { value: 6, label: "Junio" },
+  { value: 7, label: "Julio" },
+  { value: 8, label: "Agosto" },
+  { value: 9, label: "Septiembre" },
+  { value: 10, label: "Octubre" },
+  { value: 11, label: "Noviembre" },
+  { value: 12, label: "Diciembre" },
+];
 
 const Historial = () => {
   const navigate = useNavigate();
@@ -127,11 +139,10 @@ const Historial = () => {
   const [analysisToDelete, setAnalysisToDelete] = useState<Analysis | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   
-  // Filter states
+  // Filter states - now using month/year instead of date range
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
-  const [periodFilter, setPeriodFilter] = useState<string>("all");
-  const [dateFrom, setDateFrom] = useState<Date | undefined>();
-  const [dateTo, setDateTo] = useState<Date | undefined>();
+  const [monthFilter, setMonthFilter] = useState<string>("all");
+  const [yearFilter, setYearFilter] = useState<string>("all");
 
   const handleDeleteClick = (analysis: Analysis, e: React.MouseEvent) => {
     e.preventDefault();
@@ -205,9 +216,16 @@ const Historial = () => {
     return unique.sort();
   }, [analyses]);
 
-  const periods = useMemo(() => {
-    const unique = [...new Set(analyses.map(a => a.period))];
-    return unique.sort().reverse();
+  // Get unique years from period_date
+  const years = useMemo(() => {
+    const yearsSet = new Set<number>();
+    analyses.forEach(a => {
+      if (a.period_date) {
+        const year = new Date(a.period_date).getFullYear();
+        yearsSet.add(year);
+      }
+    });
+    return Array.from(yearsSet).sort((a, b) => b - a);
   }, [analyses]);
 
   // Filter analyses
@@ -217,33 +235,31 @@ const Historial = () => {
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
-      // Period filter
-      if (periodFilter !== "all" && analysis.period !== periodFilter) {
-        return false;
-      }
-      // Date range filter
-      const analysisDate = new Date(analysis.created_at);
-      if (dateFrom && analysisDate < dateFrom) {
-        return false;
-      }
-      if (dateTo) {
-        const endOfDay = new Date(dateTo);
-        endOfDay.setHours(23, 59, 59, 999);
-        if (analysisDate > endOfDay) {
+      
+      // Month/Year filter using period_date
+      if (analysis.period_date) {
+        const periodDate = new Date(analysis.period_date);
+        const analysisMonth = periodDate.getMonth() + 1;
+        const analysisYear = periodDate.getFullYear();
+        
+        if (monthFilter !== "all" && analysisMonth !== parseInt(monthFilter)) {
+          return false;
+        }
+        if (yearFilter !== "all" && analysisYear !== parseInt(yearFilter)) {
           return false;
         }
       }
+      
       return true;
     });
-  }, [analyses, buildingFilter, periodFilter, dateFrom, dateTo]);
+  }, [analyses, buildingFilter, monthFilter, yearFilter]);
 
-  const hasActiveFilters = buildingFilter !== "all" || periodFilter !== "all" || dateFrom || dateTo;
+  const hasActiveFilters = buildingFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
 
   const clearFilters = () => {
     setBuildingFilter("all");
-    setPeriodFilter("all");
-    setDateFrom(undefined);
-    setDateTo(undefined);
+    setMonthFilter("all");
+    setYearFilter("all");
   };
 
   useEffect(() => {
@@ -357,7 +373,7 @@ const Historial = () => {
                     </Button>
                   )}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-3 sm:grid-cols-3">
                   {/* Building filter */}
                   <Select value={buildingFilter} onValueChange={setBuildingFilter}>
                     <SelectTrigger className="h-9">
@@ -373,70 +389,35 @@ const Historial = () => {
                     </SelectContent>
                   </Select>
 
-                  {/* Period filter */}
-                  <Select value={periodFilter} onValueChange={setPeriodFilter}>
+                  {/* Month filter */}
+                  <Select value={monthFilter} onValueChange={setMonthFilter}>
                     <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Período" />
+                      <SelectValue placeholder="Mes" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">Todos los períodos</SelectItem>
-                      {periods.map((period) => (
-                        <SelectItem key={period} value={period}>
-                          {period}
+                      <SelectItem value="all">Todos los meses</SelectItem>
+                      {MONTHS.map((month) => (
+                        <SelectItem key={month.value} value={month.value.toString()}>
+                          {month.label}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
 
-                  {/* Date from */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "h-9 justify-start text-left font-normal",
-                          !dateFrom && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateFrom ? format(dateFrom, "dd/MM/yyyy", { locale: es }) : "Desde"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateFrom}
-                        onSelect={setDateFrom}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
-
-                  {/* Date to */}
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className={cn(
-                          "h-9 justify-start text-left font-normal",
-                          !dateTo && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {dateTo ? format(dateTo, "dd/MM/yyyy", { locale: es }) : "Hasta"}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={dateTo}
-                        onSelect={setDateTo}
-                        initialFocus
-                        className="p-3 pointer-events-auto"
-                      />
-                    </PopoverContent>
-                  </Popover>
+                  {/* Year filter */}
+                  <Select value={yearFilter} onValueChange={setYearFilter}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Año" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos los años</SelectItem>
+                      {years.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
                 {hasActiveFilters && (
                   <p className="text-xs text-muted-foreground mt-3">

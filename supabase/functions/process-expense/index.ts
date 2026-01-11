@@ -176,12 +176,23 @@ Usa español argentino simple, evita jerga contable.`
       throw new Error("Error al interpretar los datos de la expensa");
     }
 
+    // Build period_date from extracted month/year
+    let periodDate: string | null = null;
+    if (extractedData.period_year && extractedData.period_month) {
+      const year = parseInt(extractedData.period_year);
+      const month = parseInt(extractedData.period_month);
+      if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
+        periodDate = `${year}-${month.toString().padStart(2, '0')}-01`;
+      }
+    }
+
     // Update the analysis record with extracted data
     const { error: updateError } = await supabase
       .from("expense_analyses")
       .update({
         building_name: extractedData.building_name,
         period: extractedData.period,
+        period_date: periodDate,
         unit: extractedData.unit,
         total_amount: extractedData.total_amount,
         file_url: filePath,
