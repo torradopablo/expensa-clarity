@@ -92,7 +92,7 @@ Deno.serve(async (req) => {
     // Fetch the analysis
     const { data: analysisData, error: analysisError } = await supabase
       .from("expense_analyses")
-      .select("id, building_name, period, unit, total_amount, previous_total, status, created_at, period_date")
+      .select("id, user_id, building_name, period, unit, total_amount, previous_total, status, created_at, period_date")
       .eq("id", linkData.analysis_id)
       .single();
 
@@ -103,6 +103,8 @@ Deno.serve(async (req) => {
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    const { user_id: ownerUserId, ...publicAnalysis } = analysisData as any;
 
     // Fetch categories
     const { data: categoriesData, error: categoriesError } = await supabase
@@ -119,13 +121,14 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Fetch historical data for this building
+    // Fetch historical data for this building (owner only)
     let historicalData: any[] = [];
-    if (analysisData.building_name) {
+    if (analysisData.building_name && ownerUserId) {
       const { data: histData, error: histError } = await supabase
         .from("expense_analyses")
         .select("id, period, total_amount, created_at, period_date")
         .eq("building_name", analysisData.building_name)
+        .eq("user_id", ownerUserId)
         .order("period_date", { ascending: true, nullsFirst: false });
 
       if (!histError && histData) {
@@ -136,6 +139,42 @@ Deno.serve(async (req) => {
           }
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         });
+      }
+    }
+
+    // Enrich previous-period data for older analyses (when previous_* fields are null)
+    let computedPreviousTotal: number | null = (publicAnalysis as any).previous_total ?? null;
+    let enrichedCategories = (categoriesData || []) as any[];
+
+    if (historicalData.length >= 2) {
+      const currentIdx = historicalData.findIndex((h) => h.id === (publicAnalysis as any).id);
+      const previousAnalysis = currentIdx > 0 ? historicalData[currentIdx - 1] : null;
+
+      if (previousAnalysis) {
+        computedPreviousTotal = computedPreviousTotal ?? previousAnalysis.total_amount;
+
+        const needsPrevCategories = enrichedCategories.some((c) => c.previous_amount === null);
+        if (needsPrevCategories) {
+          const { data: prevCats, error: prevCatsError } = await supabase
+            .from("expense_categories")
+            .select("name, current_amount")
+            .eq("analysis_id", previousAnalysis.id);
+
+          if (!prevCatsError && prevCats) {
+            const normalizeName = (name: string) => name.toLowerCase().trim();
+            const prevMap = new Map<string, number>(
+              prevCats.map((c: any) => [normalizeName(c.name), c.current_amount])
+            );
+
+            enrichedCategories = enrichedCategories.map((c) => ({
+              ...c,
+              previous_amount:
+                c.previous_amount !== null
+                  ? c.previous_amount
+                  : (prevMap.get(normalizeName(c.name)) ?? null),
+            }));
+          }
+        }
       }
     }
 
@@ -291,8 +330,8 @@ Deno.serve(async (req) => {
 
     return new Response(
       JSON.stringify({
-        analysis: analysisData,
-        categories: categoriesData || [],
+        analysis: { ...(publicAnalysis as any), previous_total: computedPreviousTotal },
+        categories: enrichedCategories,
         historicalData: historicalData.map(h => ({
           id: h.id,
           period: h.period,
