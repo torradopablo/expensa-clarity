@@ -24,8 +24,17 @@ import {
   Zap,
   Users,
   Shield,
-  LogOut
+  LogOut,
+  Share2,
+  MessageCircle,
+  Mail
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { generateAnalysisPdf } from "@/lib/generatePdf";
@@ -207,6 +216,34 @@ const AnalysisPage = () => {
   const totalChange = calculateChange(analysis.total_amount, analysis.previous_total);
   const attentionItems = categories.filter(c => c.status === "attention").length;
 
+  const generateShareText = () => {
+    const statusText = attentionItems > 0 
+      ? `⚠️ ${attentionItems} punto(s) a revisar` 
+      : "✅ Todo en orden";
+    
+    return `📊 *Análisis de Expensas - ExpensaCheck*
+
+🏢 ${analysis.building_name || "Mi edificio"}
+📅 Período: ${analysis.period}
+💰 Total: ${formatCurrency(analysis.total_amount)}
+${analysis.previous_total ? `📈 Variación: ${totalChange > 0 ? "+" : ""}${totalChange.toFixed(1)}% vs mes anterior` : ""}
+
+${statusText}
+
+Analizá tu expensa en ExpensaCheck`;
+  };
+
+  const shareViaWhatsApp = () => {
+    const text = encodeURIComponent(generateShareText());
+    window.open(`https://wa.me/?text=${text}`, "_blank");
+  };
+
+  const shareViaEmail = () => {
+    const subject = encodeURIComponent(`Análisis de Expensas - ${analysis.period}`);
+    const body = encodeURIComponent(generateShareText().replace(/\*/g, ""));
+    window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="min-h-screen bg-gradient-soft">
@@ -220,13 +257,33 @@ const AnalysisPage = () => {
                   Volver al inicio
                 </Link>
               </Button>
-              <Button 
-                variant="outline" 
-                onClick={() => generateAnalysisPdf(analysis, categories)}
-              >
-                <Download className="w-4 h-4 mr-2" />
-                Descargar PDF
-              </Button>
+              <div className="flex gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline">
+                      <Share2 className="w-4 h-4 mr-2" />
+                      Compartir
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem onClick={shareViaWhatsApp} className="cursor-pointer">
+                      <MessageCircle className="w-4 h-4 mr-2 text-green-600" />
+                      WhatsApp
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={shareViaEmail} className="cursor-pointer">
+                      <Mail className="w-4 h-4 mr-2 text-blue-600" />
+                      Email
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button 
+                  variant="outline" 
+                  onClick={() => generateAnalysisPdf(analysis, categories)}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar PDF
+                </Button>
+              </div>
             </div>
 
             {/* Summary Card */}
