@@ -28,12 +28,17 @@ import {
   Share2,
   MessageCircle,
   Mail,
-  History
+  History,
+  Link2,
+  Copy,
+  Check,
+  Loader2
 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
@@ -153,12 +158,21 @@ const formatShortDate = (dateString: string) => {
   }).format(new Date(dateString));
 };
 
+interface HistoricalDataPoint {
+  period: string;
+  total_amount: number;
+}
+
 const AnalysisPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [historicalData, setHistoricalData] = useState<HistoricalDataPoint[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [sharedLink, setSharedLink] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -190,6 +204,37 @@ const AnalysisPage = () => {
 
         if (categoriesError) throw categoriesError;
         setCategories(categoriesData || []);
+
+        // Fetch historical data for PDF
+        if (analysisData.building_name) {
+          const { data: histData, error: histError } = await supabase
+            .from("expense_analyses")
+            .select("period, total_amount, created_at, period_date")
+            .eq("building_name", analysisData.building_name)
+            .order("period_date", { ascending: true, nullsFirst: false });
+
+          if (!histError && histData) {
+            const sortedData = histData.sort((a, b) => {
+              if (a.period_date && b.period_date) {
+                return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
+              }
+              return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+            });
+            setHistoricalData(sortedData.map(d => ({ period: d.period, total_amount: d.total_amount })));
+          }
+        }
+
+        // Check for existing shared link
+        const { data: existingLink } = await supabase
+          .from("shared_analysis_links")
+          .select("token, is_active")
+          .eq("analysis_id", id)
+          .eq("is_active", true)
+          .maybeSingle();
+
+        if (existingLink) {
+          setSharedLink(`${window.location.origin}/compartido/${existingLink.token}`);
+        }
       } catch (error: any) {
         console.error("Error fetching analysis:", error);
         toast.error("Error al cargar el análisis");
@@ -297,6 +342,66 @@ Analizá tu expensa en ExpensaCheck`;
     window.open(`mailto:?subject=${subject}&body=${body}`, "_blank");
   };
 
+  const generateShareableLink = async () => {
+    if (!analysis || !id) return;
+    
+    setIsGeneratingLink(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        toast.error("Debes iniciar sesión para generar un enlace");
+        return;
+      }
+
+      // Generate a unique token
+      const token = crypto.randomUUID().replace(/-/g, '').substring(0, 32);
+      
+      const { error } = await supabase
+        .from("shared_analysis_links")
+        .insert({
+          analysis_id: id,
+          token: token,
+          created_by: session.user.id,
+          is_active: true
+        });
+
+      if (error) throw error;
+
+      const link = `${window.location.origin}/compartido/${token}`;
+      setSharedLink(link);
+      
+      // Copy to clipboard
+      await navigator.clipboard.writeText(link);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+      
+      toast.success("Enlace creado y copiado al portapapeles");
+    } catch (error: any) {
+      console.error("Error generating link:", error);
+      toast.error("Error al generar el enlace");
+    } finally {
+      setIsGeneratingLink(false);
+    }
+  };
+
+  const copySharedLink = async () => {
+    if (!sharedLink) return;
+    await navigator.clipboard.writeText(sharedLink);
+    setLinkCopied(true);
+    setTimeout(() => setLinkCopied(false), 2000);
+    toast.success("Enlace copiado al portapapeles");
+  };
+
+  const handleDownloadPdf = () => {
+    generateAnalysisPdf(
+      analysis, 
+      categories, 
+      undefined, 
+      undefined, 
+      historicalData.length >= 2 ? historicalData : undefined
+    );
+  };
+
   return (
     <TooltipProvider delayDuration={200}>
       <div className="min-h-screen bg-gradient-soft">
@@ -318,7 +423,27 @@ Analizá tu expensa en ExpensaCheck`;
                       Compartir
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
+                  <DropdownMenuContent align="end" className="w-56">
+                    {sharedLink ? (
+                      <DropdownMenuItem onClick={copySharedLink} className="cursor-pointer">
+                        {linkCopied ? (
+                          <Check className="w-4 h-4 mr-2 text-green-600" />
+                        ) : (
+                          <Copy className="w-4 h-4 mr-2 text-primary" />
+                        )}
+                        {linkCopied ? "¡Copiado!" : "Copiar enlace público"}
+                      </DropdownMenuItem>
+                    ) : (
+                      <DropdownMenuItem onClick={generateShareableLink} className="cursor-pointer" disabled={isGeneratingLink}>
+                        {isGeneratingLink ? (
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        ) : (
+                          <Link2 className="w-4 h-4 mr-2 text-primary" />
+                        )}
+                        Crear enlace público
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={shareViaWhatsApp} className="cursor-pointer">
                       <MessageCircle className="w-4 h-4 mr-2 text-green-600" />
                       WhatsApp
@@ -331,7 +456,7 @@ Analizá tu expensa en ExpensaCheck`;
                 </DropdownMenu>
                 <Button 
                   variant="outline" 
-                  onClick={() => generateAnalysisPdf(analysis, categories)}
+                  onClick={handleDownloadPdf}
                 >
                   <Download className="w-4 h-4 mr-2" />
                   Descargar PDF

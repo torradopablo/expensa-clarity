@@ -234,6 +234,47 @@ export type Database = {
         }
         Relationships: []
       }
+      shared_analysis_links: {
+        Row: {
+          analysis_id: string
+          created_at: string
+          created_by: string
+          expires_at: string | null
+          id: string
+          is_active: boolean
+          token: string
+          view_count: number
+        }
+        Insert: {
+          analysis_id: string
+          created_at?: string
+          created_by: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          token: string
+          view_count?: number
+        }
+        Update: {
+          analysis_id?: string
+          created_at?: string
+          created_by?: string
+          expires_at?: string | null
+          id?: string
+          is_active?: boolean
+          token?: string
+          view_count?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shared_analysis_links_analysis_id_fkey"
+            columns: ["analysis_id"]
+            isOneToOne: false
+            referencedRelation: "expense_analyses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
