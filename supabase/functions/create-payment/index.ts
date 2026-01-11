@@ -84,7 +84,7 @@ serve(async (req) => {
           title: "Análisis de Expensa - ExpensaCheck",
           description: "Análisis completo de tu liquidación de expensas con detección de anomalías",
           quantity: 1,
-          unit_price: 500,
+          unit_price: 1500,
           currency_id: "ARS",
         },
       ],
