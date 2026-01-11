@@ -156,6 +156,9 @@ const Historial = () => {
     if (!analysisToDelete) return;
     
     setIsDeleting(true);
+    let fileDeleted = false;
+    let fileDeleteError = false;
+    
     try {
       // First delete the file from storage if it exists
       if (analysisToDelete.file_url) {
@@ -170,7 +173,9 @@ const Historial = () => {
           
           if (storageError) {
             console.error("Error deleting file from storage:", storageError);
-            // Continue with deletion even if file removal fails
+            fileDeleteError = true;
+          } else {
+            fileDeleted = true;
           }
         }
       }
@@ -192,7 +197,19 @@ const Historial = () => {
       if (analysisError) throw analysisError;
 
       setAnalyses(prev => prev.filter(a => a.id !== analysisToDelete.id));
-      toast.success("Análisis eliminado correctamente");
+      
+      // Show appropriate success message
+      if (fileDeleted) {
+        toast.success("Análisis y archivo eliminados correctamente", {
+          description: "El documento también fue eliminado del almacenamiento."
+        });
+      } else if (fileDeleteError) {
+        toast.success("Análisis eliminado", {
+          description: "El archivo no pudo ser eliminado del almacenamiento."
+        });
+      } else {
+        toast.success("Análisis eliminado correctamente");
+      }
     } catch (error: any) {
       console.error("Error deleting analysis:", error);
       toast.error("Error al eliminar el análisis");
