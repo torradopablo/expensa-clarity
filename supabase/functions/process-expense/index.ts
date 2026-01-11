@@ -1,10 +1,120 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://esm.sh/zod@3.23.8";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
+
+// ========== VALIDATION SCHEMAS FOR AI RESPONSES ==========
+
+// Category schema with strict validation
+const CategorySchema = z.object({
+  name: z.string().min(1).max(100).transform(s => s.trim()),
+  icon: z.string().max(50).nullable().optional(),
+  current_amount: z.number().min(0).max(100000000), // Max 100 million (reasonable upper bound for ARS)
+  previous_amount: z.number().min(0).max(100000000).nullable().optional(),
+  status: z.enum(["ok", "attention", "normal", "high", "low", "new"]).default("ok"),
+  explanation: z.string().max(1000).nullable().optional().transform(s => s ? s.trim().slice(0, 1000) : s),
+});
+
+// Building profile schema
+const BuildingProfileSchema = z.object({
+  country: z.string().max(100).nullable().optional().transform(s => s ? s.trim() : s),
+  province: z.string().max(100).nullable().optional().transform(s => s ? s.trim() : s),
+  city: z.string().max(100).nullable().optional().transform(s => s ? s.trim() : s),
+  neighborhood: z.string().max(200).nullable().optional().transform(s => s ? s.trim() : s),
+  zone: z.enum(["CABA", "GBA Norte", "GBA Oeste", "GBA Sur", "Interior"]).nullable().optional(),
+  unit_count_range: z.enum(["1-10", "11-30", "31-50", "51-100", "100+"]).nullable().optional(),
+  age_category: z.string().max(50).nullable().optional(),
+  has_amenities: z.boolean().nullable().optional(),
+  amenities: z.array(z.string().max(100)).max(20).nullable().optional(),
+  construction_year: z.number().min(1800).max(2030).nullable().optional(),
+});
+
+// Main AI response schema
+const AIResponseSchema = z.object({
+  building_name: z.string().min(1).max(200).transform(s => s.trim()),
+  period: z.string().min(1).max(100).transform(s => s.trim()),
+  period_month: z.number().min(1).max(12).optional(),
+  period_year: z.number().min(1900).max(2100).optional(),
+  period_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  unit: z.string().max(50).nullable().optional().transform(s => s ? s.trim() : s),
+  total_amount: z.number().min(0).max(100000000), // Max 100 million ARS
+  previous_total: z.number().min(0).max(100000000).nullable().optional(),
+  categories: z.array(CategorySchema).min(1).max(50),
+  building_profile: BuildingProfileSchema.nullable().optional(),
+});
+
+type ValidatedAIResponse = z.infer<typeof AIResponseSchema>;
+
+// Validate and sanitize AI response
+function validateAIResponse(data: unknown): ValidatedAIResponse {
+  // First, do a basic type check
+  if (typeof data !== "object" || data === null) {
+    throw new Error("AI response is not an object");
+  }
+
+  // Parse with zod - this will throw if validation fails
+  const validated = AIResponseSchema.parse(data);
+
+  // Additional business logic validations
+  const totalCategoryAmount = validated.categories.reduce(
+    (sum, cat) => sum + cat.current_amount,
+    0
+  );
+
+  // Check if categories sum is reasonably close to total (within 50% tolerance)
+  // This helps detect manipulation of amounts but allows for flexibility
+  const tolerance = validated.total_amount * 0.5;
+  if (Math.abs(totalCategoryAmount - validated.total_amount) > tolerance && validated.total_amount > 0) {
+    console.warn("Categories total differs significantly from stated total", {
+      categoriesSum: totalCategoryAmount,
+      statedTotal: validated.total_amount,
+    });
+    // Don't reject, but log for audit
+  }
+
+  // Sanitize string fields to prevent XSS if displayed in HTML
+  validated.building_name = sanitizeString(validated.building_name);
+  validated.period = sanitizeString(validated.period);
+  if (validated.unit) validated.unit = sanitizeString(validated.unit);
+
+  validated.categories = validated.categories.map(cat => ({
+    ...cat,
+    name: sanitizeString(cat.name),
+    explanation: cat.explanation ? sanitizeString(cat.explanation) : cat.explanation,
+  }));
+
+  if (validated.building_profile) {
+    const bp = validated.building_profile;
+    if (bp.neighborhood) bp.neighborhood = sanitizeString(bp.neighborhood);
+    if (bp.city) bp.city = sanitizeString(bp.city);
+    if (bp.province) bp.province = sanitizeString(bp.province);
+    if (bp.country) bp.country = sanitizeString(bp.country);
+    if (bp.age_category) bp.age_category = sanitizeString(bp.age_category);
+    if (bp.amenities) {
+      bp.amenities = bp.amenities.map(a => sanitizeString(a));
+    }
+  }
+
+  return validated;
+}
+
+// Basic string sanitization to prevent XSS
+function sanitizeString(str: string): string {
+  return str
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#x27;")
+    .trim();
+}
+
+// ========== END VALIDATION SCHEMAS ==========
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -20,6 +130,15 @@ serve(async (req) => {
     if (!file) {
       return new Response(
         JSON.stringify({ error: "No se proporcionó ningún archivo" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate analysisId format (should be a UUID)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!analysisId || !uuidRegex.test(analysisId)) {
+      return new Response(
+        JSON.stringify({ error: "ID de análisis inválido" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -88,6 +207,8 @@ serve(async (req) => {
             content: `Eres un experto analizador de liquidaciones de expensas de edificios en Argentina. 
 Tu trabajo es extraer y estructurar los datos de una liquidación de expensas.
 
+IMPORTANTE: Solo extraé datos que realmente aparezcan en el documento. NO inventés ni inferás datos que no estén presentes.
+
 DEBES responder SOLO con un JSON válido con esta estructura exacta:
 {
   "building_name": "nombre del edificio o consorcio",
@@ -133,6 +254,12 @@ IMPORTANTE sobre building_profile:
 - Si ves gastos de pileta, seguridad 24hs, mantenimiento de SUM, etc., incluí esos amenities
 - Si no podés inferir un campo, dejalo como null
 - unit_count_range: estimá por la cantidad de UFs mencionadas, si hay portero/encargado permanente (sugiere >30 unidades), múltiples ascensores, etc.
+
+VALIDACIÓN DE DATOS:
+- Los montos deben ser números positivos y razonables (entre 0 y 100.000.000 ARS)
+- El nombre del edificio debe tener máximo 200 caracteres
+- Las categorías deben tener nombres de máximo 100 caracteres
+- Las explicaciones deben ser breves (máximo 500 caracteres)
 
 Categorías comunes de gastos: Encargado, Servicios públicos, Agua y cloacas, Mantenimiento, Seguro del edificio, Administración, Ascensores, Limpieza, Expensas extraordinarias.
 
@@ -186,25 +313,43 @@ Usa español argentino simple, evita jerga contable.`
       throw new Error("No se pudo analizar el documento");
     }
 
+    // Log original AI response for audit purposes
+    console.log("Original AI response (for audit):", content.substring(0, 500));
+
     // Parse the JSON response from AI
-    let extractedData;
+    let rawExtractedData;
     try {
       // Clean the response - remove markdown code blocks if present
       const cleanedContent = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-      extractedData = JSON.parse(cleanedContent);
+      rawExtractedData = JSON.parse(cleanedContent);
     } catch (parseError) {
       console.error("Parse error:", parseError, "Content:", content);
       throw new Error("Error al interpretar los datos de la expensa");
     }
 
+    // Validate and sanitize AI response using zod schema
+    let extractedData: ValidatedAIResponse;
+    try {
+      extractedData = validateAIResponse(rawExtractedData);
+      console.log("AI response validated successfully");
+    } catch (validationError) {
+      console.error("Validation error:", validationError);
+      
+      // If validation fails, we can try to salvage the data with defaults
+      // This prevents total failure while still protecting against malicious data
+      if (validationError instanceof z.ZodError) {
+        console.error("Zod validation errors:", validationError.errors);
+        throw new Error("Los datos extraídos no son válidos. Por favor, intentá con otro documento.");
+      }
+      throw validationError;
+    }
+
     // Build period_date from extracted month/year
     let periodDate: string | null = null;
     if (extractedData.period_year && extractedData.period_month) {
-      const year = parseInt(extractedData.period_year);
-      const month = parseInt(extractedData.period_month);
-      if (!isNaN(year) && !isNaN(month) && month >= 1 && month <= 12) {
-        periodDate = `${year}-${month.toString().padStart(2, '0')}-01`;
-      }
+      const year = extractedData.period_year;
+      const month = extractedData.period_month;
+      periodDate = `${year}-${month.toString().padStart(2, '0')}-01`;
     }
 
     // Normalize building name by matching against existing building names from user's previous analyses
@@ -304,14 +449,14 @@ Usa español argentino simple, evita jerga contable.`
 
     // Insert categories
     if (extractedData.categories && extractedData.categories.length > 0) {
-      const categories = extractedData.categories.map((cat: any) => ({
+      const categories = extractedData.categories.map((cat) => ({
         analysis_id: analysisId,
         name: cat.name,
-        icon: cat.icon,
+        icon: cat.icon || null,
         current_amount: cat.current_amount,
         previous_amount: cat.previous_amount || null,
         status: cat.status || "ok",
-        explanation: cat.explanation,
+        explanation: cat.explanation || null,
       }));
 
       const { error: catError } = await supabase
@@ -337,7 +482,7 @@ Usa español argentino simple, evita jerga contable.`
 
       if (existingProfile) {
         // Update only if extracted data is more complete (don't overwrite existing with nulls)
-        const updates: Record<string, any> = {};
+        const updates: Record<string, unknown> = {};
         
         if (profileData.country && !existingProfile.country) {
           updates.country = profileData.country;
