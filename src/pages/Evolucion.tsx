@@ -21,6 +21,7 @@ import {
   Building,
   Calendar,
   RefreshCw,
+  Download,
   Sparkles,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
@@ -35,6 +36,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
+import { generateEvolutionPdf } from "@/lib/generatePdf";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -570,7 +572,7 @@ const Evolucion = () => {
       <Header />
       <main className="pt-24 pb-20">
         <div className="container max-w-5xl">
-          <div className="flex items-center justify-between gap-4 mb-8">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
                 <LineChart className="w-6 h-6 text-primary" />
@@ -582,12 +584,34 @@ const Evolucion = () => {
                 </p>
               </div>
             </div>
-            <Button variant="ghost" asChild>
-              <Link to="/historial">
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Volver
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              {selectedBuilding !== "all" && chartData.length >= 2 && stats && (
+                <Button 
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    generateEvolutionPdf(
+                      selectedBuilding,
+                      chartData,
+                      comparisonData,
+                      stats,
+                      deviation || undefined,
+                      aiAnalysis
+                    );
+                  }}
+                >
+                  <Download className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Descargar PDF</span>
+                  <span className="sm:hidden">PDF</span>
+                </Button>
+              )}
+              <Button variant="ghost" asChild size="sm">
+                <Link to="/historial">
+                  <ArrowLeft className="w-4 h-4 mr-2" />
+                  <span className="hidden sm:inline">Volver</span>
+                </Link>
+              </Button>
+            </div>
           </div>
 
           {analyses.length === 0 ? (
