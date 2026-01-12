@@ -301,11 +301,25 @@ const AnalysisPage = () => {
               }
             }
 
-            // Fetch inflation data
-            const { data: inflationData } = await supabase
-              .from("inflation_data")
-              .select("period, value, is_estimated")
-              .order("period", { ascending: true });
+            // Fetch inflation data using the same method as Evolucion.tsx
+            const inflationResponse = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-inflation`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+              }
+            );
+
+            let inflationData = null;
+            if (inflationResponse.ok) {
+              const result = await inflationResponse.json();
+              if (result.data) {
+                inflationData = result.data;
+              }
+            }
 
             // Fetch other buildings data for comparison
             const { data: otherBuildingsData } = await supabase
@@ -318,7 +332,7 @@ const AnalysisPage = () => {
             if (historicalAnalyses.length >= 2) {
               const baseTotal = historicalAnalyses[0].total_amount;
               
-              // Create inflation map
+              // Create inflation map - use YYYY-MM format like in Evolucion.tsx
               const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
               if (inflationData) {
                 inflationData.forEach(inf => {
@@ -326,28 +340,36 @@ const AnalysisPage = () => {
                 });
               }
 
-              // Calculate cumulative inflation from first period
-              const calculateCumulativeInflation = (targetPeriod: string): { cumulative: number; isEstimated: boolean } | null => {
-                const sortedPeriods = historicalAnalyses.map(h => h.period).sort();
-                const startIndex = 0;
-                const endIndex = sortedPeriods.indexOf(targetPeriod);
-                
-                if (endIndex <= startIndex) return { cumulative: 0, isEstimated: false };
-                
-                let cumulativeInflation = 0;
-                let hasEstimated = false;
-                
-                for (let i = startIndex + 1; i <= endIndex; i++) {
-                  const period = sortedPeriods[i];
-                  const infData = inflationMap.get(period);
-                  if (infData) {
-                    cumulativeInflation = (1 + cumulativeInflation / 100) * (1 + infData.value / 100) * 100 - 100;
-                    if (infData.is_estimated) hasEstimated = true;
+              // Helper to get YYYY-MM from period_date or parse from period string (same as Evolucion.tsx)
+              const getYYYYMM = (periodDate: string | null, period: string): string | null => {
+                if (periodDate) {
+                  const date = new Date(periodDate);
+                  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                }
+                // Check if period is already in YYYY-MM format
+                if (/^\d{4}-\d{2}$/.test(period)) {
+                  return period;
+                }
+                // Parse Spanish period like "enero 2024"
+                const monthsEs: Record<string, number> = {
+                  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+                  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+                };
+                const parts = period.toLowerCase().trim().split(/\s+/);
+                if (parts.length >= 2) {
+                  const month = monthsEs[parts[0]];
+                  if (month !== undefined) {
+                    const year = parseInt(parts[1]) || new Date().getFullYear();
+                    return `${year}-${String(month + 1).padStart(2, '0')}`;
                   }
                 }
-                
-                return { cumulative: cumulativeInflation, isEstimated: hasEstimated };
+                return null;
               };
+
+              // Find base inflation value for the first period (same as Evolucion.tsx)
+              const firstPeriodData = historicalAnalyses[0];
+              const firstPeriodYYYYMM = getYYYYMM(firstPeriodData.period_date, firstPeriodData.period);
+              const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null;
 
               // Calculate other buildings average by period
               const buildingsAvgByPeriod = new Map<string, number[]>();
@@ -369,7 +391,19 @@ const AnalysisPage = () => {
 
               const evolution: EvolutionDataPoint[] = historicalAnalyses.map((h) => {
                 const userPercent = ((h.total_amount - baseTotal) / baseTotal) * 100;
-                const inflationResult = calculateCumulativeInflation(h.period);
+                
+                // Calculate inflation percent change from base (same as Evolucion.tsx)
+                let inflationPercent: number | null = null;
+                let inflationEstimated = false;
+                
+                const periodYYYYMM = getYYYYMM(h.period_date, h.period);
+                if (periodYYYYMM && baseInflation) {
+                  const inflationItem = inflationMap.get(periodYYYYMM);
+                  if (inflationItem) {
+                    inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+                    inflationEstimated = inflationItem.is_estimated;
+                  }
+                }
                 
                 let buildingsPercent: number | null = null;
                 if (baseOtherBuildings) {
@@ -383,8 +417,8 @@ const AnalysisPage = () => {
                 return {
                   period: h.period,
                   userPercent,
-                  inflationPercent: inflationResult?.cumulative || null,
-                  inflationEstimated: inflationResult?.isEstimated,
+                  inflationPercent,
+                  inflationEstimated,
                   buildingsPercent
                 };
               });

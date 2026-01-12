@@ -13,21 +13,24 @@ const monthsEs: Record<string, number> = {
 
 const parseDate = (period: string): Date => {
   const parts = period.toLowerCase().split(" ");
-  console.log("Parsing period:", period, "Parts:", parts);
   
   if (parts.length >= 2) {
     const month = monthsEs[parts[0]] ?? 0;
     const year = parseInt(parts[1]) || 2024;
     const date = new Date(year, month);
-    console.log("Parsed date:", date, "Month:", month, "Year:", year);
     return date;
   }
   
-  console.log("Failed to parse period, returning default date");
   return new Date();
 };
 
 const periodToYearMonth = (period: string): string => {
+  // Check if period is already in YYYY-MM format
+  if (/^\d{4}-\d{2}$/.test(period)) {
+    return period;
+  }
+  
+  // Otherwise, parse Spanish format like "enero 2024"
   const date = parseDate(period);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
 };
@@ -38,7 +41,10 @@ Deno.serve(async (req) => {
   }
 
   try {
+    console.log("Function started");
+    
     const { token } = await req.json();
+    console.log("Token received:", token);
 
     if (!token) {
       return new Response(
@@ -51,24 +57,30 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     
+    console.log("Creating Supabase client");
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // First verify the shared link is valid
+    console.log("Fetching shared link");
     const { data: linkData, error: linkError } = await supabase
       .from("shared_analysis_links")
       .select("analysis_id, is_active, expires_at, view_count")
       .eq("token", token)
       .maybeSingle();
 
+    console.log("Link data:", linkData);
+    console.log("Link error:", linkError);
+
     if (linkError) {
       console.error("Error fetching link:", linkError);
       return new Response(
-        JSON.stringify({ error: "Error fetching shared link" }),
+        JSON.stringify({ error: "Error fetching shared link", details: linkError.message }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     if (!linkData) {
+      console.log("Link not found");
       return new Response(
         JSON.stringify({ error: "Link not found" }),
         { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -76,6 +88,7 @@ Deno.serve(async (req) => {
     }
 
     if (!linkData.is_active) {
+      console.log("Link deactivated");
       return new Response(
         JSON.stringify({ error: "Link is deactivated" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -83,11 +96,14 @@ Deno.serve(async (req) => {
     }
 
     if (linkData.expires_at && new Date(linkData.expires_at) < new Date()) {
+      console.log("Link expired");
       return new Response(
         JSON.stringify({ error: "Link has expired" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    console.log("Link is valid, proceeding with analysis fetch");
 
     // Update view count
     await supabase
@@ -184,14 +200,39 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Fetch inflation data
-    const { data: inflationData, error: inflationError } = await supabase
-      .from("inflation_data")
-      .select("period, value, is_estimated")
-      .order("period", { ascending: true });
+    // Fetch inflation data using the same method as Evolucion.tsx
+    let inflationData = null;
+    try {
+      const inflationResponse = await fetch(
+        `${supabaseUrl}/functions/v1/fetch-inflation`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")!}`,
+          },
+        }
+      );
 
-    if (inflationError) {
-      console.error("Error fetching inflation:", inflationError);
+      if (inflationResponse.ok) {
+        const result = await inflationResponse.json();
+        if (result.data) {
+          inflationData = result.data;
+          console.log("Inflation data fetched via API:", result.data);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching inflation data via API, falling back to database:", error);
+      // Fallback to direct database access
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from("inflation_data")
+        .select("period, value, is_estimated")
+        .order("period", { ascending: true });
+
+      if (!fallbackError && fallbackData) {
+        inflationData = fallbackData;
+        console.log("Inflation data fetched via database fallback:", fallbackData);
+      }
     }
 
     // Fetch all buildings data for comparison (anonymized averages by period)
@@ -210,7 +251,7 @@ Deno.serve(async (req) => {
     
     // Exclude current building from averages
     const otherBuildings = (allAnalyses || []).filter(
-      a => a.building_name?.toLowerCase().trim() !== analysisData.building_name?.toLowerCase().trim()
+      (a: any) => a.building_name?.toLowerCase().trim() !== analysisData.building_name?.toLowerCase().trim()
     );
 
     console.log("Other buildings count:", otherBuildings.length);
@@ -243,7 +284,8 @@ Deno.serve(async (req) => {
       const baseValue = buildingsTrend[0].average;
       console.log("Base value for buildings trend:", baseValue);
       for (const item of buildingsTrend) {
-        (item as any).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
+        const normalizedItem = item as { average: number; normalizedPercent?: number };
+        normalizedItem.normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
       }
     }
 
@@ -251,25 +293,24 @@ Deno.serve(async (req) => {
 
     // Calculate stats for buildings comparison
     const buildingsTrendStats = {
-      totalBuildings: new Set(otherBuildings.map(a => a.building_name)).size,
+      totalBuildings: new Set(otherBuildings.map((a: any) => a.building_name)).size,
       totalAnalyses: otherBuildings.length,
       periodsCount: buildingsTrend.length,
       filtersApplied: false,
       usedFallback: false
     };
 
-    // Build evolution comparison data (percentage based)
-    const evolutionData: any[] = [];
+    // Build evolution comparison data (percentage based) - same logic as AnalysisPage.tsx and Evolucion.tsx
+    let evolutionData: any[] = [];
     
     if (historicalData.length >= 2) {
       const baseTotal = historicalData[0]?.total_amount || 0;
       
       // Build inflation map by year-month
-      const inflationMap = new Map<string, { value: number; isEstimated: boolean }>();
+      const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
       if (inflationData) {
-        console.log("Available inflation data:", inflationData);
         for (const inf of inflationData) {
-          inflationMap.set(inf.period, { value: inf.value, isEstimated: inf.is_estimated });
+          inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
         }
       }
       
@@ -279,64 +320,48 @@ Deno.serve(async (req) => {
         buildingsMap.set(bt.period, (bt as any).normalizedPercent || 0);
       }
       
-      console.log("Buildings map:", buildingsMap);
-      
-      // Get sorted periods from historical data to calculate cumulative inflation
-      const sortedPeriods = historicalData.map(h => ({
-        period: h.period,
-        yearMonth: periodToYearMonth(h.period)
-      }));
-      
-      console.log("Sorted periods:", sortedPeriods);
-      
-      // Calculate cumulative inflation from base period
-      const baseYearMonth = sortedPeriods[0]?.yearMonth;
-      let cumulativeInflation = 0;
-      const cumulativeInflationMap = new Map<string, number>();
-      
-      if (inflationData && baseYearMonth) {
-        // Sort inflation data chronologically
-        const sortedInflation = [...inflationData].sort((a, b) => a.period.localeCompare(b.period));
-        
-        // Find base index
-        const baseIdx = sortedInflation.findIndex(inf => inf.period >= baseYearMonth);
-        
-        if (baseIdx >= 0) {
-          cumulativeInflationMap.set(sortedInflation[baseIdx].period, 0); // base period = 0%
-          
-          for (let i = baseIdx + 1; i < sortedInflation.length; i++) {
-            // Cumulative: (1 + prev) * (1 + current/100) - 1
-            const monthlyRate = sortedInflation[i].value / 100;
-            cumulativeInflation = ((1 + cumulativeInflation / 100) * (1 + monthlyRate) - 1) * 100;
-            cumulativeInflationMap.set(sortedInflation[i].period, cumulativeInflation);
-          }
-        }
-      }
+      // Find base inflation value for first period (same as Evolucion.tsx)
+      const firstPeriodData = historicalData[0];
+      const firstPeriodYYYYMM = periodToYearMonth(firstPeriodData.period);
+      const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null;
       
       for (const hist of historicalData) {
         const userPercent = baseTotal > 0 ? ((hist.total_amount - baseTotal) / baseTotal) * 100 : 0;
-        const yearMonth = periodToYearMonth(hist.period);
-        const cumulativeInflationPercent = cumulativeInflationMap.get(yearMonth) ?? null;
-        const buildingsPercent = buildingsMap.get(hist.period) ?? null;
         
-        console.log("Evolution data mapping:", {
-          period: hist.period,
-          yearMonth,
-          userPercent,
-          cumulativeInflationPercent,
-          buildingsPercent,
-          availableInflationPeriods: Array.from(cumulativeInflationMap.keys()).slice(-5),
-          availableBuildingsPeriods: Array.from(buildingsMap.keys())
-        });
+        // Calculate inflation percent change from base (same as Evolucion.tsx)
+        let inflationPercent: number | null = null;
+        let inflationEstimated = false;
+        
+        const periodYYYYMM = periodToYearMonth(hist.period);
+        
+        if (periodYYYYMM && baseInflation) {
+          const inflationItem = inflationMap.get(periodYYYYMM);
+          
+          if (inflationItem) {
+            inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+            inflationEstimated = inflationItem.is_estimated;
+          }
+        }
+        
+        const buildingsPercent = buildingsMap.get(hist.period) ?? null;
         
         evolutionData.push({
           period: hist.period,
           userPercent: parseFloat(userPercent.toFixed(1)),
-          inflationPercent: cumulativeInflationPercent !== null ? parseFloat(cumulativeInflationPercent.toFixed(1)) : null,
-          inflationEstimated: inflationMap.get(yearMonth)?.isEstimated ?? false,
+          inflationPercent: inflationPercent !== null ? parseFloat(inflationPercent.toFixed(1)) : null,
+          inflationEstimated,
           buildingsPercent: buildingsPercent !== null ? parseFloat(buildingsPercent.toFixed(1)) : null
         });
       }
+      
+      // Filter out periods with no data for any metric
+      const filteredEvolutionData = evolutionData.filter(item => 
+        item.userPercent !== null && 
+        (item.inflationPercent !== null || item.buildingsPercent !== null)
+      );
+      
+      console.log("Final evolution data after filtering:", filteredEvolutionData);
+      evolutionData = filteredEvolutionData;
     }
 
     // Calculate deviations for the last period
@@ -368,7 +393,7 @@ Deno.serve(async (req) => {
           created_at: h.created_at,
           period_date: h.period_date
         })),
-        evolutionData,
+        evolutionData: evolutionData,
         deviation,
         buildingsTrendStats: buildingsTrendStats.totalBuildings > 0 ? buildingsTrendStats : null
       }),
