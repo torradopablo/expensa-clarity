@@ -25,7 +25,7 @@ import {
   ExternalLink,
   History
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from "@supabase/supabase-js";
 import { Sparkles } from "lucide-react";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
 import { ComparisonChart } from "@/components/ComparisonChart";
@@ -39,6 +39,18 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
+
+// Create a separate client for function calls that bypasses authentication
+const supabaseFunctions = createClient(
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    }
+  }
+);
 
 const iconMap: Record<string, any> = {
   users: Users,
@@ -342,42 +354,37 @@ const SharedAnalysis = () => {
       }
 
       try {
-        // First, get the shared link to find the analysis_id
-        const { data: linkData, error: linkError } = await supabase
-          .from("shared_analysis_links")
-          .select("analysis_id, is_active, expires_at")
-          .eq("token", token)
-          .maybeSingle();
-
-        if (linkError) throw linkError;
+        console.log("Fetching shared analysis for token:", token);
         
-        if (!linkData) {
-          setError("Este enlace no existe o ya no está disponible");
-          setIsLoading(false);
-          return;
-        }
-
-        if (!linkData.is_active) {
-          setError("Este enlace fue desactivado");
-          setIsLoading(false);
-          return;
-        }
-
-        if (linkData.expires_at && new Date(linkData.expires_at) < new Date()) {
-          setError("Este enlace ha expirado");
-          setIsLoading(false);
-          return;
-        }
-
-        // Fetch analysis using edge function for security (bypasses RLS)
-        const { data: analysisResult, error: analysisError } = await supabase
+        // Use edge function for all operations (bypasses RLS and works for both logged in and anonymous users)
+        const { data: analysisResult, error: analysisError } = await supabaseFunctions
           .functions.invoke('get-shared-analysis', {
             body: { token }
           });
 
-        if (analysisError) throw analysisError;
+        console.log("Edge function response:", { analysisResult, analysisError });
+
+        if (analysisError) {
+          console.error("Edge function error:", analysisError);
+          
+          // Handle specific error cases from edge function
+          if (analysisError.message?.includes("Link not found")) {
+            setError("Este enlace no existe o ya no está disponible");
+          } else if (analysisError.message?.includes("Link is deactivated")) {
+            setError("Este enlace fue desactivado");
+          } else if (analysisError.message?.includes("Link has expired")) {
+            setError("Este enlace ha expirado");
+          } else if (analysisError.message?.includes("Token is required")) {
+            setError("Token inválido");
+          } else {
+            setError("Error al cargar el análisis compartido");
+          }
+          setIsLoading(false);
+          return;
+        }
 
         if (analysisResult.analysis) {
+          console.log("Analysis loaded successfully");
           setAnalysis(analysisResult.analysis);
           setCategories(analysisResult.categories || []);
           setHistoricalData(analysisResult.historicalData || []);
@@ -385,6 +392,7 @@ const SharedAnalysis = () => {
           setDeviation(analysisResult.deviation || null);
           setBuildingsTrendStats(analysisResult.buildingsTrendStats || null);
         } else {
+          console.log("No analysis data in response");
           setError("No se pudo cargar el análisis");
         }
       } catch (err: any) {

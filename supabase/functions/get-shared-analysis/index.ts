@@ -47,6 +47,7 @@ Deno.serve(async (req) => {
     console.log("Token received:", token);
 
     if (!token) {
+      console.log("No token provided");
       return new Response(
         JSON.stringify({ error: "Token is required" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -382,6 +383,8 @@ Deno.serve(async (req) => {
       };
     }
 
+    console.log("Function completed successfully, returning data");
+    
     return new Response(
       JSON.stringify({
         analysis: { ...(publicAnalysis as any), previous_total: computedPreviousTotal },
