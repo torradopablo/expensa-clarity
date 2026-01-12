@@ -292,13 +292,20 @@ DEVUELVE SOLO EL JSON. NADA DE TEXTO.`
         body: JSON.stringify(requestBody),
       });
     } else if (AI_PROVIDER === "gemini") {
+      console.log("=== GEMINI API PROCESSING START ===");
       const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
       
+      console.log("Gemini API Key exists:", !!GEMINI_API_KEY);
+      console.log("File type:", isPDF ? "PDF" : "Image");
+      
       if (!GEMINI_API_KEY) {
+        console.error("GEMINI_API_KEY no configurada");
         throw new Error("GEMINI_API_KEY no configurada");
       }
 
-      aiResponse = await fetch("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=" + GEMINI_API_KEY, {
+      console.log("Making request to Gemini API...");
+      
+      aiResponse = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -308,7 +315,13 @@ DEVUELVE SOLO EL JSON. NADA DE TEXTO.`
             {
               parts: [
                 {
-                  text: `Eres un experto en analizar liquidaciones de expensas de Argentina. Extrae datos del ${isPDF ? 'PDF' : 'imagen'} y devuelve SOLO JSON.
+                  text: `Eres un experto en analizar liquidaciones de expensas de Argentina. Tu tarea es extraer datos del PDF y devolver JSON.
+
+REGLAS IMPORTANTES:
+1. Analiza el contenido del PDF que se proporciona
+2. Extrae todos los datos visibles y legibles
+3. Si no puedes leer algún campo, usa null
+4. Devuelve SOLO JSON, sin texto adicional
 
 JSON requerido:
 {
@@ -340,9 +353,16 @@ JSON requerido:
   }
 }
 
-DEVUELVE ÚNICAMENTE EL JSON. SIN TEXTO ADICIONAL.`
+EJEMPLO: {"building_name":"Edificio San Martín","period":"Enero 2024","period_month":1,"period_year":2024,"unit":"UF 205","total_amount":18500,"categories":[{"name":"Expensas ordinarias","icon":"building","current_amount":18500,"status":"ok","explanation":"Gastos mensuales"}],"building_profile":{"country":"Argentina","province":null,"city":null,"neighborhood":null,"zone":null,"unit_count_range":null,"age_category":null,"has_amenities":false,"amenities":[]}}
+
+DEVUELVE ÚNICAMENTE EL JSON.`
                 },
-                ...(isPDF ? [] : [{
+                ...(isPDF ? [{
+                  inline_data: {
+                    mime_type: "application/pdf",
+                    data: base64
+                  }
+                }] : [{
                   inline_data: {
                     mime_type: mimeType,
                     data: base64
@@ -357,6 +377,16 @@ DEVUELVE ÚNICAMENTE EL JSON. SIN TEXTO ADICIONAL.`
           }
         }),
       });
+
+      console.log("Gemini response status:", aiResponse.status);
+      
+      if (!aiResponse.ok) {
+        const errorText = await aiResponse.text();
+        console.error("Gemini API error response:", errorText);
+        throw new Error(`Gemini API error: ${aiResponse.status} - ${errorText}`);
+      }
+
+      console.log("=== GEMINI API SUCCESS ===");
     } else if (AI_PROVIDER === "lovable") {
       const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
       
