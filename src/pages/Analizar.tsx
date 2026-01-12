@@ -444,6 +444,7 @@ const PaymentSuccessHandler = ({
           throw new Error(errorData.error || "Error al procesar la expensa");
         }
 
+        const responseData = await response.json();
         onProcessingComplete(analysisId);
       } catch (err: any) {
         console.error("Processing error:", err);
