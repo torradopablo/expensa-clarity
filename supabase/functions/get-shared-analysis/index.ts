@@ -13,11 +13,17 @@ const monthsEs: Record<string, number> = {
 
 const parseDate = (period: string): Date => {
   const parts = period.toLowerCase().split(" ");
+  console.log("Parsing period:", period, "Parts:", parts);
+  
   if (parts.length >= 2) {
     const month = monthsEs[parts[0]] ?? 0;
     const year = parseInt(parts[1]) || 2024;
-    return new Date(year, month);
+    const date = new Date(year, month);
+    console.log("Parsed date:", date, "Month:", month, "Year:", year);
+    return date;
   }
+  
+  console.log("Failed to parse period, returning default date");
   return new Date();
 };
 
@@ -207,6 +213,9 @@ Deno.serve(async (req) => {
       a => a.building_name?.toLowerCase().trim() !== analysisData.building_name?.toLowerCase().trim()
     );
 
+    console.log("Other buildings count:", otherBuildings.length);
+    console.log("Sample other building:", otherBuildings[0]);
+
     for (const analysis of otherBuildings) {
       const period = analysis.period;
       if (!periodMap.has(period)) {
@@ -227,13 +236,18 @@ Deno.serve(async (req) => {
       }))
       .sort((a, b) => parseDate(a.period).getTime() - parseDate(b.period).getTime());
 
+    console.log("Buildings trend before normalization:", buildingsTrend);
+
     // Calculate normalized percentage change from first period for buildings trend
     if (buildingsTrend.length > 0) {
       const baseValue = buildingsTrend[0].average;
+      console.log("Base value for buildings trend:", baseValue);
       for (const item of buildingsTrend) {
         (item as any).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
       }
     }
+
+    console.log("Buildings trend after normalization:", buildingsTrend);
 
     // Calculate stats for buildings comparison
     const buildingsTrendStats = {
@@ -253,6 +267,7 @@ Deno.serve(async (req) => {
       // Build inflation map by year-month
       const inflationMap = new Map<string, { value: number; isEstimated: boolean }>();
       if (inflationData) {
+        console.log("Available inflation data:", inflationData);
         for (const inf of inflationData) {
           inflationMap.set(inf.period, { value: inf.value, isEstimated: inf.is_estimated });
         }
@@ -264,11 +279,15 @@ Deno.serve(async (req) => {
         buildingsMap.set(bt.period, (bt as any).normalizedPercent || 0);
       }
       
+      console.log("Buildings map:", buildingsMap);
+      
       // Get sorted periods from historical data to calculate cumulative inflation
       const sortedPeriods = historicalData.map(h => ({
         period: h.period,
         yearMonth: periodToYearMonth(h.period)
       }));
+      
+      console.log("Sorted periods:", sortedPeriods);
       
       // Calculate cumulative inflation from base period
       const baseYearMonth = sortedPeriods[0]?.yearMonth;
@@ -299,6 +318,16 @@ Deno.serve(async (req) => {
         const yearMonth = periodToYearMonth(hist.period);
         const cumulativeInflationPercent = cumulativeInflationMap.get(yearMonth) ?? null;
         const buildingsPercent = buildingsMap.get(hist.period) ?? null;
+        
+        console.log("Evolution data mapping:", {
+          period: hist.period,
+          yearMonth,
+          userPercent,
+          cumulativeInflationPercent,
+          buildingsPercent,
+          availableInflationPeriods: Array.from(cumulativeInflationMap.keys()).slice(-5),
+          availableBuildingsPeriods: Array.from(buildingsMap.keys())
+        });
         
         evolutionData.push({
           period: hist.period,

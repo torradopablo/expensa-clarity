@@ -45,6 +45,47 @@ async function callLovableAI(prompt: string, systemPrompt: string): Promise<stri
   return aiResponse.choices?.[0]?.message?.content || "";
 }
 
+async function callGemini(prompt: string, systemPrompt: string): Promise<string> {
+  const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+  if (!GEMINI_API_KEY) {
+    throw new Error("GEMINI_API_KEY is not configured");
+  }
+
+  const response = await fetch("https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent?key=" + GEMINI_API_KEY, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      contents: [
+        {
+          parts: [
+            {
+              text: `${systemPrompt}\n\n${prompt}`
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        maxOutputTokens: 500,
+        temperature: 0.1,
+      }
+    }),
+  });
+
+  if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("RATE_LIMIT");
+    }
+    const errorText = await response.text();
+    console.error("Gemini error:", response.status, errorText);
+    throw new Error(`Gemini error: ${response.status}`);
+  }
+
+  const geminiResponse = await response.json();
+  return geminiResponse.candidates?.[0]?.content?.parts?.[0]?.text || "";
+}
+
 async function callOpenAI(prompt: string, systemPrompt: string): Promise<string> {
   const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
   if (!OPENAI_API_KEY) {
@@ -130,6 +171,9 @@ Responde en español argentino, de forma clara y directa.`;
       if (aiProvider.toLowerCase() === "openai") {
         console.log("Using OpenAI provider");
         analysis = await callOpenAI(prompt, systemPrompt);
+      } else if (aiProvider.toLowerCase() === "gemini") {
+        console.log("Using Gemini provider");
+        analysis = await callGemini(prompt, systemPrompt);
       } else {
         console.log("Using Lovable AI provider");
         analysis = await callLovableAI(prompt, systemPrompt);

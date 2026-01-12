@@ -74,6 +74,15 @@ export const EvolutionComparisonChart = ({
   isLoadingAnalysis,
   buildingsTrendStats
 }: EvolutionComparisonChartProps) => {
+  console.log("EvolutionComparisonChart received:", { 
+    dataLength: data.length, 
+    buildingName, 
+    deviation, 
+    hasAnalysis: !!analysis,
+    isLoadingAnalysis,
+    buildingsTrendStats 
+  });
+
   const hasInflationData = data.some(d => d.inflationPercent !== null);
   const hasBuildingsData = data.some(d => d.buildingsPercent !== null);
   const hasEstimatedData = data.some(d => d.inflationEstimated);
