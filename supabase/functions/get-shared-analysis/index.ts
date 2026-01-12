@@ -149,7 +149,7 @@ serve(async (req) => {
       .from('expense_analyses')
       .select('id, period, total_amount, created_at, period_date')
       .eq('building_name', analysis.building_name)
-      .order('created_at', { ascending: true })
+      .order('period_date', { ascending: true, nullsFirst: false })
 
     if (historicalError) {
       console.log('Historical data error:', historicalError)
