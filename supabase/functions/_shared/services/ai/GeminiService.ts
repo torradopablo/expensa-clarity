@@ -8,7 +8,17 @@ export class GeminiService implements AIService {
 
   constructor() {
     const config = getAIProviderConfig("gemini");
-    this.apiKey = config.apiKey!;
+    console.log("Gemini config:", { 
+      hasApiKey: !!config.apiKey, 
+      model: config.model, 
+      endpoint: config.endpoint 
+    });
+    
+    if (!config.apiKey) {
+      throw new Error("GEMINI_API_KEY environment variable is not set");
+    }
+    
+    this.apiKey = config.apiKey;
     this.model = config.model;
     this.endpoint = config.endpoint;
   }

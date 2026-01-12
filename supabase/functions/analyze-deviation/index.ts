@@ -6,7 +6,7 @@ import type { AnalysisRequest } from "../_shared/types/analysis.types.ts";
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: basicCorsHeaders });
   }
 
   try {

@@ -8,7 +8,17 @@ export class DeviationAnalysisService {
 
   constructor() {
     const provider = getAIProvider();
-    this.aiService = provider === "openai" ? new OpenAIService() : new GeminiService();
+    console.log("AI Provider configured:", provider);
+    
+    if (provider === "openai") {
+      this.aiService = new OpenAIService();
+    } else if (provider === "gemini") {
+      this.aiService = new GeminiService();
+    } else {
+      // Default to Gemini for any other provider including "lovable"
+      console.log("Defaulting to Gemini service for provider:", provider);
+      this.aiService = new GeminiService();
+    }
   }
 
   async analyzeDeviations(request: AnalysisRequest): Promise<{

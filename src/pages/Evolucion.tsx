@@ -457,6 +457,10 @@ const Evolucion = () => {
         setDeviation(result.deviation);
       } else if (response.status === 429) {
         toast.error("Límite de análisis alcanzado. Intentá más tarde.");
+      } else {
+        const errorText = await response.text();
+        console.error("AI Analysis error:", response.status, errorText);
+        toast.error(`Error: ${response.status} - ${errorText}`);
       }
     } catch (error) {
       console.error("Error fetching AI analysis:", error);
