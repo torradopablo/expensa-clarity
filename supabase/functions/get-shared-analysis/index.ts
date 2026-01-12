@@ -1,208 +1,204 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+
+interface Category {
+  id: string;
+  name: string;
+  icon: string;
+  current_amount: number;
+  previous_amount: number | null;
+  status: string;
+  explanation: string | null;
+}
+
+interface Analysis {
+  id: string;
+  building_name: string | null;
+  period: string;
+  unit: string | null;
+  total_amount: number;
+  previous_total: number | null;
+  status: string;
+  created_at: string;
+}
+
+interface HistoricalDataPoint {
+  id: string;
+  period: string;
+  total_amount: number;
+  created_at: string;
+  period_date: string | null;
+}
+
+interface EvolutionDataPoint {
+  period: string;
+  userPercent: number;
+  inflationPercent: number | null;
+  inflationEstimated?: boolean;
+  buildingsPercent: number | null;
+}
+
+interface Deviation {
+  fromInflation: number;
+  fromBuildings: number;
+  isSignificant: boolean;
+}
+
+interface BuildingsTrendStats {
+  totalBuildings: number;
+  totalAnalyses: number;
+  periodsCount: number;
+  filtersApplied: boolean;
+  usedFallback?: boolean;
+}
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
-// Helper to parse Spanish period to date
-const monthsEs: Record<string, number> = {
-  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-};
-
-const parseDate = (period: string): Date => {
-  const parts = period.toLowerCase().split(" ");
-  
-  if (parts.length >= 2) {
-    const month = monthsEs[parts[0]] ?? 0;
-    const year = parseInt(parts[1]) || 2024;
-    const date = new Date(year, month);
-    return date;
-  }
-  
-  return new Date();
-};
-
-const periodToYearMonth = (period: string): string => {
-  // Check if period is already in YYYY-MM format
-  if (/^\d{4}-\d{2}$/.test(period)) {
-    return period;
-  }
-  
-  // Otherwise, parse Spanish format like "enero 2024"
-  const date = parseDate(period);
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-};
-
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log("Function started");
-    
-    const { token } = await req.json();
-    console.log("Token received:", token);
+    const { token } = await req.json()
 
     if (!token) {
-      console.log("No token provided");
       return new Response(
-        JSON.stringify({ error: "Token is required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Token is required' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Create a Supabase client with service role to bypass RLS
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
-    console.log("Creating Supabase client");
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // First verify the shared link is valid
-    console.log("Fetching shared link");
+    console.log('Looking for shared link with token:', token)
+
+    // Find the shared link
     const { data: linkData, error: linkError } = await supabase
-      .from("shared_analysis_links")
-      .select("analysis_id, is_active, expires_at, view_count")
-      .eq("token", token)
-      .maybeSingle();
+      .from('shared_analysis_links')
+      .select('*')
+      .eq('token', token)
+      .single()
 
-    console.log("Link data:", linkData);
-    console.log("Link error:", linkError);
-
-    if (linkError) {
-      console.error("Error fetching link:", linkError);
+    if (linkError || !linkData) {
+      console.log('Link not found:', linkError)
       return new Response(
-        JSON.stringify({ error: "Error fetching shared link", details: linkError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Link not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    if (!linkData) {
-      console.log("Link not found");
-      return new Response(
-        JSON.stringify({ error: "Link not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
+    // Check if link is active
     if (!linkData.is_active) {
-      console.log("Link deactivated");
       return new Response(
-        JSON.stringify({ error: "Link is deactivated" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Link is deactivated' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
+    // Check if link has expired
     if (linkData.expires_at && new Date(linkData.expires_at) < new Date()) {
-      console.log("Link expired");
       return new Response(
-        JSON.stringify({ error: "Link has expired" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Link has expired' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    console.log("Link is valid, proceeding with analysis fetch");
+    console.log('Link found, fetching analysis:', linkData.analysis_id)
 
-    // Update view count
-    await supabase
-      .from("shared_analysis_links")
-      .update({ view_count: linkData.view_count + 1 })
-      .eq("token", token);
+    // Get the analysis
+    const { data: analysis, error: analysisError } = await supabase
+      .from('expense_analyses')
+      .select('*')
+      .eq('id', linkData.analysis_id)
+      .single()
 
-    // Fetch the analysis
-    const { data: analysisData, error: analysisError } = await supabase
-      .from("expense_analyses")
-      .select("id, user_id, building_name, period, unit, total_amount, previous_total, status, created_at, period_date")
-      .eq("id", linkData.analysis_id)
-      .single();
-
-    if (analysisError) {
-      console.error("Error fetching analysis:", analysisError);
+    if (analysisError || !analysis) {
+      console.log('Analysis not found:', analysisError)
       return new Response(
-        JSON.stringify({ error: "Error fetching analysis" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Analysis not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    const { user_id: ownerUserId, ...publicAnalysis } = analysisData as any;
-
-    // Fetch categories
-    const { data: categoriesData, error: categoriesError } = await supabase
-      .from("expense_categories")
-      .select("id, name, icon, current_amount, previous_amount, status, explanation")
-      .eq("analysis_id", linkData.analysis_id)
-      .order("current_amount", { ascending: false });
+    // Get categories for this analysis
+    const { data: categories, error: categoriesError } = await supabase
+      .from('expense_categories')
+      .select('*')
+      .eq('analysis_id', linkData.analysis_id)
+      .order('current_amount', { ascending: false })
 
     if (categoriesError) {
-      console.error("Error fetching categories:", categoriesError);
+      console.log('Categories error:', categoriesError)
       return new Response(
-        JSON.stringify({ error: "Error fetching categories" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+        JSON.stringify({ error: 'Failed to fetch categories' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Fetch historical data for this building (owner only)
-    let historicalData: any[] = [];
-    if (analysisData.building_name && ownerUserId) {
-      const { data: histData, error: histError } = await supabase
-        .from("expense_analyses")
-        .select("id, period, total_amount, created_at, period_date")
-        .eq("building_name", analysisData.building_name)
-        .eq("user_id", ownerUserId)
-        .order("period_date", { ascending: true, nullsFirst: false });
+    // Get historical data for the same building
+    const { data: historicalData, error: historicalError } = await supabase
+      .from('expense_analyses')
+      .select('id, period, total_amount, created_at, period_date')
+      .eq('building_name', analysis.building_name)
+      .order('period_date', { ascending: true, nullsFirst: false })
 
-      if (!histError && histData) {
-        // Sort by period_date or created_at
-        historicalData = histData.sort((a, b) => {
-          if (a.period_date && b.period_date) {
-            return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
-          }
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        });
-      }
+    if (historicalError) {
+      console.log('Historical data error:', historicalError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch historical data' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    // Enrich previous-period data for older analyses (when previous_* fields are null)
-    let computedPreviousTotal: number | null = (publicAnalysis as any).previous_total ?? null;
-    let enrichedCategories = (categoriesData || []) as any[];
-
-    if (historicalData.length >= 2) {
-      const currentIdx = historicalData.findIndex((h) => h.id === (publicAnalysis as any).id);
-      const previousAnalysis = currentIdx > 0 ? historicalData[currentIdx - 1] : null;
+    // Enrich categories with previous period data if needed
+    let enrichedCategories = categories || []
+    if (historicalData && historicalData.length > 1) {
+      const currentIdx = historicalData.findIndex((h: any) => h.id === analysis.id)
+      const previousAnalysis = currentIdx > 0 ? historicalData[currentIdx - 1] : null
 
       if (previousAnalysis) {
-        computedPreviousTotal = computedPreviousTotal ?? previousAnalysis.total_amount;
+        const needsPrevCategories = (categories || []).some((c: any) => c.previous_amount === null)
 
-        const needsPrevCategories = enrichedCategories.some((c) => c.previous_amount === null);
         if (needsPrevCategories) {
           const { data: prevCats, error: prevCatsError } = await supabase
-            .from("expense_categories")
-            .select("name, current_amount")
-            .eq("analysis_id", previousAnalysis.id);
+            .from('expense_categories')
+            .select('name, current_amount')
+            .eq('analysis_id', previousAnalysis.id)
 
           if (!prevCatsError && prevCats) {
-            const normalizeName = (name: string) => name.toLowerCase().trim();
+            const normalizeName = (name: string) => name.toLowerCase().trim()
             const prevMap = new Map<string, number>(
               prevCats.map((c: any) => [normalizeName(c.name), c.current_amount])
-            );
+            )
 
-            enrichedCategories = enrichedCategories.map((c) => ({
+            enrichedCategories = (categories || []).map((c: any) => ({
               ...c,
               previous_amount:
                 c.previous_amount !== null
                   ? c.previous_amount
                   : (prevMap.get(normalizeName(c.name)) ?? null),
-            }));
+            }))
           }
         }
       }
     }
 
-    // Fetch inflation data using the same method as Evolucion.tsx
-    let inflationData = null;
+    // Get evolution data (inflation and buildings comparison)
+    const evolutionData: EvolutionDataPoint[] = []
+    let deviation: Deviation | null = null
+    let buildingsTrendStats: BuildingsTrendStats | null = null
+
+    // Fetch inflation data
+    let inflationData = null
     try {
       const inflationResponse = await fetch(
         `${supabaseUrl}/functions/v1/fetch-inflation`,
@@ -210,204 +206,175 @@ Deno.serve(async (req) => {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")!}`,
+            Authorization: `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
           },
         }
-      );
-
+      )
+      
       if (inflationResponse.ok) {
-        const result = await inflationResponse.json();
+        const result = await inflationResponse.json()
         if (result.data) {
-          inflationData = result.data;
-          console.log("Inflation data fetched via API:", result.data);
+          inflationData = result.data
         }
       }
     } catch (error) {
-      console.error("Error fetching inflation data via API, falling back to database:", error);
-      // Fallback to direct database access
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from("inflation_data")
-        .select("period, value, is_estimated")
-        .order("period", { ascending: true });
-
-      if (!fallbackError && fallbackData) {
-        inflationData = fallbackData;
-        console.log("Inflation data fetched via database fallback:", fallbackData);
-      }
+      console.log('Failed to fetch inflation data:', error)
     }
 
-    // Fetch all buildings data for comparison (anonymized averages by period)
-    const { data: allAnalyses, error: allError } = await supabase
-      .from("expense_analyses")
-      .select("period, total_amount, building_name")
-      .eq("status", "completed")
-      .not("building_name", "is", null);
+    // Fetch other buildings data for comparison
+    const { data: otherBuildingsData } = await supabase
+      .from('expense_analyses')
+      .select('id, period, total_amount, period_date, building_name, user_id')
+      .neq('building_name', analysis.building_name)
+      .order('period_date', { ascending: true, nullsFirst: false })
 
-    if (allError) {
-      console.error("Error fetching all analyses:", allError);
-    }
-
-    // Group all analyses by period and calculate average
-    const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();
-    
-    // Exclude current building from averages
-    const otherBuildings = (allAnalyses || []).filter(
-      (a: any) => a.building_name?.toLowerCase().trim() !== analysisData.building_name?.toLowerCase().trim()
-    );
-
-    console.log("Other buildings count:", otherBuildings.length);
-    console.log("Sample other building:", otherBuildings[0]);
-
-    for (const analysis of otherBuildings) {
-      const period = analysis.period;
-      if (!periodMap.has(period)) {
-        periodMap.set(period, { total: 0, count: 0, buildings: new Set() });
-      }
-      const entry = periodMap.get(period)!;
-      entry.total += analysis.total_amount;
-      entry.count++;
-      entry.buildings.add(analysis.building_name);
-    }
-
-    const buildingsTrend = Array.from(periodMap.entries())
-      .map(([period, data]) => ({
-        period,
-        average: Math.round(data.total / data.count),
-        count: data.count,
-        buildingsCount: data.buildings.size
-      }))
-      .sort((a, b) => parseDate(a.period).getTime() - parseDate(b.period).getTime());
-
-    console.log("Buildings trend before normalization:", buildingsTrend);
-
-    // Calculate normalized percentage change from first period for buildings trend
-    if (buildingsTrend.length > 0) {
-      const baseValue = buildingsTrend[0].average;
-      console.log("Base value for buildings trend:", baseValue);
-      for (const item of buildingsTrend) {
-        const normalizedItem = item as { average: number; normalizedPercent?: number };
-        normalizedItem.normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
-      }
-    }
-
-    console.log("Buildings trend after normalization:", buildingsTrend);
-
-    // Calculate stats for buildings comparison
-    const buildingsTrendStats = {
-      totalBuildings: new Set(otherBuildings.map((a: any) => a.building_name)).size,
-      totalAnalyses: otherBuildings.length,
-      periodsCount: buildingsTrend.length,
-      filtersApplied: false,
-      usedFallback: false
-    };
-
-    // Build evolution comparison data (percentage based) - same logic as AnalysisPage.tsx and Evolucion.tsx
-    let evolutionData: any[] = [];
-    
-    if (historicalData.length >= 2) {
-      const baseTotal = historicalData[0]?.total_amount || 0;
+    // Calculate evolution data if we have historical data
+    if (historicalData && historicalData.length >= 2) {
+      const baseTotal = historicalData[0].total_amount
       
-      // Build inflation map by year-month
-      const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+      // Create inflation map
+      const inflationMap = new Map<string, { value: number; is_estimated: boolean }>()
       if (inflationData) {
-        for (const inf of inflationData) {
-          inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
+        inflationData.forEach((inf: any) => {
+          inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated })
+        })
+      }
+
+      // Helper to get YYYY-MM from period_date or parse from period string
+      const getYYYYMM = (periodDate: string | null, period: string): string | null => {
+        if (periodDate) {
+          const date = new Date(periodDate)
+          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
         }
+        // Check if period is already in YYYY-MM format
+        if (/^\d{4}-\d{2}$/.test(period)) {
+          return period
+        }
+        // Parse Spanish period like "enero 2024"
+        const monthsEs: Record<string, number> = {
+          enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+          julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+        }
+        const parts = period.toLowerCase().trim().split(/\s+/)
+        if (parts.length >= 2) {
+          const month = monthsEs[parts[0]]
+          if (month !== undefined) {
+            const year = parseInt(parts[1]) || new Date().getFullYear()
+            return `${year}-${String(month + 1).padStart(2, '0')}`
+          }
+        }
+        return null
       }
-      
-      // Build buildings average map by period name
-      const buildingsMap = new Map<string, number>();
-      for (const bt of buildingsTrend) {
-        buildingsMap.set(bt.period, (bt as any).normalizedPercent || 0);
+
+      // Find base inflation value for first period
+      const firstPeriodData = historicalData[0]
+      const firstPeriodYYYYMM = getYYYYMM(firstPeriodData.period_date, firstPeriodData.period)
+      const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null
+
+      // Calculate other buildings average by period
+      const buildingsAvgByPeriod = new Map<string, number[]>()
+      if (otherBuildingsData) {
+        otherBuildingsData.forEach(b => {
+          if (!buildingsAvgByPeriod.has(b.period)) {
+            buildingsAvgByPeriod.set(b.period, [])
+          }
+          buildingsAvgByPeriod.get(b.period)!.push(b.total_amount)
+        })
       }
-      
-      // Find base inflation value for first period (same as Evolucion.tsx)
-      const firstPeriodData = historicalData[0];
-      const firstPeriodYYYYMM = periodToYearMonth(firstPeriodData.period);
-      const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null;
-      
-      for (const hist of historicalData) {
-        const userPercent = baseTotal > 0 ? ((hist.total_amount - baseTotal) / baseTotal) * 100 : 0;
+
+      // Get first period averages for other buildings
+      const firstPeriod = historicalData[0].period
+      const firstPeriodOtherBuildings = buildingsAvgByPeriod.get(firstPeriod)
+      const baseOtherBuildings = firstPeriodOtherBuildings && firstPeriodOtherBuildings.length > 0
+        ? firstPeriodOtherBuildings.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildings.length
+        : null
+
+      const evolution: EvolutionDataPoint[] = historicalData.map((h) => {
+        const userPercent = ((h.total_amount - baseTotal) / baseTotal) * 100
         
-        // Calculate inflation percent change from base (same as Evolucion.tsx)
-        let inflationPercent: number | null = null;
-        let inflationEstimated = false;
+        // Calculate inflation percent change from base
+        let inflationPercent: number | null = null
+        let inflationEstimated = false
         
-        const periodYYYYMM = periodToYearMonth(hist.period);
-        
+        const periodYYYYMM = getYYYYMM(h.period_date, h.period)
         if (periodYYYYMM && baseInflation) {
-          const inflationItem = inflationMap.get(periodYYYYMM);
-          
+          const inflationItem = inflationMap.get(periodYYYYMM)
           if (inflationItem) {
-            inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
-            inflationEstimated = inflationItem.is_estimated;
+            inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100
+            inflationEstimated = inflationItem.is_estimated
           }
         }
         
-        const buildingsPercent = buildingsMap.get(hist.period) ?? null;
-        
-        evolutionData.push({
-          period: hist.period,
-          userPercent: parseFloat(userPercent.toFixed(1)),
-          inflationPercent: inflationPercent !== null ? parseFloat(inflationPercent.toFixed(1)) : null,
-          inflationEstimated,
-          buildingsPercent: buildingsPercent !== null ? parseFloat(buildingsPercent.toFixed(1)) : null
-        });
-      }
-      
-      // Filter out periods with no data for any metric
-      const filteredEvolutionData = evolutionData.filter(item => 
-        item.userPercent !== null && 
-        (item.inflationPercent !== null || item.buildingsPercent !== null)
-      );
-      
-      console.log("Final evolution data after filtering:", filteredEvolutionData);
-      evolutionData = filteredEvolutionData;
-    }
+        let buildingsPercent: number | null = null
+        if (baseOtherBuildings) {
+          const periodBuildings = buildingsAvgByPeriod.get(h.period)
+          if (periodBuildings && periodBuildings.length > 0) {
+            const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length
+            buildingsPercent = ((avgThisPeriod - baseOtherBuildings) / baseOtherBuildings) * 100
+          }
+        }
 
-    // Calculate deviations for the last period
-    let deviation = null;
-    if (evolutionData.length >= 2) {
-      const lastPoint = evolutionData[evolutionData.length - 1];
-      const fromInflation = lastPoint.inflationPercent !== null 
-        ? lastPoint.userPercent - lastPoint.inflationPercent 
-        : 0;
-      const fromBuildings = lastPoint.buildingsPercent !== null 
-        ? lastPoint.userPercent - lastPoint.buildingsPercent 
-        : 0;
-      
-      deviation = {
-        fromInflation: parseFloat(fromInflation.toFixed(1)),
-        fromBuildings: parseFloat(fromBuildings.toFixed(1)),
-        isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
-      };
-    }
-
-    console.log("Function completed successfully, returning data");
-    
-    return new Response(
-      JSON.stringify({
-        analysis: { ...(publicAnalysis as any), previous_total: computedPreviousTotal },
-        categories: enrichedCategories,
-        historicalData: historicalData.map(h => ({
-          id: h.id,
+        return {
           period: h.period,
-          total_amount: h.total_amount,
-          created_at: h.created_at,
-          period_date: h.period_date
-        })),
-        evolutionData: evolutionData,
-        deviation,
-        buildingsTrendStats: buildingsTrendStats.totalBuildings > 0 ? buildingsTrendStats : null
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+          userPercent,
+          inflationPercent,
+          inflationEstimated,
+          buildingsPercent
+        }
+      })
+
+      evolutionData.push(...evolution)
+
+      // Calculate deviation for latest period
+      const latestEvolution = evolution[evolution.length - 1]
+      if (latestEvolution) {
+        const fromInflation = latestEvolution.inflationPercent !== null 
+          ? latestEvolution.userPercent - latestEvolution.inflationPercent 
+          : 0
+        const fromBuildings = latestEvolution.buildingsPercent !== null 
+          ? latestEvolution.userPercent - latestEvolution.buildingsPercent 
+          : 0
+        
+        deviation = {
+          fromInflation,
+          fromBuildings,
+          isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
+        }
+      }
+
+      // Set buildings trend stats
+      if (otherBuildingsData) {
+        const uniqueBuildings = new Set(otherBuildingsData.map(b => b.building_name))
+        const uniquePeriods = new Set(otherBuildingsData.map(b => b.period))
+        buildingsTrendStats = {
+          totalBuildings: uniqueBuildings.size,
+          totalAnalyses: otherBuildingsData.length,
+          periodsCount: uniquePeriods.size,
+          filtersApplied: false
+        }
+      }
+    }
+    const responseData = {
+      analysis,
+      categories: enrichedCategories,
+      historicalData: historicalData || [],
+      evolutionData,
+      deviation,
+      buildingsTrendStats
+    }
+
+    console.log('Returning analysis data successfully')
+
+    return new Response(
+      JSON.stringify(responseData),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error("Error:", error);
+    console.error('Error in get-shared-analysis:', error)
     return new Response(
-      JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ error: 'Internal server error' }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
+})

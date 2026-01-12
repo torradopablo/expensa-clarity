@@ -1,0 +1,140 @@
+import { createSupabaseClient } from "../../config/supabase.ts";
+import type { Category, BuildingProfile } from "../../types/analysis.types.ts";
+
+export class AnalysisRepository {
+  private supabase: ReturnType<typeof createSupabaseClient>;
+
+  constructor(authHeader?: string) {
+    this.supabase = createSupabaseClient(authHeader);
+  }
+
+  async createAnalysis(analysisData: {
+    id: string;
+    user_id: string;
+    building_name?: string;
+    period?: string;
+    period_date?: string;
+    unit?: string;
+    total_amount?: number;
+    previous_total?: number;
+    file_url?: string;
+    status?: string;
+    scanned_at?: string;
+  }) {
+    const { data, error } = await this.supabase
+      .from("expense_analyses")
+      .insert(analysisData)
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
+  async updateAnalysis(id: string, updates: Partial<{
+    building_name: string;
+    period: string;
+    period_date: string;
+    unit: string;
+    total_amount: number;
+    previous_total: number;
+    file_url: string;
+    status: string;
+    scanned_at: string;
+  }>) {
+    const { data, error } = await this.supabase
+      .from("expense_analyses")
+      .update(updates)
+      .eq("id", id)
+      .select()
+      .single();
+
+    return { data, error };
+  }
+
+  async getAnalysis(id: string) {
+    const { data, error } = await this.supabase
+      .from("expense_analyses")
+      .select("*")
+      .eq("id", id)
+      .single();
+
+    return { data, error };
+  }
+
+  async getUserAnalyses(userId: string, buildingName?: string) {
+    let query = this.supabase
+      .from("expense_analyses")
+      .select("id, period, total_amount, created_at, period_date")
+      .eq("user_id", userId);
+
+    if (buildingName) {
+      query = query.eq("building_name", buildingName);
+    }
+
+    const { data, error } = await query.order("period_date", { ascending: true, nullsFirst: false });
+
+    return { data, error };
+  }
+
+  async getBuildingNames(userId: string, excludeAnalysisId?: string) {
+    let query = this.supabase
+      .from("expense_analyses")
+      .select("building_name")
+      .eq("user_id", userId)
+      .not("building_name", "is", null);
+
+    if (excludeAnalysisId) {
+      query = query.neq("id", excludeAnalysisId);
+    }
+
+    const { data, error } = await query;
+
+    return { data, error };
+  }
+
+  async getAllCompletedAnalyses() {
+    const { data, error } = await this.supabase
+      .from("expense_analyses")
+      .select("period, total_amount, building_name")
+      .eq("status", "completed")
+      .not("building_name", "is", null);
+
+    return { data, error };
+  }
+
+  async createCategories(categories: Array<{
+    analysis_id: string;
+    name: string;
+    icon?: string | null;
+    current_amount: number;
+    previous_amount?: number | null;
+    status?: string;
+    explanation?: string | null;
+  }>) {
+    const { data, error } = await this.supabase
+      .from("expense_categories")
+      .insert(categories)
+      .select();
+
+    return { data, error };
+  }
+
+  async getCategories(analysisId: string) {
+    const { data, error } = await this.supabase
+      .from("expense_categories")
+      .select("id, name, icon, current_amount, previous_amount, status, explanation")
+      .eq("analysis_id", analysisId)
+      .order("current_amount", { ascending: false });
+
+    return { data, error };
+  }
+
+  async getPreviousCategories(analysisId: string) {
+    const { data, error } = await this.supabase
+      .from("expense_categories")
+      .select("name, current_amount")
+      .eq("analysis_id", analysisId);
+
+    return { data, error };
+  }
+}
