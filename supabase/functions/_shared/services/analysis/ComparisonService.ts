@@ -1,0 +1,132 @@
+export class ComparisonService {
+  static normalizeForComparison(str: string): string {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-z0-9]/g, "") // Remove non-alphanumeric
+      .trim();
+  }
+
+  static findMatchingBuilding(
+    extractedName: string, 
+    existingNames: string[]
+  ): string | null {
+    const extractedNormalized = this.normalizeForComparison(extractedName);
+
+    const matchingBuilding = existingNames.find(existingName => {
+      const existingNormalized = this.normalizeForComparison(existingName);
+      
+      // Exact match after normalization
+      if (extractedNormalized === existingNormalized) {
+        return true;
+      }
+      
+      // One contains the other (handles abbreviations like "Edif." vs "Edificio")
+      if (extractedNormalized.includes(existingNormalized) || existingNormalized.includes(extractedNormalized)) {
+        // Only match if substantial overlap (at least 60% of shorter string)
+        const shorter = Math.min(extractedNormalized.length, existingNormalized.length);
+        const longer = Math.max(extractedNormalized.length, existingNormalized.length);
+        if (shorter / longer > 0.5) {
+          return true;
+        }
+      }
+
+      // Levenshtein-like similarity for typos
+      if (Math.abs(extractedNormalized.length - existingNormalized.length) <= 2) {
+        let differences = 0;
+        const maxLen = Math.max(extractedNormalized.length, existingNormalized.length);
+        for (let i = 0; i < maxLen; i++) {
+          if (extractedNormalized[i] !== existingNormalized[i]) {
+            differences++;
+          }
+        }
+        if (differences <= 2 && maxLen > 5) {
+          return true;
+        }
+      }
+
+      return false;
+    });
+
+    return matchingBuilding || null;
+  }
+
+  static calculateBuildingsTrend(analyses: Array<{ period: string; total_amount: number; building_name: string }>, excludeBuilding?: string) {
+    // Exclude current building from averages
+    const otherBuildings = analyses.filter(
+      (a) => a.building_name?.toLowerCase().trim() !== excludeBuilding?.toLowerCase().trim()
+    );
+
+    // Group by period and calculate average
+    const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();
+    
+    for (const analysis of otherBuildings) {
+      const period = analysis.period;
+      if (!periodMap.has(period)) {
+        periodMap.set(period, { total: 0, count: 0, buildings: new Set() });
+      }
+      const entry = periodMap.get(period)!;
+      entry.total += analysis.total_amount;
+      entry.count++;
+      entry.buildings.add(analysis.building_name);
+    }
+
+    const buildingsTrend = Array.from(periodMap.entries())
+      .map(([period, data]) => ({
+        period,
+        average: Math.round(data.total / data.count),
+        count: data.count,
+        buildingsCount: data.buildings.size
+      }))
+      .sort((a, b) => this.parseDate(a.period).getTime() - this.parseDate(b.period).getTime());
+
+    // Calculate normalized percentage change from first period
+    if (buildingsTrend.length > 0) {
+      const baseValue = buildingsTrend[0].average;
+      for (const item of buildingsTrend) {
+        (item as { normalizedPercent?: number }).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
+      }
+    }
+
+    return {
+      trend: buildingsTrend,
+      stats: {
+        totalBuildings: new Set(otherBuildings.map((a) => a.building_name)).size,
+        totalAnalyses: otherBuildings.length,
+        periodsCount: buildingsTrend.length,
+        filtersApplied: false,
+        usedFallback: false
+      }
+    };
+  }
+
+  private static parseDate(period: string): Date {
+    const monthsEs: Record<string, number> = {
+      enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+      julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+    };
+
+    const parts = period.toLowerCase().split(" ");
+    
+    if (parts.length >= 2) {
+      const month = monthsEs[parts[0]] ?? 0;
+      const year = parseInt(parts[1]) || 2024;
+      const date = new Date(year, month);
+      return date;
+    }
+    
+    return new Date();
+  }
+
+  static periodToYearMonth(period: string): string {
+    // Check if period is already in YYYY-MM format
+    if (/^\d{4}-\d{2}$/.test(period)) {
+      return period;
+    }
+    
+    // Otherwise, parse Spanish format like "enero 2024"
+    const date = this.parseDate(period);
+    return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+  }
+}
