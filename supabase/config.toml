@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.analyze-deviation]
 verify_jwt = false
+
+[functions.get-shared-analysis]
+verify_jwt = false
