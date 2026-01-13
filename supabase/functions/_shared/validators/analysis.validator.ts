@@ -6,7 +6,10 @@ export const CategorySchema = z.object({
   icon: z.string().max(50).nullable().optional(),
   current_amount: z.number().min(0).max(100000000),
   previous_amount: z.number().min(0).max(100000000).nullable().optional(),
-  status: z.enum(["ok", "attention", "normal", "high", "low", "new"]).default("ok"),
+  status: z.preprocess(
+    (val) => ["ok", "attention", "info"].includes(String(val)) ? val : "ok",
+    z.enum(["ok", "attention", "info"]).default("ok")
+  ),
   explanation: z.string().max(1000).nullable().optional().transform(s => s ? s.trim().slice(0, 1000) : s),
 });
 
@@ -29,7 +32,7 @@ export const AIResponseSchema = z.object({
   period_month: z.number().min(1).max(12).optional(),
   period_year: z.number().min(1900).max(2100).optional(),
   period_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-  unit: z.string().max(50).nullable().optional().transform(s => s ? s.trim() : s),
+  unit: z.string().max(200).nullable().optional().transform(s => s ? s.trim() : s),
   total_amount: z.number().min(0).max(100000000),
   previous_total: z.number().min(0).max(100000000).nullable().optional(),
   categories: z.array(CategorySchema).min(1).max(50),

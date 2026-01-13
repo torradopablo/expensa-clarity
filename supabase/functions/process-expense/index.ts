@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 import { corsHeaders } from "../_shared/config/cors.ts";
 import { validateUUID, validateFileUpload } from "../_shared/validators/common.validator.ts";
 import { validateAIResponse } from "../_shared/validators/analysis.validator.ts";
@@ -7,6 +8,7 @@ import { ExpenseAnalysisService } from "../_shared/services/analysis/ExpenseAnal
 import { AnalysisRepository } from "../_shared/services/database/AnalysisRepository.ts";
 import { BuildingRepository } from "../_shared/services/database/BuildingRepository.ts";
 import { StorageService } from "../_shared/services/storage/StorageService.ts";
+import { PDFService } from "../_shared/services/pdf/PDFService.ts";
 import { ComparisonService } from "../_shared/services/analysis/ComparisonService.ts";
 import { buildPeriodDate } from "../_shared/utils/date.utils.ts";
 import { ValidationError, AuthenticationError, isRateLimitError } from "../_shared/utils/error.utils.ts";
@@ -30,7 +32,7 @@ serve(async (req) => {
     }
 
     validateUUID(analysisId);
-    
+
     const authHeader = req.headers.get("Authorization");
     if (!authHeader?.startsWith("Bearer ")) {
       throw new AuthenticationError("No autorizado");
@@ -42,55 +44,38 @@ serve(async (req) => {
     const buildingRepository = new BuildingRepository(authHeader);
     const storageService = new StorageService(authHeader);
     const expenseAnalysisService = new ExpenseAnalysisService();
+    const pdfService = new PDFService();
 
     // Verify user
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    
+
     if (claimsError || !claimsData?.claims) {
       throw new AuthenticationError("Token inválido");
     }
 
     const userId = claimsData.claims.sub as string;
 
-    // Convert file to base64 for AI processing
+    // Convert file to base64 for AI processing (safe for large files)
     const arrayBuffer = await file.arrayBuffer();
-    const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+    const base64 = encode(new Uint8Array(arrayBuffer));
     const mimeType = file.type;
     const isPDF = mimeType === "application/pdf";
 
-    // For PDFs, we need to extract text first since OpenAI can't read PDF base64 directly
-    let contentToSend;
+    // For PDFs, we use OCR to extract text first, saving on AI image processing costs
+    let pdfText = "";
     if (isPDF) {
-      // For now, we'll try a different approach for PDFs
-      // In a production environment, you'd use a PDF parsing library
-      contentToSend = [
-        {
-          type: "text",
-          text: `Analizá el contenido de este archivo PDF de liquidación de expensas. El archivo está codificado en base64. Extraé los datos estructurados que puedas identificar del contenido textual:\n\n${base64.substring(0, 5000)}...`
-        }
-      ];
-    } else {
-      contentToSend = [
-        {
-          type: "text",
-          text: "Analizá esta liquidación de expensas y extraé los datos estructurados:"
-        },
-        {
-          type: "image_url",
-          image_url: {
-            url: `data:${mimeType};base64,${base64}`
-          }
-        }
-      ];
+      console.log("Extracting text from PDF using PDFService...");
+      pdfText = await pdfService.extractText(arrayBuffer);
+      console.log(`Extracted ${pdfText.length} characters from PDF`);
     }
 
     // Upload file to storage
     const filePath = storageService.createFilePath(userId, analysisId, file.name);
     const { error: uploadError } = await storageService.uploadFile(
-      "expense-files", 
-      filePath, 
-      file, 
+      "expense-files",
+      filePath,
+      file,
       { contentType: mimeType }
     );
 
@@ -101,12 +86,17 @@ serve(async (req) => {
     // Analyze expense file using AI service
     let extractedData: ValidatedAIResponse;
     try {
-      const aiResponse = await expenseAnalysisService.analyzeExpenseFile(
-        base64,
-        mimeType,
-        isPDF
-      );
-      extractedData = validateAIResponse(aiResponse);
+      if (isPDF && pdfText) {
+        const aiResponse = await expenseAnalysisService.analyzeExpenseText(pdfText);
+        extractedData = validateAIResponse(aiResponse);
+      } else {
+        const aiResponse = await expenseAnalysisService.analyzeExpenseFile(
+          base64,
+          mimeType,
+          isPDF
+        );
+        extractedData = validateAIResponse(aiResponse);
+      }
     } catch (aiError) {
       if (isRateLimitError(aiError)) {
         return new Response(
@@ -114,14 +104,14 @@ serve(async (req) => {
           { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
       if (aiError instanceof Error && aiError.message.includes("429")) {
         return new Response(
           JSON.stringify({ error: "Créditos insuficientes. Por favor, agregá créditos a tu cuenta." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
-      
+
       throw new Error(`Error al procesar el documento: ${aiError instanceof Error ? aiError.message : "Error desconocido"}`);
     }
 
@@ -130,10 +120,10 @@ serve(async (req) => {
 
     // Normalize building name using ComparisonService
     let normalizedBuildingName = extractedData.building_name;
-    
+
     if (normalizedBuildingName) {
       const { data: existingAnalyses } = await analysisRepository.getBuildingNames(userId, analysisId);
-      
+
       if (existingAnalyses && existingAnalyses.length > 0) {
         const existingBuildingNames = [...new Set(
           existingAnalyses
@@ -190,7 +180,7 @@ serve(async (req) => {
     // Update or create building profile using repository
     if (normalizedBuildingName && extractedData.building_profile) {
       const profileData = extractedData.building_profile;
-      
+
       try {
         await buildingRepository.mergeBuildingProfile(userId, normalizedBuildingName, profileData);
       } catch (error) {
@@ -201,7 +191,7 @@ serve(async (req) => {
     // Delete file from storage after successful processing to save space
     if (filePath) {
       const { error: deleteFileError } = await storageService.deleteFile("expense-files", filePath);
-      
+
       if (deleteFileError) {
         console.error("File deletion error:", deleteFileError);
       } else {
@@ -220,14 +210,14 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Process expense error:", error);
-    
+
     if (error instanceof ValidationError || error instanceof AuthenticationError) {
       return new Response(
         JSON.stringify({ error: error.message }),
         { status: error.statusCode, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
-    
+
     return new Response(
       JSON.stringify({ error: error instanceof Error ? error.message : "Error desconocido" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
