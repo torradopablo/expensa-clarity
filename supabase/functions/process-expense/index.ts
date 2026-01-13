@@ -117,14 +117,15 @@ serve(async (req) => {
     let extractedData: ValidatedAIResponse;
     try {
       if (isPDF && pdfText) {
-        const aiResponse = await expenseAnalysisService.analyzeExpenseText(pdfText, previousCategories);
+        const aiResponse = await expenseAnalysisService.analyzeExpenseText(pdfText, previousCategories, existingBuildingNames);
         extractedData = validateAIResponse(aiResponse);
       } else {
         const aiResponse = await expenseAnalysisService.analyzeExpenseFile(
           base64,
           mimeType,
           isPDF,
-          previousCategories
+          previousCategories,
+          existingBuildingNames
         );
         extractedData = validateAIResponse(aiResponse);
       }

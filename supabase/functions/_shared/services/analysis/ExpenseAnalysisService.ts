@@ -22,9 +22,10 @@ export class ExpenseAnalysisService {
     base64Content: string,
     mimeType: string,
     isPDF: boolean,
-    previousCategories: string[] = []
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
   ): Promise<AIResponse> {
-    const systemPrompt = this.getSystemPrompt(isPDF, previousCategories);
+    const systemPrompt = this.getSystemPrompt(isPDF, previousCategories, existingBuildingNames);
     const prompt = this.getAnalysisPrompt(isPDF);
 
     const content = await this.aiService.generateContentWithImage(
@@ -39,9 +40,10 @@ export class ExpenseAnalysisService {
 
   async analyzeExpenseText(
     text: string,
-    previousCategories: string[] = []
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
   ): Promise<AIResponse> {
-    const systemPrompt = this.getSystemPrompt(true, previousCategories);
+    const systemPrompt = this.getSystemPrompt(true, previousCategories, existingBuildingNames);
 
     // Protection against extremely large texts
     const truncatedText = text.length > 80000 ? text.substring(0, 80000) + "..." : text;
@@ -140,16 +142,25 @@ REGLAS DE SALIDA:
     }
   }
 
-  private getSystemPrompt(isPDF: boolean | string, previousCategories: string[] = []): string {
+  private getSystemPrompt(
+    isPDF: boolean | string,
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
+  ): string {
     const categoriesGuide = previousCategories.length > 0
-      ? `\nGUIÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):
+      ? `\nGUÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):
 ${previousCategories.map(c => `- ${c}`).join('\n')}\n`
+      : "";
+
+    const buildingGuide = existingBuildingNames.length > 0
+      ? `\nGUÍA DE EDIFICIOS EXISTENTES (Si el edificio es uno de estos, usa el nombre EXACTO):
+${existingBuildingNames.map(b => `- ${b}`).join('\n')}\n`
       : "";
 
     return `Eres un experto en liquidaciones de expensas argentinas. Devuelve ÚNICAMENTE JSON plano.
 No incluyas explicaciones externas al JSON. 
 Si hay muchas categorías, sé breve en las descripciones.
-${categoriesGuide}
+${buildingGuide}${categoriesGuide}
 REGLAS CRÍTICAS DE NEGOCIO:
 1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
 2. Los montos deben ser números positivos.
@@ -158,7 +169,8 @@ REGLAS CRÍTICAS DE NEGOCIO:
    - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
    - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
    - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
-5. IMPORTANTE: Si se proporciona una GUIÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
+5. IMPORTANTE: Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, identifica si el documento pertenece a alguno de ellos (incluso si el nombre en el PDF varía levemente o tiene abreviaturas) y usa el nombre de la guía.
+6. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
 
 JSON Schema:
 {
