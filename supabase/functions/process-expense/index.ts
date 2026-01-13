@@ -83,17 +83,48 @@ serve(async (req) => {
       console.error("File upload error:", uploadError);
     }
 
+    // Fetch existing building names for the user to help with matching
+    const { data: existingAnalyses } = await analysisRepository.getBuildingNames(userId, analysisId);
+    const existingBuildingNames = existingAnalyses
+      ? [...new Set((existingAnalyses as { building_name: string }[]).map(a => a.building_name).filter(Boolean))]
+      : [];
+
+    // Try a quick match in the text to identify the building and fetch its standard categories
+    let matchedBuildingName = "";
+    if (pdfText) {
+      for (const name of existingBuildingNames) {
+        if (pdfText.toLowerCase().includes(name.toLowerCase())) {
+          matchedBuildingName = name;
+          break;
+        }
+      }
+    }
+
+    let previousCategories: string[] = [];
+    if (matchedBuildingName) {
+      console.log(`Matched existing building "${matchedBuildingName}" from text. Fetching previous categories...`);
+      previousCategories = await analysisRepository.getLatestBuildingCategories(userId, matchedBuildingName);
+    } else {
+      // Fallback: get all unique categories of the user to guide the AI
+      console.log("No specific building matched. Fetching user-wide common categories...");
+      previousCategories = await analysisRepository.getUserCategories(userId);
+    }
+
+    // Limit categories to 50 most relevant to avoid too large prompt
+    previousCategories = previousCategories.slice(0, 50);
+
     // Analyze expense file using AI service
     let extractedData: ValidatedAIResponse;
     try {
       if (isPDF && pdfText) {
-        const aiResponse = await expenseAnalysisService.analyzeExpenseText(pdfText);
+        const aiResponse = await expenseAnalysisService.analyzeExpenseText(pdfText, previousCategories);
         extractedData = validateAIResponse(aiResponse);
       } else {
         const aiResponse = await expenseAnalysisService.analyzeExpenseFile(
           base64,
           mimeType,
-          isPDF
+          isPDF,
+          previousCategories
         );
         extractedData = validateAIResponse(aiResponse);
       }
@@ -126,8 +157,8 @@ serve(async (req) => {
 
       if (existingAnalyses && existingAnalyses.length > 0) {
         const existingBuildingNames = [...new Set(
-          existingAnalyses
-            .map((a: unknown) => (a as { building_name?: string }).building_name)
+          (existingAnalyses as { building_name?: string }[])
+            .map((a) => a.building_name)
             .filter((name): name is string => name !== null && name !== undefined)
         )];
 

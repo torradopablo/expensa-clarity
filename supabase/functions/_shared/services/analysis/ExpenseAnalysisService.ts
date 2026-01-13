@@ -21,9 +21,10 @@ export class ExpenseAnalysisService {
   async analyzeExpenseFile(
     base64Content: string,
     mimeType: string,
-    isPDF: boolean
+    isPDF: boolean,
+    previousCategories: string[] = []
   ): Promise<AIResponse> {
-    const systemPrompt = this.getSystemPrompt(isPDF);
+    const systemPrompt = this.getSystemPrompt(isPDF, previousCategories);
     const prompt = this.getAnalysisPrompt(isPDF);
 
     const content = await this.aiService.generateContentWithImage(
@@ -37,9 +38,10 @@ export class ExpenseAnalysisService {
   }
 
   async analyzeExpenseText(
-    text: string
+    text: string,
+    previousCategories: string[] = []
   ): Promise<AIResponse> {
-    const systemPrompt = this.getSystemPrompt(true);
+    const systemPrompt = this.getSystemPrompt(true, previousCategories);
 
     // Protection against extremely large texts
     const truncatedText = text.length > 80000 ? text.substring(0, 80000) + "..." : text;
@@ -83,7 +85,22 @@ REGLAS DE SALIDA:
     }
 
     try {
-      return JSON.parse(cleanedContent.trim());
+      const data = JSON.parse(cleanedContent.trim());
+
+      // Ensure mathematical consistency programmatically
+      if (data.categories && Array.isArray(data.categories)) {
+        const categoriesSum = data.categories.reduce((sum: number, cat: any) => sum + (Number(cat.current_amount) || 0), 0);
+
+        // If the sum of categories is significantly different (> 10%) from the total_amount,
+        // we prioritize the sum of categories as it's the more detailed data source.
+        // This handles cases where total_amount is the "Unit Total" but categories are "Building Total".
+        if (categoriesSum > 0 && Math.abs(categoriesSum - data.total_amount) > (data.total_amount * 0.1)) {
+          console.warn(`Programmatically adjusting total_amount from ${data.total_amount} to ${categoriesSum} for consistency.`);
+          data.total_amount = categoriesSum;
+        }
+      }
+
+      return data;
     } catch (error) {
       console.error("JSON parsing error:", error);
       console.error("Cleaned content length:", cleanedContent.length);
@@ -123,15 +140,25 @@ REGLAS DE SALIDA:
     }
   }
 
-  private getSystemPrompt(isPDF: boolean | string): string {
+  private getSystemPrompt(isPDF: boolean | string, previousCategories: string[] = []): string {
+    const categoriesGuide = previousCategories.length > 0
+      ? `\nGUIÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):
+${previousCategories.map(c => `- ${c}`).join('\n')}\n`
+      : "";
+
     return `Eres un experto en liquidaciones de expensas argentinas. Devuelve ÚNICAMENTE JSON plano.
 No incluyas explicaciones externas al JSON. 
 Si hay muchas categorías, sé breve en las descripciones.
-
+${categoriesGuide}
 REGLAS CRÍTICAS DE NEGOCIO:
 1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
 2. Los montos deben ser números positivos.
 3. El JSON debe ser válido y completo.
+4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". 
+   - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
+   - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
+   - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
+5. IMPORTANTE: Si se proporciona una GUIÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
 
 JSON Schema:
 {

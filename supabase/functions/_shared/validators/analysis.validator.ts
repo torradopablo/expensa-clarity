@@ -7,7 +7,7 @@ export const CategorySchema = z.object({
   current_amount: z.number().min(0).max(100000000),
   previous_amount: z.number().min(0).max(100000000).nullable().optional(),
   status: z.preprocess(
-    (val) => ["ok", "attention", "info"].includes(String(val)) ? val : "ok",
+    (val: any) => ["ok", "attention", "info"].includes(String(val)) ? val : "ok",
     z.enum(["ok", "attention", "info"]).default("ok")
   ),
   explanation: z.string().max(1000).nullable().optional().transform(s => s ? s.trim().slice(0, 1000) : s),
@@ -52,11 +52,12 @@ export function validateAIResponse(data: unknown): AIResponse {
     0
   );
 
-  const tolerance = validated.total_amount * 0.5;
+  const tolerance = validated.total_amount * 0.05; // 5% tolerance
   if (Math.abs(totalCategoryAmount - validated.total_amount) > tolerance && validated.total_amount > 0) {
-    console.warn("Categories total differs significantly from stated total", {
+    console.warn("Categories total differs from stated total", {
       categoriesSum: totalCategoryAmount,
       statedTotal: validated.total_amount,
+      difference: totalCategoryAmount - validated.total_amount,
     });
   }
 
