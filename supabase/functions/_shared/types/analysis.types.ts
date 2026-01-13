@@ -3,7 +3,7 @@ export interface Category {
   icon?: string | null;
   current_amount: number;
   previous_amount?: number | null;
-  status?: "ok" | "attention" | "normal" | "high" | "low" | "new";
+  status?: "ok" | "attention" | "info";
   explanation?: string | null;
 }
 

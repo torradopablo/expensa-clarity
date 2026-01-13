@@ -1,3 +1,4 @@
+import type { AIProvider } from "../../config/ai-providers.ts";
 import type { AIResponse } from "../../types/analysis.types.ts";
 import { OpenAIService } from "../ai/OpenAIService.ts";
 import { GeminiService } from "../ai/GeminiService.ts";
@@ -8,62 +9,110 @@ export class ExpenseAnalysisService {
 
   constructor() {
     const provider = getAIProvider();
-    this.aiService = provider === "openai" ? new OpenAIService() : new GeminiService();
+    console.log(`Initializing ExpenseAnalysisService with provider: ${provider}`);
+
+    if (provider === "lovable" || provider === "openai") {
+      this.aiService = new OpenAIService(provider);
+    } else {
+      this.aiService = new GeminiService(provider);
+    }
   }
 
   async analyzeExpenseFile(
     base64Content: string,
     mimeType: string,
-    isPDF: boolean
+    isPDF: boolean,
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
   ): Promise<AIResponse> {
-    const systemPrompt = this.getSystemPrompt(isPDF);
+    const systemPrompt = this.getSystemPrompt(isPDF, previousCategories, existingBuildingNames);
     const prompt = this.getAnalysisPrompt(isPDF);
 
-    let content: string;
-    if (isPDF) {
-      content = await this.aiService.generateContentWithImage(
-        prompt,
-        base64Content,
-        mimeType,
-        systemPrompt
-      );
-    } else {
-      content = await this.aiService.generateContentWithImage(
-        prompt,
-        base64Content,
-        mimeType,
-        systemPrompt
-      );
-    }
+    const content = await this.aiService.generateContentWithImage(
+      prompt,
+      base64Content,
+      mimeType,
+      systemPrompt
+    );
 
-    // Parse JSON response - improved handling for Gemini responses
+    return this.parseAIResponse(content);
+  }
+
+  async analyzeExpenseText(
+    text: string,
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
+  ): Promise<AIResponse> {
+    const systemPrompt = this.getSystemPrompt(true, previousCategories, existingBuildingNames);
+
+    // Protection against extremely large texts
+    const truncatedText = text.length > 80000 ? text.substring(0, 80000) + "..." : text;
+
+    const prompt = `Analizá esta liquidación de expensas (texto extraído por OCR). 
+Tarea: Limpia errores de lectura, identifica montos (puntos/comas) y extrae los datos JSON.
+
+TEXTO:
+"""
+${truncatedText}
+"""
+
+REGLAS DE SALIDA:
+1. Devuelve ÚNICAMENTE el código JSON.
+2. Sé conciso en el campo "explanation" de cada categoría para ahorrar espacio.
+3. Asegurate de que el JSON esté completo y cierre correctamente.`;
+
+    const content = await this.aiService.generateContent(
+      prompt,
+      systemPrompt
+    );
+
+    return this.parseAIResponse(content);
+  }
+
+  private parseAIResponse(content: string): AIResponse {
     let cleanedContent = content;
-    
-    // Remove markdown code blocks if present
+
+    // Log for debugging (truncated in console/logs is normal but helps see the start)
+    console.log(`AI Response start: ${content.substring(0, 200)}...`);
+
     cleanedContent = cleanedContent.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    
-    // Handle Gemini responses that include explanatory text before JSON
-    // Look for JSON pattern in the response
+
     const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       cleanedContent = jsonMatch[0];
     }
-    
-    // Also handle cases where JSON might be wrapped in quotes
+
     if (cleanedContent.startsWith('"') && cleanedContent.endsWith('"')) {
       cleanedContent = cleanedContent.slice(1, -1);
     }
-    
-    cleanedContent = cleanedContent.trim();
-    
+
     try {
-      return JSON.parse(cleanedContent);
+      const data = JSON.parse(cleanedContent.trim());
+
+      // Ensure mathematical consistency programmatically
+      if (data.categories && Array.isArray(data.categories)) {
+        const categoriesSum = data.categories.reduce((sum: number, cat: any) => sum + (Number(cat.current_amount) || 0), 0);
+
+        // If the sum of categories is significantly different (> 10%) from the total_amount,
+        // we prioritize the sum of categories as it's the more detailed data source.
+        // This handles cases where total_amount is the "Unit Total" but categories are "Building Total".
+        if (categoriesSum > 0 && Math.abs(categoriesSum - data.total_amount) > (data.total_amount * 0.1)) {
+          console.warn(`Programmatically adjusting total_amount from ${data.total_amount} to ${categoriesSum} for consistency.`);
+          data.total_amount = categoriesSum;
+        }
+      }
+
+      return data;
     } catch (error) {
       console.error("JSON parsing error:", error);
-      console.error("Original content:", content);
-      console.error("Cleaned content:", cleanedContent);
-      
-      // Return error structure if parsing fails
+      console.error("Cleaned content length:", cleanedContent.length);
+      console.error("Original content length:", content.length);
+
+      // Fallback for truncated JSON - try to close it if it ends abruptly (very basic attempt)
+      if (cleanedContent.lastIndexOf('}') < cleanedContent.lastIndexOf('{')) {
+        console.warn("JSON seems truncated, attempt to return partial or error.");
+      }
+
       return {
         building_name: "Error en parsing",
         period: "Error",
@@ -76,7 +125,7 @@ export class ExpenseAnalysisService {
           icon: "alert",
           current_amount: 0,
           status: "attention",
-          explanation: "No se pudo interpretar la respuesta de la IA"
+          explanation: "La respuesta de la IA fue demasiado larga o se cortó."
         }],
         building_profile: {
           country: "Argentina",
@@ -93,94 +142,68 @@ export class ExpenseAnalysisService {
     }
   }
 
-  private getSystemPrompt(isPDF: boolean): string {
-    if (isPDF) {
-      return `Eres un experto en analizar liquidaciones de expensas de Argentina. Tu tarea es extraer datos del ${isPDF ? 'PDF' : 'imagen'} y devolver ÚNICAMENTE JSON.
+  private getSystemPrompt(
+    isPDF: boolean | string,
+    previousCategories: string[] = [],
+    existingBuildingNames: string[] = []
+  ): string {
+    const categoriesGuide = previousCategories.length > 0
+      ? `\nGUÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):
+${previousCategories.map(c => `- ${c}`).join('\n')}\n`
+      : "";
 
-INSTRUCCIONES CRÍTICAS:
-1. Analiza el contenido del ${isPDF ? 'PDF' : 'imagen'} que se proporciona
-2. Extrae todos los datos visibles y legibles
-3. Si no puedes leer algún campo, usa null
-4. Devuelve ÚNICAMENTE JSON, sin texto explicativo antes o después
-5. No incluyas frases como "Aquí está el JSON:" o similar
-6. El JSON debe ser válido y completo
+    const buildingGuide = existingBuildingNames.length > 0
+      ? `\nGUÍA DE EDIFICIOS EXISTENTES (Si el edificio es uno de estos, usa el nombre EXACTO):
+${existingBuildingNames.map(b => `- ${b}`).join('\n')}\n`
+      : "";
 
-JSON requerido (devolver exactamente este formato):
+    return `Eres un experto en liquidaciones de expensas argentinas. Devuelve ÚNICAMENTE JSON plano.
+No incluyas explicaciones externas al JSON. 
+Si hay muchas categorías, sé breve en las descripciones.
+${buildingGuide}${categoriesGuide}
+REGLAS CRÍTICAS DE NEGOCIO:
+1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
+2. Los montos deben ser números positivos.
+3. El JSON debe ser válido y completo.
+4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". 
+   - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
+   - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
+   - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
+5. IMPORTANTE: Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, identifica si el documento pertenece a alguno de ellos (incluso si el nombre en el PDF varía levemente o tiene abreviaturas) y usa el nombre de la guía.
+6. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
+
+JSON Schema:
 {
-  "building_name": "nombre del edificio o null",
-  "period": "mes año o null",
-  "period_month": número del mes o null,
-  "period_year": año o null,
-  "unit": "unidad funcional o null",
-  "total_amount": monto total o 0,
+  "building_name": string,
+  "period": string,
+  "period_month": number (1-12),
+  "period_year": number (YYYY),
+  "unit": string o null,
+  "total_amount": number,
   "categories": [
     {
-      "name": "nombre categoría o null",
-      "icon": "building",
-      "current_amount": monto o 0,
-      "status": "ok",
-      "explanation": "descripción o null"
+      "name": string,
+      "icon": string (use Lucide icon name),
+      "current_amount": number,
+      "status": "ok" | "attention" | "info",
+      "explanation": string o null
     }
   ],
   "building_profile": {
     "country": "Argentina",
-    "province": null,
-    "city": null,
-    "neighborhood": null,
-    "zone": null,
-    "unit_count_range": null,
-    "age_category": null,
-    "has_amenities": false,
-    "amenities": []
+    "province": string o null,
+    "city": string o null,
+    "neighborhood": string o null,
+    "zone": "CABA" | "GBA Norte" | "GBA Oeste" | "GBA Sur" | "Interior" | null,
+    "unit_count_range": "1-10" | "11-30" | "31-50" | "51-100" | "100+" | null,
+    "age_category": string o null,
+    "has_amenities": boolean,
+    "amenities": string[]
   }
-}
-
-EJEMPLO VÁLIDO:
-{"building_name":"Edificio Central","period":"Enero 2024","period_month":1,"period_year":2024,"unit":"UF 12","total_amount":15000,"categories":[{"name":"Expensas comunes","icon":"building","current_amount":15000,"status":"ok","explanation":"Gastos mensuales"}],"building_profile":{"country":"Argentina","province":null,"city":null,"neighborhood":null,"zone":null,"unit_count_range":null,"age_category":null,"has_amenities":false,"amenities":[]}}`;
-    }
-
-    return `PRIMERO: Describe qué ves en esta imagen en 1-2 frases.
-
-SEGUNDO: Si es una liquidación de expensas, extrae los datos. Si no lo es o no puedes leer, devuelve JSON con valores null.
-
-JSON requerido:
-{
-  "building_name": "nombre que veas o null",
-  "period": "mes año que veas o null", 
-  "period_month": número del mes o null,
-  "period_year": año que veas o null,
-  "unit": "unidad que veas o null",
-  "total_amount": monto total que veas o 0,
-  "categories": [
-    {
-      "name": "nombre categoría que veas o null",
-      "icon": "building",
-      "current_amount": monto que veas o 0,
-      "status": "ok",
-      "explanation": "descripción que veas o null"
-    }
-  ],
-  "building_profile": {
-    "country": "Argentina",
-    "province": null,
-    "city": null,
-    "neighborhood": null,
-    "zone": null,
-    "unit_count_range": null,
-    "age_category": null,
-    "has_amenities": false,
-    "amenities": []
-  }
-}
-
-DEVUELVE SOLO EL JSON. NADA DE TEXTO.`;
+}`;
   }
 
   private getAnalysisPrompt(isPDF: boolean): string {
-    if (isPDF) {
-      return "Analizá este PDF de liquidación de expensas y extraé los datos estructurados:";
-    }
-
-    return "Analizá esta liquidación de expensas y extraé los datos estructurados:";
+    return "Analizá esta liquidación de expensas y extraé los datos estructurados en JSON:";
   }
 }

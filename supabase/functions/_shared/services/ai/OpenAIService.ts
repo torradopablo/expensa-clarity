@@ -1,13 +1,15 @@
 import type { AIService, AIRequestOptions } from "./AIService.interface.ts";
-import { getAIProviderConfig } from "../../config/ai-providers.ts";
+import { AIProvider, getAIProviderConfig } from "../../config/ai-providers.ts";
 
 export class OpenAIService implements AIService {
   private apiKey: string;
   private model: string;
   private endpoint: string;
 
-  constructor() {
-    const config = getAIProviderConfig("openai");
+  constructor(provider: AIProvider = "openai") {
+    const config = getAIProviderConfig(provider);
+    console.log(`[OpenAIService] Initialized with model: ${config.model}`);
+
     this.apiKey = config.apiKey!;
     this.model = config.model;
     this.endpoint = config.endpoint;
@@ -26,14 +28,12 @@ export class OpenAIService implements AIService {
           { role: "system", content: systemPrompt || "" },
           { role: "user", content: prompt }
         ],
-        max_tokens: 2500,
+        max_tokens: 16000, // Aumentado significativamente para evitar JSONs truncados
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("RATE_LIMIT");
-      }
       const errorText = await response.text();
       throw new Error(`OpenAI error: ${response.status} - ${errorText}`);
     }
@@ -43,9 +43,9 @@ export class OpenAIService implements AIService {
   }
 
   async generateContentWithImage(
-    prompt: string, 
-    base64Image: string, 
-    mimeType: string, 
+    prompt: string,
+    base64Image: string,
+    mimeType: string,
     systemPrompt?: string
   ): Promise<string> {
     const response = await fetch(this.endpoint, {
@@ -77,14 +77,12 @@ export class OpenAIService implements AIService {
             ]
           }
         ],
-        max_tokens: 2500,
+        max_tokens: 16000, // Aumentado significativamente
+        response_format: { type: "json_object" }
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("RATE_LIMIT");
-      }
       const errorText = await response.text();
       throw new Error(`OpenAI error: ${response.status} - ${errorText}`);
     }

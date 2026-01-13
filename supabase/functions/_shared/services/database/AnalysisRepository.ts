@@ -137,4 +137,38 @@ export class AnalysisRepository {
 
     return { data, error };
   }
+
+  async getUserCategories(userId: string): Promise<string[]> {
+    const { data, error } = await this.supabase
+      .from("expense_categories")
+      .select(`
+        name,
+        expense_analyses!inner(user_id)
+      `)
+      .eq("expense_analyses.user_id", userId);
+
+    if (error || !data) return [];
+    return [...new Set(data.map((c: { name: string }) => c.name))];
+  }
+
+  async getLatestBuildingCategories(userId: string, buildingName: string): Promise<string[]> {
+    const { data: latestAnalysis, error: analysisError } = await this.supabase
+      .from("expense_analyses")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("building_name", buildingName)
+      .order("period_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (analysisError || !latestAnalysis) return [];
+
+    const { data: categories, error: catError } = await this.supabase
+      .from("expense_categories")
+      .select("name")
+      .eq("analysis_id", latestAnalysis.id);
+
+    if (catError || !categories) return [];
+    return (categories as { name: string }[]).map(c => c.name);
+  }
 }

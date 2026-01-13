@@ -1,23 +1,19 @@
+import { AIProvider, getAIProviderConfig } from "../../config/ai-providers.ts";
 import type { AIService } from "./AIService.interface.ts";
-import { getAIProviderConfig } from "../../config/ai-providers.ts";
 
 export class GeminiService implements AIService {
   private apiKey: string;
   private model: string;
   private endpoint: string;
 
-  constructor() {
-    const config = getAIProviderConfig("gemini");
-    console.log("Gemini config:", { 
-      hasApiKey: !!config.apiKey, 
-      model: config.model, 
-      endpoint: config.endpoint 
-    });
-    
+  constructor(provider: AIProvider = "gemini") {
+    const config = getAIProviderConfig(provider);
+    console.log(`[GeminiService] Initialized with model: ${config.model} (v3 - MaxTokensFix)`);
+
     if (!config.apiKey) {
       throw new Error("GEMINI_API_KEY environment variable is not set");
     }
-    
+
     this.apiKey = config.apiKey;
     this.model = config.model;
     this.endpoint = config.endpoint;
@@ -39,17 +35,14 @@ export class GeminiService implements AIService {
             ]
           }
         ],
-        generationConfig: {
-          maxOutputTokens: 2500,
-          temperature: 0.1,
+        generation_config: {
+          max_output_tokens: 16000, // Aumentado para evitar truncamiento
+          temperature: 0.1
         }
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("RATE_LIMIT");
-      }
       const errorText = await response.text();
       throw new Error(`Gemini error: ${response.status} - ${errorText}`);
     }
@@ -59,9 +52,9 @@ export class GeminiService implements AIService {
   }
 
   async generateContentWithImage(
-    prompt: string, 
-    base64Image: string, 
-    mimeType: string, 
+    prompt: string,
+    base64Image: string,
+    mimeType: string,
     systemPrompt?: string
   ): Promise<string> {
     const response = await fetch(`${this.endpoint}?key=${this.apiKey}`, {
@@ -85,17 +78,14 @@ export class GeminiService implements AIService {
             ]
           }
         ],
-        generationConfig: {
-          maxOutputTokens: 2500,
-          temperature: 0.1,
+        generation_config: {
+          max_output_tokens: 16000,
+          temperature: 0.1
         }
       }),
     });
 
     if (!response.ok) {
-      if (response.status === 429) {
-        throw new Error("RATE_LIMIT");
-      }
       const errorText = await response.text();
       throw new Error(`Gemini error: ${response.status} - ${errorText}`);
     }
