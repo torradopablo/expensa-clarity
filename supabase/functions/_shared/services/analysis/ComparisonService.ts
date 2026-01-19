@@ -9,19 +9,19 @@ export class ComparisonService {
   }
 
   static findMatchingBuilding(
-    extractedName: string, 
+    extractedName: string,
     existingNames: string[]
   ): string | null {
     const extractedNormalized = this.normalizeForComparison(extractedName);
 
     const matchingBuilding = existingNames.find(existingName => {
       const existingNormalized = this.normalizeForComparison(existingName);
-      
+
       // Exact match after normalization
       if (extractedNormalized === existingNormalized) {
         return true;
       }
-      
+
       // One contains the other (handles abbreviations like "Edif." vs "Edificio")
       if (extractedNormalized.includes(existingNormalized) || existingNormalized.includes(extractedNormalized)) {
         // Only match if substantial overlap (at least 60% of shorter string)
@@ -60,32 +60,47 @@ export class ComparisonService {
 
     // Group by period and calculate average
     const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();
-    
-    for (const analysis of otherBuildings) {
+
+    for (const analysis of otherBuildings as any[]) {
       const period = analysis.period;
       if (!periodMap.has(period)) {
         periodMap.set(period, { total: 0, count: 0, buildings: new Set() });
       }
       const entry = periodMap.get(period)!;
-      entry.total += analysis.total_amount;
+
+      let amount = analysis.total_amount;
+
+      // If categories are included (from a join), find the relevant one
+      if (analysis.expense_categories) {
+        const categories = Array.isArray(analysis.expense_categories)
+          ? analysis.expense_categories
+          : [analysis.expense_categories];
+
+        // Since the query filtered by category name, we can just take the first one
+        if (categories.length > 0) {
+          amount = (categories[0] as any).current_amount;
+        }
+      }
+
+      entry.total += amount;
       entry.count++;
       entry.buildings.add(analysis.building_name);
     }
 
     const buildingsTrend = Array.from(periodMap.entries())
-      .map(([period, data]) => ({
+      .map(([period, data]: [string, any]) => ({
         period,
         average: Math.round(data.total / data.count),
         count: data.count,
         buildingsCount: data.buildings.size
       }))
-      .sort((a, b) => this.parseDate(a.period).getTime() - this.parseDate(b.period).getTime());
+      .sort((a, b) => this.parseDate(a.period).valueOf() - this.parseDate(b.period).valueOf());
 
     // Calculate normalized percentage change from first period
     if (buildingsTrend.length > 0) {
       const baseValue = buildingsTrend[0].average;
       for (const item of buildingsTrend) {
-        (item as { normalizedPercent?: number }).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
+        (item as any).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
       }
     }
 
@@ -108,14 +123,14 @@ export class ComparisonService {
     };
 
     const parts = period.toLowerCase().split(" ");
-    
+
     if (parts.length >= 2) {
       const month = monthsEs[parts[0]] ?? 0;
       const year = parseInt(parts[1]) || 2024;
       const date = new Date(year, month);
       return date;
     }
-    
+
     return new Date();
   }
 
@@ -124,7 +139,7 @@ export class ComparisonService {
     if (/^\d{4}-\d{2}$/.test(period)) {
       return period;
     }
-    
+
     // Otherwise, parse Spanish format like "enero 2024"
     const date = this.parseDate(period);
     return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;

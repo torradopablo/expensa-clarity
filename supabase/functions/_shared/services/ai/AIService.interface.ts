@@ -1,6 +1,6 @@
 export interface AIService {
-  generateContent(prompt: string, systemPrompt?: string): Promise<string>;
-  generateContentWithImage(prompt: string, base64Image: string, mimeType: string, systemPrompt?: string): Promise<string>;
+  generateContent(prompt: string, systemPrompt?: string, options?: { json?: boolean }): Promise<string>;
+  generateContentWithImage(prompt: string, base64Image: string, mimeType: string, systemPrompt?: string, options?: { json?: boolean }): Promise<string>;
 }
 
 export interface AIRequestOptions {

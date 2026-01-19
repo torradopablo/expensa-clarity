@@ -14,8 +14,10 @@ export class DeviationAnalysisService {
       this.aiService = new OpenAIService();
     } else if (provider === "gemini") {
       this.aiService = new GeminiService();
+    } else if (provider === "lovable") {
+      this.aiService = new OpenAIService("lovable");
     } else {
-      // Default to Gemini for any other provider including "lovable"
+      // Default to Gemini for any other provider
       console.log("Defaulting to Gemini service for provider:", provider);
       this.aiService = new GeminiService();
     }
@@ -78,7 +80,7 @@ Proporciona un análisis breve y accionable (máximo 3-4 oraciones) que:
 Responde en español argentino, de forma clara y directa.`;
 
     try {
-      return await this.aiService.generateContent(prompt, systemPrompt);
+      return await this.aiService.generateContent(prompt, systemPrompt, { json: false });
     } catch (error) {
       if (error instanceof Error && error.message === "RATE_LIMIT") {
         throw error;

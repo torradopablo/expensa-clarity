@@ -15,7 +15,7 @@ export class OpenAIService implements AIService {
     this.endpoint = config.endpoint;
   }
 
-  async generateContent(prompt: string, systemPrompt?: string): Promise<string> {
+  async generateContent(prompt: string, systemPrompt?: string, options?: { json?: boolean }): Promise<string> {
     const response = await fetch(this.endpoint, {
       method: "POST",
       headers: {
@@ -28,8 +28,8 @@ export class OpenAIService implements AIService {
           { role: "system", content: systemPrompt || "" },
           { role: "user", content: prompt }
         ],
-        max_tokens: 16000, // Aumentado significativamente para evitar JSONs truncados
-        response_format: { type: "json_object" }
+        max_tokens: 16000,
+        ...(options?.json !== false ? { response_format: { type: "json_object" } } : {})
       }),
     });
 
@@ -46,7 +46,8 @@ export class OpenAIService implements AIService {
     prompt: string,
     base64Image: string,
     mimeType: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    options?: { json?: boolean }
   ): Promise<string> {
     const response = await fetch(this.endpoint, {
       method: "POST",
@@ -77,8 +78,8 @@ export class OpenAIService implements AIService {
             ]
           }
         ],
-        max_tokens: 16000, // Aumentado significativamente
-        response_format: { type: "json_object" }
+        max_tokens: 16000,
+        ...(options?.json !== false ? { response_format: { type: "json_object" } } : {})
       }),
     });
 

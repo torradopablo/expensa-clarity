@@ -125,6 +125,8 @@ interface Analysis {
   created_at: string;
   scanned_at: string | null;
   expense_categories?: AnalysisCategory[];
+  evolution_analysis?: string | null;
+  deviation_stats?: any | null;
 }
 
 interface ChartData {
@@ -349,8 +351,25 @@ const Evolucion = () => {
 
   const handleBuildingChange = (value: string) => {
     setSelectedBuilding(value);
-    setAiAnalysis(null);
-    setDeviation(null);
+
+    // Try to load persisted analysis for this building if we are in "total" view
+    if (value !== "all" && selectedCategory === "all") {
+      const latest = [...analyses]
+        .filter(a => a.building_name === value)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (latest?.evolution_analysis) {
+        setAiAnalysis(latest.evolution_analysis);
+        setDeviation(latest.deviation_stats);
+      } else {
+        setAiAnalysis(null);
+        setDeviation(null);
+      }
+    } else {
+      setAiAnalysis(null);
+      setDeviation(null);
+    }
+
     if (value === "all") {
       searchParams.delete("edificio");
     } else {
@@ -361,8 +380,26 @@ const Evolucion = () => {
 
   const handleCategoryChange = (value: string) => {
     setSelectedCategory(value);
-    setAiAnalysis(null);
-    setDeviation(null);
+
+    // Reset AI analysis when changing category - we only persist total analysis for now
+    // If selecting "all" (Total), we try to restore the persisted one
+    if (value === "all" && selectedBuilding !== "all") {
+      const latest = [...analyses]
+        .filter(a => a.building_name === selectedBuilding)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (latest?.evolution_analysis) {
+        setAiAnalysis(latest.evolution_analysis);
+        setDeviation(latest.deviation_stats);
+      } else {
+        setAiAnalysis(null);
+        setDeviation(null);
+      }
+    } else {
+      setAiAnalysis(null);
+      setDeviation(null);
+    }
+
     if (value === "all") {
       searchParams.delete("categoria");
     } else {
@@ -465,55 +502,6 @@ const Evolucion = () => {
     }
   }, []);
 
-  // Fetch AI analysis
-  const fetchAiAnalysis = useCallback(async () => {
-    if (comparisonData.length < 2 || selectedBuilding === "all") return;
-
-    setIsLoadingAnalysis(true);
-    try {
-      const userTrend = comparisonData.map(d => ({ period: d.period, percent: d.userPercent }));
-      const inflationTrend = comparisonData
-        .filter(d => d.inflationPercent !== null)
-        .map(d => ({ period: d.period, percent: d.inflationPercent! }));
-      const buildingsTrendData = comparisonData
-        .filter(d => d.buildingsPercent !== null)
-        .map(d => ({ period: d.period, percent: d.buildingsPercent! }));
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-deviation`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            userTrend,
-            inflationTrend,
-            buildingsTrend: buildingsTrendData,
-            buildingName: selectedBuilding,
-            categoryName: selectedCategory !== "all" ? selectedCategory : undefined,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        setAiAnalysis(result.analysis);
-        setDeviation(result.deviation);
-      } else if (response.status === 429) {
-        toast.error("Límite de análisis alcanzado. Intentá más tarde.");
-      } else {
-        const errorText = await response.text();
-        console.error("AI Analysis error:", response.status, errorText);
-        toast.error(`Error: ${response.status} - ${errorText}`);
-      }
-    } catch (error) {
-      console.error("Error fetching AI analysis:", error);
-    } finally {
-      setIsLoadingAnalysis(false);
-    }
-  }, [comparisonData, selectedBuilding]);
 
   // Load comparison data with profile-based filtering
   const loadComparisonData = useCallback(async (buildingName?: string, categoryName?: string) => {
@@ -545,17 +533,28 @@ const Evolucion = () => {
       try {
         const { data, error } = await supabase
           .from("expense_analyses")
-          .select("id, building_name, period, period_date, total_amount, created_at, scanned_at, expense_categories(name, current_amount)")
+          .select("id, building_name, period, period_date, total_amount, created_at, scanned_at, evolution_analysis, deviation_stats, expense_categories(name, current_amount)")
           .eq("status", "completed")
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: true }) as { data: Analysis[] | null, error: any };
 
         if (error) throw error;
         setAnalyses(data || []);
 
-        if (!searchParams.get("edificio") && data && data.length > 0) {
-          const firstBuilding = data.find(a => a.building_name)?.building_name;
-          if (firstBuilding) {
-            setSelectedBuilding(firstBuilding);
+        if (data && data.length > 0) {
+          const bName = searchParams.get("edificio") || data.find(a => a.building_name)?.building_name;
+          if (bName && searchParams.get("categoria") === null || searchParams.get("categoria") === "all") {
+            const latest = [...data]
+              .filter(a => a.building_name === bName)
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+            if (latest?.evolution_analysis) {
+              setAiAnalysis(latest.evolution_analysis);
+              setDeviation(latest.deviation_stats);
+            }
+          }
+
+          if (!searchParams.get("edificio") && bName) {
+            setSelectedBuilding(bName);
           }
         }
       } catch (error: any) {
@@ -833,20 +832,6 @@ const Evolucion = () => {
                     isLoadingAnalysis={isLoadingAnalysis}
                     buildingsTrendStats={buildingsTrendStats}
                   />
-
-                  {/* AI Analysis Button */}
-                  {!aiAnalysis && !isLoadingAnalysis && comparisonData.length >= 2 && (
-                    <div className="mt-4 flex justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={fetchAiAnalysis}
-                        className="gap-2"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        Obtener análisis inteligente
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
 

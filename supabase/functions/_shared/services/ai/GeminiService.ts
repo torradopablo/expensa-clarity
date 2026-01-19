@@ -19,7 +19,7 @@ export class GeminiService implements AIService {
     this.endpoint = config.endpoint;
   }
 
-  async generateContent(prompt: string, systemPrompt?: string): Promise<string> {
+  async generateContent(prompt: string, systemPrompt?: string, _options?: { json?: boolean }): Promise<string> {
     const response = await fetch(`${this.endpoint}?key=${this.apiKey}`, {
       method: "POST",
       headers: {
@@ -55,7 +55,8 @@ export class GeminiService implements AIService {
     prompt: string,
     base64Image: string,
     mimeType: string,
-    systemPrompt?: string
+    systemPrompt?: string,
+    _options?: { json?: boolean }
   ): Promise<string> {
     const response = await fetch(`${this.endpoint}?key=${this.apiKey}`, {
       method: "POST",
