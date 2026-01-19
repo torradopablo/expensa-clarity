@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { TrendService } from "../_shared/services/analysis/TrendService.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,18 +12,11 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    const authHeader = req.headers.get("Authorization");
+    const trendService = new TrendService(authHeader || undefined);
 
     // Parse request body for optional filters
-    let filters: {
-      unit_count_range?: string;
-      age_category?: string;
-      zone?: string;
-      has_amenities?: boolean;
-    } | null = null;
+    let filters = null;
     let fallbackIfEmpty = false;
 
     try {
@@ -31,153 +24,16 @@ serve(async (req) => {
       filters = body.filters || null;
       fallbackIfEmpty = body.fallbackIfEmpty === true;
     } catch {
-      // No body or invalid JSON, proceed without filters
+      // No body or invalid JSON
     }
 
-    // Get all completed analyses from all users (anonymized)
-    const { data: allAnalyses, error } = await supabase
-      .from("expense_analyses")
-      .select(`
-        period, 
-        total_amount, 
-        building_name, 
-        created_at,
-        building_profile_id
-      `)
-      .eq("status", "completed")
-      .not("building_name", "is", null)
-      .order("created_at", { ascending: true });
-
-    if (error) throw error;
-
-    // If filters are provided, fetch building profiles and filter analyses
-    let filteredAnalyses = allAnalyses || [];
-    let usedFallback = false;
-    let filtersApplied = false;
-
-    if (filters && Object.keys(filters).length > 0) {
-      filtersApplied = true;
-      
-      // Get all building profiles that match the filters
-      let profilesQuery = supabase.from("building_profiles").select("id, building_name");
-
-      if (filters.unit_count_range) {
-        profilesQuery = profilesQuery.eq("unit_count_range", filters.unit_count_range);
-      }
-      if (filters.age_category) {
-        profilesQuery = profilesQuery.eq("age_category", filters.age_category);
-      }
-      if (filters.zone) {
-        profilesQuery = profilesQuery.eq("zone", filters.zone);
-      }
-      if (filters.has_amenities !== undefined) {
-        profilesQuery = profilesQuery.eq("has_amenities", filters.has_amenities);
-      }
-
-      const { data: matchingProfiles, error: profilesError } = await profilesQuery;
-
-      if (profilesError) throw profilesError;
-
-      // Get building names that match the profile filters
-      const matchingBuildingNames = new Set(
-        (matchingProfiles || []).map(p => p.building_name.toLowerCase().trim())
-      );
-
-      // Filter analyses to only include those with matching building profiles
-      if (matchingBuildingNames.size > 0) {
-        const filteredByProfile = filteredAnalyses.filter(analysis => {
-          const normalizedName = analysis.building_name?.toLowerCase().trim();
-          return normalizedName && matchingBuildingNames.has(normalizedName);
-        });
-        
-        // Check if we have enough data after filtering (at least 2 buildings with 2+ periods)
-        const buildingsInFiltered = new Set(filteredByProfile.map(a => a.building_name)).size;
-        const periodsInFiltered = new Set(filteredByProfile.map(a => a.period)).size;
-        
-        if (buildingsInFiltered >= 2 && periodsInFiltered >= 2) {
-          filteredAnalyses = filteredByProfile;
-        } else if (fallbackIfEmpty) {
-          // Not enough data with filters, use all analyses as fallback
-          usedFallback = true;
-          console.log(`Fallback to all buildings: only ${buildingsInFiltered} buildings and ${periodsInFiltered} periods matched filters`);
-        } else {
-          // Return empty if no fallback requested
-          filteredAnalyses = filteredByProfile;
-        }
-      } else if (fallbackIfEmpty) {
-        // No matching profiles found, use fallback
-        usedFallback = true;
-        console.log("Fallback to all buildings: no matching profiles found");
-      } else {
-        // No matching profiles and no fallback, return empty
-        filteredAnalyses = [];
-      }
-    }
-
-    // Group by period and calculate average
-    const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();
-
-    for (const analysis of filteredAnalyses) {
-      const period = analysis.period;
-      
-      if (!periodMap.has(period)) {
-        periodMap.set(period, { total: 0, count: 0, buildings: new Set() });
-      }
-      
-      const entry = periodMap.get(period)!;
-      entry.total += analysis.total_amount;
-      entry.count++;
-      entry.buildings.add(analysis.building_name);
-    }
-
-    // Convert to array and sort by period
-    const monthsEs: Record<string, number> = {
-      enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-      julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-    };
-
-    const parseDate = (period: string): Date => {
-      const parts = period.toLowerCase().split(" ");
-      if (parts.length >= 2) {
-        const month = monthsEs[parts[0]] ?? 0;
-        const year = parseInt(parts[1]) || 2024;
-        return new Date(year, month);
-      }
-      return new Date();
-    };
-
-    const trendData = Array.from(periodMap.entries())
-      .map(([period, data]) => ({
-        period,
-        average: Math.round(data.total / data.count),
-        count: data.count,
-        buildingsCount: data.buildings.size
-      }))
-      .sort((a, b) => parseDate(a.period).getTime() - parseDate(b.period).getTime());
-
-    // Calculate normalized percentage change from first period
-    if (trendData.length > 0) {
-      const baseValue = trendData[0].average;
-      for (const item of trendData) {
-        (item as any).normalizedPercent = ((item.average - baseValue) / baseValue) * 100;
-      }
-    }
-
-    // Calculate statistics
-    const totalBuildings = new Set(filteredAnalyses.map(a => a.building_name)).size;
-    const totalAnalyses = filteredAnalyses.length;
+    const { data, stats } = await trendService.getMarketTrend(filters || undefined, fallbackIfEmpty);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        data: trendData,
-        stats: {
-          totalBuildings,
-          totalAnalyses,
-          periodsCount: trendData.length,
-          filtersApplied,
-          usedFallback
-        }
+      JSON.stringify({
+        success: true,
+        data,
+        stats
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

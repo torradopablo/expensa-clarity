@@ -10,6 +10,7 @@ import { BuildingRepository } from "../_shared/services/database/BuildingReposit
 import { StorageService } from "../_shared/services/storage/StorageService.ts";
 import { PDFService } from "../_shared/services/pdf/PDFService.ts";
 import { ComparisonService } from "../_shared/services/analysis/ComparisonService.ts";
+import { EvolutionInsightService } from "../_shared/services/analysis/EvolutionInsightService.ts";
 import { buildPeriodDate } from "../_shared/utils/date.utils.ts";
 import { ValidationError, AuthenticationError, isRateLimitError } from "../_shared/utils/error.utils.ts";
 import type { ValidatedAIResponse } from "../_shared/types/analysis.types.ts";
@@ -217,6 +218,16 @@ serve(async (req) => {
         await buildingRepository.mergeBuildingProfile(userId, normalizedBuildingName, profileData);
       } catch (error) {
         console.error("Building profile error:", error);
+      }
+    }
+
+    // Generate automated evolution analysis (async, but we wait for it to ensure it persists)
+    if (normalizedBuildingName) {
+      try {
+        const evolutionInsightService = new EvolutionInsightService(authHeader);
+        await evolutionInsightService.generateAndSaveAnalysis(userId, normalizedBuildingName, analysisId);
+      } catch (error) {
+        console.error("Error generating evolution highlights:", error);
       }
     }
 

@@ -40,6 +40,8 @@ export class AnalysisRepository {
     file_url: string;
     status: string;
     scanned_at: string;
+    evolution_analysis: string;
+    deviation_stats: any;
   }>) {
     const { data, error } = await this.supabase
       .from("expense_analyses")
@@ -148,7 +150,7 @@ export class AnalysisRepository {
       .eq("expense_analyses.user_id", userId);
 
     if (error || !data) return [];
-    return [...new Set(data.map((c: { name: string }) => c.name))];
+    return [...new Set(data.map((c: any) => c.name as string))];
   }
 
   async getLatestBuildingCategories(userId: string, buildingName: string): Promise<string[]> {

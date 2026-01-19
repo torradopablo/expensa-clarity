@@ -111,6 +111,11 @@ const periodToYYYYMM = (period: string): string | null => {
   return null;
 };
 
+interface AnalysisCategory {
+  name: string;
+  current_amount: number;
+}
+
 interface Analysis {
   id: string;
   building_name: string | null;
@@ -119,6 +124,9 @@ interface Analysis {
   total_amount: number;
   created_at: string;
   scanned_at: string | null;
+  expense_categories?: AnalysisCategory[];
+  evolution_analysis?: string | null;
+  deviation_stats?: any | null;
 }
 
 interface ChartData {
@@ -186,7 +194,10 @@ const Evolucion = () => {
   const [selectedBuilding, setSelectedBuilding] = useState<string>(
     searchParams.get("edificio") || "all"
   );
-  
+  const [selectedCategory, setSelectedCategory] = useState<string>(
+    searchParams.get("categoria") || "all"
+  );
+
   // New states for comparison data
   const [inflationData, setInflationData] = useState<InflationData[]>([]);
   const [buildingsTrend, setBuildingsTrend] = useState<BuildingsTrendData[]>([]);
@@ -207,10 +218,21 @@ const Evolucion = () => {
     return unique.sort();
   }, [analyses]);
 
+  // Get unique categories for the selected building (or all buildings)
+  const categories = useMemo(() => {
+    let filteredAnalyses = analyses;
+    if (selectedBuilding !== "all") {
+      filteredAnalyses = analyses.filter(a => a.building_name === selectedBuilding);
+    }
+
+    const allCategories = filteredAnalyses.flatMap(a => (a.expense_categories || []).map(c => c.name));
+    return [...new Set(allCategories)].sort();
+  }, [analyses, selectedBuilding]);
+
   // Filter and prepare chart data
   const chartData = useMemo(() => {
     let filtered = analyses;
-    
+
     if (selectedBuilding !== "all") {
       filtered = analyses.filter(a => a.building_name === selectedBuilding);
     }
@@ -228,23 +250,32 @@ const Evolucion = () => {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
-    return sorted.map(a => ({
-      period: a.period,
-      periodDate: a.period_date,
-      total: a.total_amount,
-      id: a.id,
-    }));
-  }, [analyses, selectedBuilding]);
+    return sorted.map(a => {
+      let amount = a.total_amount;
+
+      if (selectedCategory !== "all") {
+        const cat = a.expense_categories?.find(c => c.name === selectedCategory);
+        amount = cat ? cat.current_amount : 0;
+      }
+
+      return {
+        period: a.period,
+        periodDate: a.period_date,
+        total: amount,
+        id: a.id,
+      };
+    });
+  }, [analyses, selectedBuilding, selectedCategory]);
 
   // Create comparison chart data
   const comparisonData = useMemo((): ComparisonDataPoint[] => {
     if (chartData.length === 0) return [];
 
     const baseUserValue = chartData[0].total;
-    
+
     // Prevent division by zero
     if (baseUserValue === 0) return [];
-    
+
     const inflationMap = new Map(inflationData.map(d => [d.period, d]));
     const buildingsMap = new Map(buildingsTrend.map(d => [d.period, d]));
 
@@ -260,7 +291,7 @@ const Evolucion = () => {
     // Find base inflation value for the first user period
     const firstUserPeriodYYYYMM = getYYYYMM(chartData[0].periodDate, chartData[0].period);
     const baseInflation = firstUserPeriodYYYYMM ? inflationMap.get(firstUserPeriodYYYYMM) : null;
-    
+
     // Find base buildings value - use period matching for more accurate comparison
     const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
     const baseNormalizedPercent = baseBuildingsData?.normalizedPercent ?? 0;
@@ -268,13 +299,13 @@ const Evolucion = () => {
     return chartData.map((item) => {
       // Calculate user percent change from base
       const userPercent = ((item.total - baseUserValue) / baseUserValue) * 100;
-      
+
       const periodYYYYMM = getYYYYMM(item.periodDate, item.period);
       const inflationItem = periodYYYYMM ? inflationMap.get(periodYYYYMM) : null;
-      
+
       let inflationPercent: number | null = null;
       let inflationEstimated = false;
-      
+
       if (inflationItem && baseInflation) {
         // Calculate inflation percent change from base (same normalization as user)
         inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
@@ -283,7 +314,7 @@ const Evolucion = () => {
 
       const buildingsItem = buildingsMap.get(item.period);
       let buildingsPercent: number | null = null;
-      
+
       if (buildingsItem && typeof buildingsItem.normalizedPercent === 'number') {
         // Calculate the relative change from base period
         // This should give us the % change from the first period, matching userPercent calculation
@@ -308,7 +339,7 @@ const Evolucion = () => {
     const min = Math.min(...totals);
     const max = Math.max(...totals);
     const avg = totals.reduce((a, b) => a + b, 0) / totals.length;
-    
+
     const lastTwo = chartData.slice(-2);
     let changePercent = 0;
     if (lastTwo.length === 2 && lastTwo[0].total > 0) {
@@ -320,12 +351,59 @@ const Evolucion = () => {
 
   const handleBuildingChange = (value: string) => {
     setSelectedBuilding(value);
-    setAiAnalysis(null);
-    setDeviation(null);
+
+    // Try to load persisted analysis for this building if we are in "total" view
+    if (value !== "all" && selectedCategory === "all") {
+      const latest = [...analyses]
+        .filter(a => a.building_name === value)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (latest?.evolution_analysis) {
+        setAiAnalysis(latest.evolution_analysis);
+        setDeviation(latest.deviation_stats);
+      } else {
+        setAiAnalysis(null);
+        setDeviation(null);
+      }
+    } else {
+      setAiAnalysis(null);
+      setDeviation(null);
+    }
+
     if (value === "all") {
       searchParams.delete("edificio");
     } else {
       searchParams.set("edificio", value);
+    }
+    setSearchParams(searchParams);
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setSelectedCategory(value);
+
+    // Reset AI analysis when changing category - we only persist total analysis for now
+    // If selecting "all" (Total), we try to restore the persisted one
+    if (value === "all" && selectedBuilding !== "all") {
+      const latest = [...analyses]
+        .filter(a => a.building_name === selectedBuilding)
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+      if (latest?.evolution_analysis) {
+        setAiAnalysis(latest.evolution_analysis);
+        setDeviation(latest.deviation_stats);
+      } else {
+        setAiAnalysis(null);
+        setDeviation(null);
+      }
+    } else {
+      setAiAnalysis(null);
+      setDeviation(null);
+    }
+
+    if (value === "all") {
+      searchParams.delete("categoria");
+    } else {
+      searchParams.set("categoria", value);
     }
     setSearchParams(searchParams);
   };
@@ -380,7 +458,7 @@ const Evolucion = () => {
   }, []);
 
   // Fetch buildings trend with optional profile filters
-  const fetchBuildingsTrend = useCallback(async (profile?: BuildingProfile | null) => {
+  const fetchBuildingsTrend = useCallback(async (profile?: BuildingProfile | null, category?: string) => {
     try {
       // Build filters from profile if available
       const filters: Record<string, any> = {};
@@ -389,6 +467,10 @@ const Evolucion = () => {
         if (profile.age_category) filters.age_category = profile.age_category;
         if (profile.zone) filters.zone = profile.zone;
         if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
+      }
+
+      if (category && category !== "all") {
+        filters.category = category;
       }
 
       const hasFilters = Object.keys(filters).length > 0;
@@ -401,7 +483,7 @@ const Evolucion = () => {
             "Content-Type": "application/json",
             Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             filters: hasFilters ? filters : undefined,
             fallbackIfEmpty: true  // Request fallback to all buildings if no matches
           }),
@@ -420,71 +502,23 @@ const Evolucion = () => {
     }
   }, []);
 
-  // Fetch AI analysis
-  const fetchAiAnalysis = useCallback(async () => {
-    if (comparisonData.length < 2 || selectedBuilding === "all") return;
-
-    setIsLoadingAnalysis(true);
-    try {
-      const userTrend = comparisonData.map(d => ({ period: d.period, percent: d.userPercent }));
-      const inflationTrend = comparisonData
-        .filter(d => d.inflationPercent !== null)
-        .map(d => ({ period: d.period, percent: d.inflationPercent! }));
-      const buildingsTrendData = comparisonData
-        .filter(d => d.buildingsPercent !== null)
-        .map(d => ({ period: d.period, percent: d.buildingsPercent! }));
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/analyze-deviation`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-          },
-          body: JSON.stringify({
-            userTrend,
-            inflationTrend,
-            buildingsTrend: buildingsTrendData,
-            buildingName: selectedBuilding,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const result = await response.json();
-        setAiAnalysis(result.analysis);
-        setDeviation(result.deviation);
-      } else if (response.status === 429) {
-        toast.error("Límite de análisis alcanzado. Intentá más tarde.");
-      } else {
-        const errorText = await response.text();
-        console.error("AI Analysis error:", response.status, errorText);
-        toast.error(`Error: ${response.status} - ${errorText}`);
-      }
-    } catch (error) {
-      console.error("Error fetching AI analysis:", error);
-    } finally {
-      setIsLoadingAnalysis(false);
-    }
-  }, [comparisonData, selectedBuilding]);
 
   // Load comparison data with profile-based filtering
-  const loadComparisonData = useCallback(async (buildingName?: string) => {
+  const loadComparisonData = useCallback(async (buildingName?: string, categoryName?: string) => {
     setIsLoadingComparison(true);
-    
+
     // Fetch building profile first if a building is selected
     let profile: BuildingProfile | null = null;
     if (buildingName && buildingName !== "all") {
       profile = await fetchBuildingProfile(buildingName);
     }
-    
+
     // Fetch inflation and buildings trend (with profile filters if available)
     await Promise.all([
-      fetchInflationData(), 
-      fetchBuildingsTrend(profile)
+      fetchInflationData(),
+      fetchBuildingsTrend(profile, categoryName)
     ]);
-    
+
     setIsLoadingComparison(false);
   }, [fetchInflationData, fetchBuildingsTrend, fetchBuildingProfile]);
 
@@ -499,17 +533,28 @@ const Evolucion = () => {
       try {
         const { data, error } = await supabase
           .from("expense_analyses")
-          .select("id, building_name, period, period_date, total_amount, created_at, scanned_at")
+          .select("id, building_name, period, period_date, total_amount, created_at, scanned_at, evolution_analysis, deviation_stats, expense_categories(name, current_amount)")
           .eq("status", "completed")
-          .order("created_at", { ascending: true });
+          .order("created_at", { ascending: true }) as { data: Analysis[] | null, error: any };
 
         if (error) throw error;
         setAnalyses(data || []);
 
-        if (!searchParams.get("edificio") && data && data.length > 0) {
-          const firstBuilding = data.find(a => a.building_name)?.building_name;
-          if (firstBuilding) {
-            setSelectedBuilding(firstBuilding);
+        if (data && data.length > 0) {
+          const bName = searchParams.get("edificio") || data.find(a => a.building_name)?.building_name;
+          if (bName && searchParams.get("categoria") === null || searchParams.get("categoria") === "all") {
+            const latest = [...data]
+              .filter(a => a.building_name === bName)
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0];
+
+            if (latest?.evolution_analysis) {
+              setAiAnalysis(latest.evolution_analysis);
+              setDeviation(latest.deviation_stats);
+            }
+          }
+
+          if (!searchParams.get("edificio") && bName) {
+            setSelectedBuilding(bName);
           }
         }
       } catch (error: any) {
@@ -523,30 +568,30 @@ const Evolucion = () => {
     fetchAnalyses();
   }, [navigate, searchParams]);
 
-  // Load comparison data when analyses are loaded or building changes
+  // Load comparison data when analyses are loaded or building/category changes
   useEffect(() => {
     if (analyses.length > 0) {
-      loadComparisonData(selectedBuilding);
+      loadComparisonData(selectedBuilding, selectedCategory);
     }
-  }, [analyses.length, selectedBuilding, loadComparisonData]);
+  }, [analyses.length, selectedBuilding, selectedCategory, loadComparisonData]);
 
   // Calculate deviation when comparison data changes - automatically, without needing AI analysis
   useEffect(() => {
     if (comparisonData.length >= 2) {
       const last = comparisonData[comparisonData.length - 1];
-      
+
       // Find the last data point with valid inflation data (not null)
       const lastWithInflation = [...comparisonData].reverse().find(d => d.inflationPercent !== null);
-      const fromInflation = lastWithInflation 
-        ? lastWithInflation.userPercent - lastWithInflation.inflationPercent! 
+      const fromInflation = lastWithInflation
+        ? lastWithInflation.userPercent - lastWithInflation.inflationPercent!
         : 0;
-      
+
       // Find the last data point with valid buildings data (not null)
       const lastWithBuildings = [...comparisonData].reverse().find(d => d.buildingsPercent !== null);
-      const fromBuildings = lastWithBuildings 
-        ? lastWithBuildings.userPercent - lastWithBuildings.buildingsPercent! 
+      const fromBuildings = lastWithBuildings
+        ? lastWithBuildings.userPercent - lastWithBuildings.buildingsPercent!
         : 0;
-      
+
       setDeviation({
         fromInflation,
         fromBuildings,
@@ -613,29 +658,52 @@ const Evolucion = () => {
             </Card>
           ) : (
             <>
-              {/* Building Selector */}
+              {/* Selectors */}
               <Card variant="soft" className="mb-6 animate-fade-in-up">
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <div className="flex items-center gap-2">
-                      <Building className="w-4 h-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">Edificio:</span>
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
+                    <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Building className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Edificio:</span>
+                      </div>
+                      <Select value={selectedBuilding} onValueChange={handleBuildingChange}>
+                        <SelectTrigger className="w-full sm:w-[220px]">
+                          <SelectValue placeholder="Seleccionar edificio" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Todos los edificios</SelectItem>
+                          {buildings.map((building) => (
+                            <SelectItem key={building} value={building}>
+                              {building}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
-                    <Select value={selectedBuilding} onValueChange={handleBuildingChange}>
-                      <SelectTrigger className="w-full sm:w-[280px]">
-                        <SelectValue placeholder="Seleccionar edificio" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">Todos los edificios</SelectItem>
-                        {buildings.map((building) => (
-                          <SelectItem key={building} value={building}>
-                            {building}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+
+                    <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Sparkles className="w-4 h-4 text-muted-foreground" />
+                        <span className="text-sm font-medium">Categoría:</span>
+                      </div>
+                      <Select value={selectedCategory} onValueChange={handleCategoryChange}>
+                        <SelectTrigger className="w-full sm:w-[220px]">
+                          <SelectValue placeholder="Ver todas" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Monto total (todas)</SelectItem>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat} value={cat}>
+                              {cat}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
                     {isLoadingComparison && (
-                      <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />
+                      <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground shrink-0 self-center" />
                     )}
                   </div>
                 </CardContent>
@@ -677,21 +745,22 @@ const Evolucion = () => {
                   <CardHeader>
                     <div className="flex items-center justify-between flex-wrap gap-2">
                       <div>
-                        <CardTitle className="text-lg">Evolución del gasto total</CardTitle>
+                        <CardTitle className="text-lg">
+                          {selectedCategory === "all" ? "Evolución del gasto total" : `Evolución de ${selectedCategory}`}
+                        </CardTitle>
                         <CardDescription>
-                          {selectedBuilding === "all" 
-                            ? "Todos los edificios" 
+                          {selectedBuilding === "all"
+                            ? "Todos los edificios"
                             : selectedBuilding}
                         </CardDescription>
                       </div>
                       {stats && stats.count >= 2 && (
-                        <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${
-                          stats.changePercent > 0 
-                            ? "bg-status-attention-bg text-status-attention" 
-                            : stats.changePercent < 0 
-                              ? "bg-status-ok-bg text-status-ok"
-                              : "bg-muted text-muted-foreground"
-                        }`}>
+                        <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${stats.changePercent > 0
+                          ? "bg-status-attention-bg text-status-attention"
+                          : stats.changePercent < 0
+                            ? "bg-status-ok-bg text-status-ok"
+                            : "bg-muted text-muted-foreground"
+                          }`}>
                           {stats.changePercent > 0 ? (
                             <TrendingUp className="w-4 h-4" />
                           ) : stats.changePercent < 0 ? (
@@ -713,19 +782,19 @@ const Evolucion = () => {
                         <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                           <defs>
                             <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                              <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                              <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                             </linearGradient>
                           </defs>
                           <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                          <XAxis 
-                            dataKey="period" 
+                          <XAxis
+                            dataKey="period"
                             tick={{ fontSize: 12 }}
                             tickLine={false}
                             axisLine={false}
                             className="text-muted-foreground"
                           />
-                          <YAxis 
+                          <YAxis
                             tickFormatter={formatShortCurrency}
                             tick={{ fontSize: 12 }}
                             tickLine={false}
@@ -757,25 +826,12 @@ const Evolucion = () => {
                   <EvolutionComparisonChart
                     data={comparisonData}
                     buildingName={selectedBuilding}
+                    categoryName={selectedCategory !== "all" ? selectedCategory : undefined}
                     deviation={deviation || undefined}
                     analysis={aiAnalysis}
                     isLoadingAnalysis={isLoadingAnalysis}
                     buildingsTrendStats={buildingsTrendStats}
                   />
-                  
-                  {/* AI Analysis Button */}
-                  {!aiAnalysis && !isLoadingAnalysis && comparisonData.length >= 2 && (
-                    <div className="mt-4 flex justify-center">
-                      <Button
-                        variant="outline"
-                        onClick={fetchAiAnalysis}
-                        className="gap-2"
-                      >
-                        <Sparkles className="w-4 h-4" />
-                        Obtener análisis inteligente
-                      </Button>
-                    </div>
-                  )}
                 </div>
               )}
 
@@ -823,9 +879,8 @@ const Evolucion = () => {
                             </div>
                             <div className="flex items-center gap-4">
                               {index < chartData.length - 1 && change !== 0 && (
-                                <span className={`text-xs font-medium ${
-                                  change > 0 ? "text-status-attention" : "text-status-ok"
-                                }`}>
+                                <span className={`text-xs font-medium ${change > 0 ? "text-status-attention" : "text-status-ok"
+                                  }`}>
                                   {change > 0 ? "+" : ""}{change.toFixed(1)}%
                                 </span>
                               )}

@@ -25,6 +25,7 @@ export interface AnalysisRequest {
   inflationTrend: { period: string; percent: number }[];
   buildingsTrend: { period: string; percent: number }[];
   buildingName: string;
+  categoryName?: string;
 }
 
 export interface AIResponse {

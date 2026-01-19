@@ -9,13 +9,15 @@ export class DeviationAnalysisService {
   constructor() {
     const provider = getAIProvider();
     console.log("AI Provider configured:", provider);
-    
+
     if (provider === "openai") {
       this.aiService = new OpenAIService();
     } else if (provider === "gemini") {
       this.aiService = new GeminiService();
+    } else if (provider === "lovable") {
+      this.aiService = new OpenAIService("lovable");
     } else {
-      // Default to Gemini for any other provider including "lovable"
+      // Default to Gemini for any other provider
       console.log("Defaulting to Gemini service for provider:", provider);
       this.aiService = new GeminiService();
     }
@@ -47,14 +49,15 @@ export class DeviationAnalysisService {
   }
 
   private async generateDeviationAnalysis(
-    request: AnalysisRequest, 
+    request: AnalysisRequest,
     deviation: DeviationAnalysis
   ): Promise<string> {
     const systemPrompt = "Sos un asistente experto en análisis de expensas de consorcios en Argentina. Tus respuestas son concisas, claras y accionables.";
-    
-    const prompt = `Sos un experto analista financiero de expensas de consorcios en Argentina. Analiza los siguientes datos de evolución de expensas:
+
+    const prompt = `Sos un experto analista financiero de expensas de consorcios en Argentina. Analiza los siguientes datos de evolución de expensas ${request.categoryName ? `específicamente para la categoría "${request.categoryName}"` : "globales"}:
 
 **Edificio analizado:** ${request.buildingName}
+${request.categoryName ? `**Categoría analizada:** ${request.categoryName}\n` : ""}
 
 **Evolución de las expensas del usuario (% acumulado desde el primer período):**
 ${request.userTrend.map(t => `- ${t.period}: ${t.percent.toFixed(1)}%`).join("\n")}
@@ -77,7 +80,7 @@ Proporciona un análisis breve y accionable (máximo 3-4 oraciones) que:
 Responde en español argentino, de forma clara y directa.`;
 
     try {
-      return await this.aiService.generateContent(prompt, systemPrompt);
+      return await this.aiService.generateContent(prompt, systemPrompt, { json: false });
     } catch (error) {
       if (error instanceof Error && error.message === "RATE_LIMIT") {
         throw error;
