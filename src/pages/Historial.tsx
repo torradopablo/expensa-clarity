@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { 
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
-import { 
-  CheckCircle2, 
+import {
+  CheckCircle2,
   ArrowRight,
   TrendingUp,
   TrendingDown,
@@ -112,41 +112,24 @@ interface Analysis {
   file_url: string | null;
 }
 
-// Month names in Spanish
-const MONTHS = [
-  { value: 1, label: "Enero" },
-  { value: 2, label: "Febrero" },
-  { value: 3, label: "Marzo" },
-  { value: 4, label: "Abril" },
-  { value: 5, label: "Mayo" },
-  { value: 6, label: "Junio" },
-  { value: 7, label: "Julio" },
-  { value: 8, label: "Agosto" },
-  { value: 9, label: "Septiembre" },
-  { value: 10, label: "Octubre" },
-  { value: 11, label: "Noviembre" },
-  { value: 12, label: "Diciembre" },
-];
 
 const Historial = () => {
   const navigate = useNavigate();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   // Selection states for comparison
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [selectionMode, setSelectionMode] = useState(false);
-  
+
   // Delete confirmation state
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [analysisToDelete, setAnalysisToDelete] = useState<Analysis | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   // Filter states
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
-  const [monthFilter, setMonthFilter] = useState<string>("all");
-  const [yearFilter, setYearFilter] = useState<string>("all");
 
   const handleDeleteClick = (analysis: Analysis, e: React.MouseEvent) => {
     e.preventDefault();
@@ -157,11 +140,11 @@ const Historial = () => {
 
   const confirmDelete = async () => {
     if (!analysisToDelete) return;
-    
+
     setIsDeleting(true);
     let fileDeleted = false;
     let fileDeleteError = false;
-    
+
     try {
       // First delete the file from storage if it exists
       if (analysisToDelete.file_url) {
@@ -173,7 +156,7 @@ const Historial = () => {
           const { error: storageError } = await supabase.storage
             .from('expense-files')
             .remove([filePath]);
-          
+
           if (storageError) {
             console.error("Error deleting file from storage:", storageError);
             fileDeleteError = true;
@@ -200,7 +183,7 @@ const Historial = () => {
       if (analysisError) throw analysisError;
 
       setAnalyses(prev => prev.filter(a => a.id !== analysisToDelete.id));
-      
+
       // Show appropriate success message
       if (fileDeleted) {
         toast.success("Análisis y archivo eliminados correctamente", {
@@ -255,17 +238,6 @@ const Historial = () => {
     return unique.sort();
   }, [analyses]);
 
-  // Get unique years from period_date
-  const years = useMemo(() => {
-    const yearsSet = new Set<number>();
-    analyses.forEach(a => {
-      if (a.period_date) {
-        const year = new Date(a.period_date).getFullYear();
-        yearsSet.add(year);
-      }
-    });
-    return Array.from(yearsSet).sort((a, b) => b - a);
-  }, [analyses]);
 
   // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
@@ -285,21 +257,8 @@ const Historial = () => {
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
-      
-      // Month/Year filter using period_date
-      if (analysis.period_date) {
-        const periodDate = new Date(analysis.period_date);
-        const analysisMonth = periodDate.getMonth() + 1;
-        const analysisYear = periodDate.getFullYear();
-        
-        if (monthFilter !== "all" && analysisMonth !== parseInt(monthFilter)) {
-          return false;
-        }
-        if (yearFilter !== "all" && analysisYear !== parseInt(yearFilter)) {
-          return false;
-        }
-      }
-      
+
+
       return true;
     });
 
@@ -309,15 +268,13 @@ const Historial = () => {
       const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
       return dateB - dateA; // Descending order (newest first)
     });
-  }, [analyses, searchQuery, buildingFilter, monthFilter, yearFilter]);
+  }, [analyses, searchQuery, buildingFilter]);
 
-  const hasActiveFilters = searchQuery.trim() !== "" || buildingFilter !== "all" || monthFilter !== "all" || yearFilter !== "all";
+  const hasActiveFilters = searchQuery.trim() !== "" || buildingFilter !== "all";
 
   const clearFilters = () => {
     setSearchQuery("");
     setBuildingFilter("all");
-    setMonthFilter("all");
-    setYearFilter("all");
   };
 
   useEffect(() => {
@@ -397,8 +354,8 @@ const Historial = () => {
                       <Button variant="ghost" size="sm" onClick={cancelSelection}>
                         Cancelar
                       </Button>
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         onClick={handleCompare}
                         disabled={selectedIds.size !== 2}
                       >
@@ -453,7 +410,7 @@ const Historial = () => {
                     </Button>
                   )}
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid gap-3">
                   {/* Building filter */}
                   <Select value={buildingFilter} onValueChange={setBuildingFilter}>
                     <SelectTrigger className="h-9">
@@ -464,36 +421,6 @@ const Historial = () => {
                       {buildings.map((building) => (
                         <SelectItem key={building} value={building as string}>
                           {building}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Month filter */}
-                  <Select value={monthFilter} onValueChange={setMonthFilter}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Mes" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los meses</SelectItem>
-                      {MONTHS.map((month) => (
-                        <SelectItem key={month.value} value={month.value.toString()}>
-                          {month.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {/* Year filter */}
-                  <Select value={yearFilter} onValueChange={setYearFilter}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Año" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los años</SelectItem>
-                      {years.map((year) => (
-                        <SelectItem key={year} value={year.toString()}>
-                          {year}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -546,10 +473,10 @@ const Historial = () => {
               {filteredAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
                 const isSelected = selectedIds.has(analysis.id);
-                
+
                 const cardContent = (
-                  <Card 
-                    variant="interactive" 
+                  <Card
+                    variant="interactive"
                     className={cn(
                       "animate-fade-in-up transition-all",
                       isSelected && "ring-2 ring-primary"
@@ -603,9 +530,8 @@ const Historial = () => {
                             <p className="text-xs text-muted-foreground mb-0.5">Total</p>
                             <p className="text-lg font-bold">{formatCurrency(analysis.total_amount)}</p>
                             {change !== null && (
-                              <div className={`flex items-center justify-center gap-1 text-xs font-medium mt-1 ${
-                                change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
-                              }`}>
+                              <div className={`flex items-center justify-center gap-1 text-xs font-medium mt-1 ${change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                                }`}>
                                 {change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                                 {change > 0 ? "+" : ""}{change.toFixed(1)}%
                               </div>
@@ -620,8 +546,8 @@ const Historial = () => {
 
                 if (selectionMode) {
                   return (
-                    <div 
-                      key={analysis.id} 
+                    <div
+                      key={analysis.id}
                       className="cursor-pointer"
                       onClick={(e) => toggleSelection(analysis.id, e)}
                     >
@@ -631,8 +557,8 @@ const Historial = () => {
                 }
 
                 return (
-                  <Link 
-                    key={analysis.id} 
+                  <Link
+                    key={analysis.id}
                     to={`/analisis/${analysis.id}`}
                     className="block"
                   >
@@ -654,7 +580,7 @@ const Historial = () => {
                   <div>
                     <h3 className="font-semibold mb-1">Comparación automática</h3>
                     <p className="text-sm text-muted-foreground">
-                      Cada análisis compara automáticamente con el mes anterior. 
+                      Cada análisis compara automáticamente con el mes anterior.
                       Podés ver la evolución de tus gastos haciendo clic en cada período.
                     </p>
                   </div>
