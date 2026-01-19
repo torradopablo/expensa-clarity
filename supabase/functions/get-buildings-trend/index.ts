@@ -14,7 +14,7 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Parse request body for optional filters
@@ -23,6 +23,7 @@ serve(async (req) => {
       age_category?: string;
       zone?: string;
       has_amenities?: boolean;
+      category?: string;
     } | null = null;
     let fallbackIfEmpty = false;
 
@@ -34,8 +35,10 @@ serve(async (req) => {
       // No body or invalid JSON, proceed without filters
     }
 
-    // Get all completed analyses from all users (anonymized)
-    const { data: allAnalyses, error } = await supabase
+    const category = filters?.category;
+
+    // Build the query
+    let query = supabase
       .from("expense_analyses")
       .select(`
         period, 
@@ -43,21 +46,32 @@ serve(async (req) => {
         building_name, 
         created_at,
         building_profile_id
+        ${category ? ', expense_categories!inner(name, current_amount)' : ''}
       `)
       .eq("status", "completed")
-      .not("building_name", "is", null)
-      .order("created_at", { ascending: true });
+      .not("building_name", "is", null);
+
+    if (category) {
+      query = query.eq("expense_categories.name", category);
+    }
+
+    // Get analyses
+    const { data: allAnalyses, error } = await query.order("created_at", { ascending: true });
 
     if (error) throw error;
 
-    // If filters are provided, fetch building profiles and filter analyses
+    // If filters are provided (except category which is handled in DB), fetch building profiles and filter analyses
     let filteredAnalyses = allAnalyses || [];
     let usedFallback = false;
     let filtersApplied = false;
 
-    if (filters && Object.keys(filters).length > 0) {
+    // Basic filters include building profile attributes
+    const profileFilters = { ...filters };
+    delete profileFilters.category;
+
+    if (Object.keys(profileFilters).length > 0) {
       filtersApplied = true;
-      
+
       // Get all building profiles that match the filters
       let profilesQuery = supabase.from("building_profiles").select("id, building_name");
 
@@ -89,11 +103,11 @@ serve(async (req) => {
           const normalizedName = analysis.building_name?.toLowerCase().trim();
           return normalizedName && matchingBuildingNames.has(normalizedName);
         });
-        
+
         // Check if we have enough data after filtering (at least 2 buildings with 2+ periods)
         const buildingsInFiltered = new Set(filteredByProfile.map(a => a.building_name)).size;
         const periodsInFiltered = new Set(filteredByProfile.map(a => a.period)).size;
-        
+
         if (buildingsInFiltered >= 2 && periodsInFiltered >= 2) {
           filteredAnalyses = filteredByProfile;
         } else if (fallbackIfEmpty) {
@@ -119,13 +133,28 @@ serve(async (req) => {
 
     for (const analysis of filteredAnalyses) {
       const period = analysis.period;
-      
+
       if (!periodMap.has(period)) {
         periodMap.set(period, { total: 0, count: 0, buildings: new Set() });
       }
-      
+
       const entry = periodMap.get(period)!;
-      entry.total += analysis.total_amount;
+
+      // Use category amount if category is selected, otherwise total amount
+      let amount = analysis.total_amount;
+      if (category && analysis.expense_categories) {
+        // Handle both single object and array of objects from join
+        const categories = Array.isArray(analysis.expense_categories)
+          ? analysis.expense_categories
+          : [analysis.expense_categories];
+
+        const catMatch = categories.find((c: any) => c.name === category);
+        if (catMatch) {
+          amount = catMatch.current_amount;
+        }
+      }
+
+      entry.total += amount;
       entry.count++;
       entry.buildings.add(analysis.building_name);
     }
@@ -168,8 +197,8 @@ serve(async (req) => {
     const totalAnalyses = filteredAnalyses.length;
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         data: trendData,
         stats: {
           totalBuildings,

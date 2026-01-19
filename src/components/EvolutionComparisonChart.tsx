@@ -33,6 +33,7 @@ interface BuildingsTrendStats {
 interface EvolutionComparisonChartProps {
   data: TrendDataPoint[];
   buildingName: string;
+  categoryName?: string;
   deviation?: {
     fromInflation: number;
     fromBuildings: number;
@@ -50,8 +51,8 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         <p className="font-medium text-sm mb-2">{label}</p>
         {payload.map((entry: any, index: number) => (
           <div key={index} className="flex items-center gap-2 text-sm">
-            <div 
-              className="w-3 h-3 rounded-full" 
+            <div
+              className="w-3 h-3 rounded-full"
               style={{ backgroundColor: entry.color }}
             />
             <span className="text-muted-foreground">{entry.name}:</span>
@@ -66,21 +67,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export const EvolutionComparisonChart = ({ 
-  data, 
-  buildingName, 
-  deviation, 
-  analysis, 
+export const EvolutionComparisonChart = ({
+  data,
+  buildingName,
+  categoryName,
+  deviation,
+  analysis,
   isLoadingAnalysis,
   buildingsTrendStats
 }: EvolutionComparisonChartProps) => {
-  console.log("EvolutionComparisonChart received:", { 
-    dataLength: data.length, 
-    buildingName, 
-    deviation, 
+  console.log("EvolutionComparisonChart received:", {
+    dataLength: data.length,
+    buildingName,
+    deviation,
     hasAnalysis: !!analysis,
     isLoadingAnalysis,
-    buildingsTrendStats 
+    buildingsTrendStats
   });
 
   const hasInflationData = data.some(d => d.inflationPercent !== null);
@@ -112,22 +114,23 @@ export const EvolutionComparisonChart = ({
       <CardHeader>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
-            <CardTitle className="text-lg">Evolución comparativa (%)</CardTitle>
+            <CardTitle className="text-lg">
+              {categoryName ? `Evolución comparativa: ${categoryName} (%)` : "Evolución comparativa (%)"}
+            </CardTitle>
             <CardDescription>
               Comparación normalizada desde el primer período
             </CardDescription>
             {buildingsTrendStats && hasBuildingsData && (
               <div className="flex items-center gap-2 mt-2">
-                <Badge 
-                  variant="outline" 
-                  className={`text-xs ${
-                    buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback 
-                      ? "border-primary/50 text-primary bg-primary/10" 
+                <Badge
+                  variant="outline"
+                  className={`text-xs ${buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback
+                      ? "border-primary/50 text-primary bg-primary/10"
                       : "border-muted-foreground/30"
-                  }`}
+                    }`}
                 >
                   <Info className="w-3 h-3 mr-1" />
-                  {buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback 
+                  {buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback
                     ? `Comparando con ${buildingsTrendStats.totalBuildings} edificios similares`
                     : `Comparando con ${buildingsTrendStats.totalBuildings} edificios totales`
                   }
@@ -141,16 +144,16 @@ export const EvolutionComparisonChart = ({
             )}
           </div>
           {alertLevel ? (
-            <Badge 
+            <Badge
               variant="destructive"
               className="flex items-center gap-1"
             >
               <AlertTriangle className="w-3 h-3" />
-              {alertLevel === "critical" ? "Desvío crítico" : 
-               alertLevel === "high" ? "Desvío alto" : "Desvío moderado"}
+              {alertLevel === "critical" ? "Desvío crítico" :
+                alertLevel === "high" ? "Desvío alto" : "Desvío moderado"}
             </Badge>
           ) : isPerformingWell ? (
-            <Badge 
+            <Badge
               variant="secondary"
               className="flex items-center gap-1 bg-status-ok-bg text-status-ok border-status-ok/30"
             >
@@ -165,8 +168,8 @@ export const EvolutionComparisonChart = ({
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis 
-                dataKey="period" 
+              <XAxis
+                dataKey="period"
                 tick={{ fontSize: 11 }}
                 tickLine={false}
                 axisLine={false}
@@ -175,7 +178,7 @@ export const EvolutionComparisonChart = ({
                 textAnchor="end"
                 height={60}
               />
-              <YAxis 
+              <YAxis
                 tickFormatter={(v) => `${v > 0 ? "+" : ""}${v}%`}
                 tick={{ fontSize: 12 }}
                 tickLine={false}
@@ -184,12 +187,12 @@ export const EvolutionComparisonChart = ({
                 width={55}
               />
               <Tooltip content={<CustomTooltip />} />
-              <Legend 
+              <Legend
                 wrapperStyle={{ paddingTop: "10px" }}
                 formatter={(value) => <span className="text-sm">{value}</span>}
               />
               <ReferenceLine y={0} stroke="hsl(var(--muted-foreground))" strokeDasharray="3 3" />
-              
+
               {/* User's building - Primary color to match other charts */}
               <Line
                 type="monotone"
@@ -200,7 +203,7 @@ export const EvolutionComparisonChart = ({
                 dot={{ fill: "hsl(var(--primary))", strokeWidth: 0, r: 4 }}
                 activeDot={{ r: 6, strokeWidth: 0 }}
               />
-              
+
               {/* Inflation - Orange/Amber */}
               {hasInflationData && (
                 <Line
@@ -215,7 +218,7 @@ export const EvolutionComparisonChart = ({
                   connectNulls
                 />
               )}
-              
+
               {/* Other buildings average - Purple */}
               {hasBuildingsData && (
                 <Line
@@ -244,13 +247,12 @@ export const EvolutionComparisonChart = ({
         {deviation && (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             {/* vs Inflation card */}
-            <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              deviation.fromInflation > 5 
-                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+            <div className={`flex items-center gap-3 p-3 rounded-lg ${deviation.fromInflation > 5
+                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
                 : deviation.fromInflation <= 0
                   ? "bg-status-ok-bg border border-status-ok/30"
                   : "bg-muted"
-            }`}>
+              }`}>
               {deviation.fromInflation > 5 ? (
                 <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
               ) : deviation.fromInflation <= 0 ? (
@@ -260,23 +262,21 @@ export const EvolutionComparisonChart = ({
               )}
               <div>
                 <p className="text-xs text-muted-foreground">vs Inflación</p>
-                <p className={`font-semibold ${
-                  deviation.fromInflation > 5 ? "text-red-600 dark:text-red-400" :
-                  deviation.fromInflation <= 0 ? "text-status-ok" : ""
-                }`}>
+                <p className={`font-semibold ${deviation.fromInflation > 5 ? "text-red-600 dark:text-red-400" :
+                    deviation.fromInflation <= 0 ? "text-status-ok" : ""
+                  }`}>
                   {deviation.fromInflation > 0 ? "+" : ""}{deviation.fromInflation.toFixed(1)} pp
                   {deviation.fromInflation <= 0 && " ✓"}
                 </p>
               </div>
             </div>
             {/* vs Other buildings card */}
-            <div className={`flex items-center gap-3 p-3 rounded-lg ${
-              deviation.fromBuildings > 5 
-                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800" 
+            <div className={`flex items-center gap-3 p-3 rounded-lg ${deviation.fromBuildings > 5
+                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
                 : deviation.fromBuildings <= 0
                   ? "bg-status-ok-bg border border-status-ok/30"
                   : "bg-muted"
-            }`}>
+              }`}>
               {deviation.fromBuildings > 5 ? (
                 <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
               ) : deviation.fromBuildings <= 0 ? (
@@ -286,10 +286,9 @@ export const EvolutionComparisonChart = ({
               )}
               <div>
                 <p className="text-xs text-muted-foreground">vs Otros edificios</p>
-                <p className={`font-semibold ${
-                  deviation.fromBuildings > 5 ? "text-red-600 dark:text-red-400" :
-                  deviation.fromBuildings <= 0 ? "text-status-ok" : ""
-                }`}>
+                <p className={`font-semibold ${deviation.fromBuildings > 5 ? "text-red-600 dark:text-red-400" :
+                    deviation.fromBuildings <= 0 ? "text-status-ok" : ""
+                  }`}>
                   {deviation.fromBuildings > 0 ? "+" : ""}{deviation.fromBuildings.toFixed(1)} pp
                   {deviation.fromBuildings <= 0 && " ✓"}
                 </p>
@@ -305,19 +304,17 @@ export const EvolutionComparisonChart = ({
             <div className="h-4 bg-muted-foreground/20 rounded w-1/2" />
           </div>
         )}
-        
+
         {analysis && !isLoadingAnalysis && (
-          <div className={`p-4 rounded-lg border ${
-            alertLevel === "critical" || alertLevel === "high"
+          <div className={`p-4 rounded-lg border ${alertLevel === "critical" || alertLevel === "high"
               ? "bg-status-attention-bg border-status-attention/30"
               : "bg-primary-soft border-primary/20"
-          }`}>
+            }`}>
             <div className="flex items-start gap-3">
-              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                alertLevel === "critical" || alertLevel === "high"
+              <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${alertLevel === "critical" || alertLevel === "high"
                   ? "bg-status-attention/20"
                   : "bg-primary/20"
-              }`}>
+                }`}>
                 {alertLevel === "critical" || alertLevel === "high" ? (
                   <AlertTriangle className="w-4 h-4 text-status-attention" />
                 ) : (

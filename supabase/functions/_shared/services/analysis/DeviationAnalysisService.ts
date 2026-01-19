@@ -9,7 +9,7 @@ export class DeviationAnalysisService {
   constructor() {
     const provider = getAIProvider();
     console.log("AI Provider configured:", provider);
-    
+
     if (provider === "openai") {
       this.aiService = new OpenAIService();
     } else if (provider === "gemini") {
@@ -47,14 +47,15 @@ export class DeviationAnalysisService {
   }
 
   private async generateDeviationAnalysis(
-    request: AnalysisRequest, 
+    request: AnalysisRequest,
     deviation: DeviationAnalysis
   ): Promise<string> {
     const systemPrompt = "Sos un asistente experto en análisis de expensas de consorcios en Argentina. Tus respuestas son concisas, claras y accionables.";
-    
-    const prompt = `Sos un experto analista financiero de expensas de consorcios en Argentina. Analiza los siguientes datos de evolución de expensas:
+
+    const prompt = `Sos un experto analista financiero de expensas de consorcios en Argentina. Analiza los siguientes datos de evolución de expensas ${request.categoryName ? `específicamente para la categoría "${request.categoryName}"` : "globales"}:
 
 **Edificio analizado:** ${request.buildingName}
+${request.categoryName ? `**Categoría analizada:** ${request.categoryName}\n` : ""}
 
 **Evolución de las expensas del usuario (% acumulado desde el primer período):**
 ${request.userTrend.map(t => `- ${t.period}: ${t.percent.toFixed(1)}%`).join("\n")}
