@@ -38,7 +38,8 @@ import {
   ArrowLeftRight,
   Trash2,
   LineChart,
-  Search
+  Search,
+  User
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,13 +63,18 @@ const Header = () => {
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         <div className="flex items-center gap-2">
-          <Button asChild>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
             <Link to="/analizar">
               <Plus className="w-4 h-4 mr-2" />
               Nueva expensa
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
+            <Link to="/perfil">
+              <User className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
@@ -148,11 +154,17 @@ const Historial = () => {
     try {
       // First delete the file from storage if it exists
       if (analysisToDelete.file_url) {
-        // Extract file path from the URL
-        // URL format: https://xxx.supabase.co/storage/v1/object/public/expense-files/user_id/filename
-        const urlParts = analysisToDelete.file_url.split('/expense-files/');
-        if (urlParts.length > 1) {
-          const filePath = urlParts[1];
+        let filePath = analysisToDelete.file_url;
+
+        // If it's a full URL, extract the path after 'expense-files/'
+        if (filePath.includes('/expense-files/')) {
+          const urlParts = filePath.split('/expense-files/');
+          if (urlParts.length > 1) {
+            filePath = urlParts[1];
+          }
+        }
+
+        if (filePath) {
           const { error: storageError } = await supabase.storage
             .from('expense-files')
             .remove([filePath]);

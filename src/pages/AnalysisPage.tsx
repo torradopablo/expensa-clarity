@@ -31,7 +31,8 @@ import {
   Link2,
   Copy,
   Check,
-  Loader2
+  Loader2,
+  User
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -95,7 +96,12 @@ const Header = () => {
               <span className="sm:hidden">Analizar</span>
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
+            <Link to="/perfil">
+              <User className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>

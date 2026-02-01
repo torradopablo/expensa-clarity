@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { 
-  FileText, 
-  Shield, 
-  TrendingUp, 
+import { supabase } from "@/integrations/supabase/client";
+import {
+  FileText,
+  Shield,
+  TrendingUp,
   CheckCircle2,
   ArrowRight,
   Upload,
@@ -16,12 +17,26 @@ import {
   X,
   Home,
   Briefcase,
-  Building2
+  Building2,
+  User
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [session, setSession] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
@@ -32,7 +47,7 @@ const Header = () => {
           </div>
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
-        
+
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-8">
           <a href="#como-funciona" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
@@ -44,22 +59,32 @@ const Header = () => {
           <a href="#precios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
             Precios
           </a>
-          <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Mi historial
-          </Link>
+          {session && (
+            <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Mi historial
+            </Link>
+          )}
         </nav>
 
         <div className="flex items-center gap-2">
+          {session && (
+            <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="hidden sm:inline-flex">
+              <Link to="/perfil">
+                <User className="w-5 h-5" />
+              </Link>
+            </Button>
+          )}
+
           {/* Mobile Menu Button */}
-          <Button 
-            variant="ghost" 
-            size="icon" 
+          <Button
+            variant="ghost"
+            size="icon"
             className="md:hidden"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
             {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
           </Button>
-          
+
           <Button asChild size="default" className="hidden sm:inline-flex">
             <Link to="/analizar">Analizar expensas</Link>
           </Button>
@@ -68,50 +93,57 @@ const Header = () => {
 
       {/* Mobile Navigation Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-background border-b border-border">
+        <div className="md:hidden bg-background border-b border-border animate-fade-in">
           <nav className="container py-4 flex flex-col gap-3">
-            <a 
-              href="#como-funciona" 
+            <a
+              href="#como-funciona"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
               Cómo funciona
             </a>
-            <a 
-              href="#beneficios" 
+            <a
+              href="#beneficios"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
               Beneficios
             </a>
-            <a 
-              href="#precios" 
+            <a
+              href="#precios"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
               onClick={() => setMobileMenuOpen(false)}
             >
               Precios
             </a>
-            <Link 
-              to="/historial" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Mi historial
-            </Link>
-            <Link 
-              to="/comparar" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Comparar períodos
-            </Link>
-            <Link 
-              to="/evolucion" 
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
-              onClick={() => setMobileMenuOpen(false)}
-            >
-              Evolución
-            </Link>
+            {session && (
+              <>
+                <Link
+                  to="/historial"
+                  className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Mi historial
+                </Link>
+                <Link
+                  to="/perfil"
+                  className="text-sm font-medium text-primary py-2 flex items-center gap-2"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  <User className="w-4 h-4" />
+                  Mi Perfil
+                </Link>
+              </>
+            )}
+            {!session && (
+              <Link
+                to="/auth"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Iniciar sesión
+              </Link>
+            )}
             <Button asChild size="default" className="mt-2 w-full">
               <Link to="/analizar" onClick={() => setMobileMenuOpen(false)}>
                 Analizar expensas
@@ -138,7 +170,7 @@ const HeroSection = () => (
             <span className="text-gradient">decisiones informadas</span>
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl">
-            Ya seas propietario o administrador, analizá expensas comparándolas con una <strong>comunidad de edificios</strong> y el <strong>contexto inflacionario</strong>. 
+            Ya seas propietario o administrador, analizá expensas comparándolas con una <strong>comunidad de edificios</strong> y el <strong>contexto inflacionario</strong>.
             Ideal para entender tus gastos o presentar informes claros en reuniones de consorcio.
           </p>
           <div className="flex flex-col sm:flex-row gap-4">
@@ -190,9 +222,9 @@ const HeroSection = () => (
         </div>
         <div className="relative animate-fade-in" style={{ animationDelay: "0.2s" }}>
           <div className="relative">
-            <img 
-              src={heroIllustration} 
-              alt="Ilustración de análisis de documentos" 
+            <img
+              src={heroIllustration}
+              alt="Ilustración de análisis de documentos"
               className="w-full rounded-2xl shadow-soft-xl"
             />
             <div className="absolute -bottom-6 -left-6 bg-card rounded-xl p-4 shadow-soft-lg animate-float">
@@ -243,8 +275,8 @@ const HowItWorksSection = () => {
         </div>
         <div className="grid md:grid-cols-3 gap-8">
           {steps.map((step, index) => (
-            <div 
-              key={index} 
+            <div
+              key={index}
               className="relative group animate-fade-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
@@ -302,7 +334,7 @@ const BenefitsSection = () => {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {pillars.map((pillar, index) => (
-            <div 
+            <div
               key={index}
               className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-md hover:shadow-soft-lg transition-all animate-fade-in-up border border-border/50"
               style={{ animationDelay: `${index * 0.1}s` }}
@@ -369,7 +401,7 @@ const UseCasesSection = () => {
         </div>
         <div className="grid md:grid-cols-3 gap-6">
           {useCases.map((useCase, index) => (
-            <div 
+            <div
               key={index}
               className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-sm hover:shadow-soft-md transition-all animate-fade-in-up border border-border/50"
               style={{ animationDelay: `${index * 0.1}s` }}
