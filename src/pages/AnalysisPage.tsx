@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import {
-  CheckCircle2, 
+  CheckCircle2,
   ArrowLeft,
   TrendingUp,
   TrendingDown,
@@ -43,6 +43,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
+import { formatPeriod, periodToYearMonth } from "@/services/formatters/date";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
@@ -169,22 +170,14 @@ interface BuildingsTrendStats {
   usedFallback?: boolean;
 }
 
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(dateString));
-};
-
-const formatShortDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(dateString));
+const formatShortCurrency = (value: number) => {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}k`;
+  }
+  return `$${value}`;
 };
 
 const AnalysisPage = () => {
@@ -258,11 +251,23 @@ const AnalysisPage = () => {
             .order("period_date", { ascending: true, nullsFirst: false });
 
           if (historicalAnalyses && historicalAnalyses.length > 0) {
-            setHistoricalData(historicalAnalyses);
+            // Limit historical analyses to 15 periods ending at the current analysis
+            let slicedHistoricalAnalyses = historicalAnalyses || [];
+            if (slicedHistoricalAnalyses.length > 0) {
+              const currentIdx = slicedHistoricalAnalyses.findIndex((h) => h.id === analysisData.id);
+              if (currentIdx !== -1) {
+                const startIdx = Math.max(0, currentIdx - 14); // 15 periods total
+                slicedHistoricalAnalyses = slicedHistoricalAnalyses.slice(startIdx, currentIdx + 1);
+              } else {
+                slicedHistoricalAnalyses = slicedHistoricalAnalyses.slice(-15);
+              }
+            }
+
+            setHistoricalData(slicedHistoricalAnalyses);
 
             // Enrich previous-period data for older analyses (when previous_* fields are null)
-            const currentIdx = historicalAnalyses.findIndex((h) => h.id === analysisData.id);
-            const previousAnalysis = currentIdx > 0 ? historicalAnalyses[currentIdx - 1] : null;
+            const globalCurrentIdx = historicalAnalyses.findIndex((h) => h.id === analysisData.id);
+            const previousAnalysis = globalCurrentIdx > 0 ? historicalAnalyses[globalCurrentIdx - 1] : null;
 
             if (previousAnalysis) {
               setPreviousPeriodLabel(previousAnalysis.period);
@@ -329,9 +334,9 @@ const AnalysisPage = () => {
               .order("period_date", { ascending: true, nullsFirst: false });
 
             // Calculate evolution data
-            if (historicalAnalyses.length >= 2) {
-              const baseTotal = historicalAnalyses[0].total_amount;
-              
+            if (slicedHistoricalAnalyses.length >= 2) {
+              const baseTotal = slicedHistoricalAnalyses[0].total_amount;
+
               // Create inflation map - use YYYY-MM format like in Evolucion.tsx
               const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
               if (inflationData) {
@@ -340,73 +345,49 @@ const AnalysisPage = () => {
                 });
               }
 
-              // Helper to get YYYY-MM from period_date or parse from period string (same as Evolucion.tsx)
-              const getYYYYMM = (periodDate: string | null, period: string): string | null => {
-                if (periodDate) {
-                  const date = new Date(periodDate);
-                  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-                }
-                // Check if period is already in YYYY-MM format
-                if (/^\d{4}-\d{2}$/.test(period)) {
-                  return period;
-                }
-                // Parse Spanish period like "enero 2024"
-                const monthsEs: Record<string, number> = {
-                  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-                  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-                };
-                const parts = period.toLowerCase().trim().split(/\s+/);
-                if (parts.length >= 2) {
-                  const month = monthsEs[parts[0]];
-                  if (month !== undefined) {
-                    const year = parseInt(parts[1]) || new Date().getFullYear();
-                    return `${year}-${String(month + 1).padStart(2, '0')}`;
-                  }
-                }
-                return null;
-              };
+              // Find base inflation value for the first sliced period (same as Evolucion.tsx)
+              const firstSlicedPeriodData = slicedHistoricalAnalyses[0];
+              const firstSlicedPeriodYYYYMM = periodToYearMonth(firstSlicedPeriodData.period, firstSlicedPeriodData.period_date);
 
-              // Find base inflation value for the first period (same as Evolucion.tsx)
-              const firstPeriodData = historicalAnalyses[0];
-              const firstPeriodYYYYMM = getYYYYMM(firstPeriodData.period_date, firstPeriodData.period);
-              const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null;
+              const baseInflation = firstSlicedPeriodYYYYMM ? (inflationMap.get(firstSlicedPeriodYYYYMM) ?? null) : null;
 
               // Calculate other buildings average by period
               const buildingsAvgByPeriod = new Map<string, number[]>();
               if (otherBuildingsData) {
                 otherBuildingsData.forEach(b => {
-                  if (!buildingsAvgByPeriod.has(b.period)) {
-                    buildingsAvgByPeriod.set(b.period, []);
+                  const pKey = b.period;
+                  if (!buildingsAvgByPeriod.has(pKey)) {
+                    buildingsAvgByPeriod.set(pKey, []);
                   }
-                  buildingsAvgByPeriod.get(b.period)!.push(b.total_amount);
+                  buildingsAvgByPeriod.get(pKey)!.push(b.total_amount);
                 });
               }
 
-              // Get first period averages for other buildings
-              const firstPeriod = historicalAnalyses[0].period;
-              const firstPeriodOtherBuildings = buildingsAvgByPeriod.get(firstPeriod);
-              const baseOtherBuildings = firstPeriodOtherBuildings && firstPeriodOtherBuildings.length > 0
-                ? firstPeriodOtherBuildings.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildings.length
+              // Get first sliced period averages for other buildings
+              const firstSlicedPeriod = slicedHistoricalAnalyses[0].period;
+              const firstSlicedPeriodOtherBuildingsArr = buildingsAvgByPeriod.get(firstSlicedPeriod);
+              const baseOtherBuildings = firstSlicedPeriodOtherBuildingsArr && firstSlicedPeriodOtherBuildingsArr.length > 0
+                ? firstSlicedPeriodOtherBuildingsArr.reduce((a, b) => a + b, 0) / firstSlicedPeriodOtherBuildingsArr.length
                 : null;
 
-              const evolution: EvolutionDataPoint[] = historicalAnalyses.map((h) => {
-                const userPercent = ((h.total_amount - baseTotal) / baseTotal) * 100;
-                
+              const evolution: EvolutionDataPoint[] = slicedHistoricalAnalyses.map((h) => {
+                const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0;
+
                 // Calculate inflation percent change from base (same as Evolucion.tsx)
                 let inflationPercent: number | null = null;
                 let inflationEstimated = false;
-                
-                const periodYYYYMM = getYYYYMM(h.period_date, h.period);
-                if (periodYYYYMM && baseInflation) {
+
+                const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
+                if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
                   const inflationItem = inflationMap.get(periodYYYYMM);
                   if (inflationItem) {
                     inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
                     inflationEstimated = inflationItem.is_estimated;
                   }
                 }
-                
+
                 let buildingsPercent: number | null = null;
-                if (baseOtherBuildings) {
+                if (baseOtherBuildings !== null) {
                   const periodBuildings = buildingsAvgByPeriod.get(h.period);
                   if (periodBuildings && periodBuildings.length > 0) {
                     const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length;
@@ -428,13 +409,13 @@ const AnalysisPage = () => {
               // Calculate deviation for latest period
               const latestEvolution = evolution[evolution.length - 1];
               if (latestEvolution) {
-                const fromInflation = latestEvolution.inflationPercent !== null 
-                  ? latestEvolution.userPercent - latestEvolution.inflationPercent 
+                const fromInflation = latestEvolution.inflationPercent !== null
+                  ? latestEvolution.userPercent - latestEvolution.inflationPercent
                   : 0;
-                const fromBuildings = latestEvolution.buildingsPercent !== null 
-                  ? latestEvolution.userPercent - latestEvolution.buildingsPercent 
+                const fromBuildings = latestEvolution.buildingsPercent !== null
+                  ? latestEvolution.userPercent - latestEvolution.buildingsPercent
                   : 0;
-                
+
                 setDeviation({
                   fromInflation,
                   fromBuildings,
@@ -500,10 +481,10 @@ const AnalysisPage = () => {
   const attentionItems = categories.filter(c => c.status === "attention").length;
 
   const generateShareText = () => {
-    const statusText = attentionItems > 0 
-      ? `⚠️ ${attentionItems} punto(s) a revisar` 
+    const statusText = attentionItems > 0
+      ? `⚠️ ${attentionItems} punto(s) a revisar`
       : "✅ Todo en orden";
-    
+
     // Find categories with biggest changes
     const sortedByChange = [...categories]
       .filter(c => c.previous_amount)
@@ -517,13 +498,13 @@ const AnalysisPage = () => {
       .sort((a, b) => Math.abs(b.change) - Math.abs(a.change));
 
     const topChanges = sortedByChange.slice(0, 3);
-    const difference = analysis.previous_total 
-      ? analysis.total_amount - analysis.previous_total 
+    const difference = analysis.previous_total
+      ? analysis.total_amount - analysis.previous_total
       : null;
 
     let detailText = "";
     if (topChanges.length > 0) {
-      detailText = "\n📋 *Principales variaciones:*\n" + topChanges.map(c => 
+      detailText = "\n📋 *Principales variaciones:*\n" + topChanges.map(c =>
         `• ${c.name}: ${c.change > 0 ? "+" : ""}${c.change.toFixed(1)}% (${formatCurrency(c.current)})`
       ).join("\n");
     }
@@ -531,7 +512,7 @@ const AnalysisPage = () => {
     const attentionCategories = categories.filter(c => c.status === "attention");
     let attentionText = "";
     if (attentionCategories.length > 0) {
-      attentionText = "\n\n🔍 *Puntos de atención:*\n" + attentionCategories.map(c => 
+      attentionText = "\n\n🔍 *Puntos de atención:*\n" + attentionCategories.map(c =>
         `• ${c.name}`
       ).join("\n");
     }
@@ -565,7 +546,7 @@ Analizá tu expensa en ExpensaCheck`;
 
   const generateShareableLink = async () => {
     if (!analysis || !id) return;
-    
+
     setIsGeneratingLink(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -576,7 +557,7 @@ Analizá tu expensa en ExpensaCheck`;
 
       // Generate a unique token
       const token = crypto.randomUUID().replace(/-/g, '').substring(0, 32);
-      
+
       const { error } = await supabase
         .from("shared_analysis_links")
         .insert({
@@ -590,12 +571,12 @@ Analizá tu expensa en ExpensaCheck`;
 
       const link = `${window.location.origin}/compartido/${token}`;
       setSharedLink(link);
-      
+
       // Copy to clipboard
       await navigator.clipboard.writeText(link);
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-      
+
       toast.success("Enlace creado y copiado al portapapeles");
     } catch (error: any) {
       console.error("Error generating link:", error);
@@ -703,224 +684,221 @@ Analizá tu expensa en ExpensaCheck`;
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                  <p className="text-muted-foreground text-sm max-w-lg">
-                    {attentionItems > 0
-                      ? "Tu expensa de este mes tiene algunos aumentos que merecen atención. A continuación te explicamos cada uno en detalle."
-                      : "Tu expensa de este mes está dentro de los rangos normales. No detectamos aumentos inusuales."}
-                  </p>
+                    <p className="text-muted-foreground text-sm max-w-lg">
+                      {attentionItems > 0
+                        ? "Tu expensa de este mes tiene algunos aumentos que merecen atención. A continuación te explicamos cada uno en detalle."
+                        : "Tu expensa de este mes está dentro de los rangos normales. No detectamos aumentos inusuales."}
+                    </p>
+                  </div>
+                  <div className="flex flex-col justify-center items-start md:items-end">
+                    <p className="text-sm text-muted-foreground mb-1">Total del mes</p>
+                    <p className="text-3xl md:text-4xl font-bold">
+                      {formatCurrency(analysis.total_amount)}
+                    </p>
+                    {analysis.previous_total && (
+                      <div className={`flex items-center gap-1 mt-2 text-sm ${totalChange > 0 ? "text-status-attention" : "text-status-ok"}`}>
+                        {totalChange > 0 ? (
+                          <TrendingUp className="w-4 h-4" />
+                        ) : (
+                          <TrendingDown className="w-4 h-4" />
+                        )}
+                        <span className="font-medium">
+                          {totalChange > 0 ? "+" : ""}{totalChange.toFixed(1)}% vs mes anterior
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col justify-center items-start md:items-end">
-                  <p className="text-sm text-muted-foreground mb-1">Total del mes</p>
-                  <p className="text-3xl md:text-4xl font-bold">
-                    {formatCurrency(analysis.total_amount)}
-                  </p>
-                  {analysis.previous_total && (
-                    <div className={`flex items-center gap-1 mt-2 text-sm ${totalChange > 0 ? "text-status-attention" : "text-status-ok"}`}>
-                      {totalChange > 0 ? (
-                        <TrendingUp className="w-4 h-4" />
-                      ) : (
-                        <TrendingDown className="w-4 h-4" />
-                      )}
-                      <span className="font-medium">
-                        {totalChange > 0 ? "+" : ""}{totalChange.toFixed(1)}% vs mes anterior
-                      </span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* AI Summary */}
-          <Card variant="soft" className="mb-8 animate-fade-in-up border-primary/20 bg-primary/5">
-            <CardContent className="p-4 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Sparkles className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium text-primary mb-1">Resumen IA</p>
-                <p className="text-sm text-muted-foreground">
-                  {attentionItems > 0
-                    ? `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. ${attentionItems} categoría${attentionItems > 1 ? 's merecen' : ' merece'} revisión por aumentos significativos.`
-                    : `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. Todos los rubros están dentro de parámetros normales.`}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Categories Breakdown */}
-          {categories.length > 0 && (
-            <div className="grid gap-4 mb-8">
-              <h2 className="text-xl font-semibold">Detalle por categoría</h2>
-              <div className="grid gap-4">
-                {categories.map((category, index) => {
-                  const change = calculateChange(category.current_amount, category.previous_amount);
-                  const Icon = iconMap[category.icon] || Building;
-                  
-                  return (
-                    <Card 
-                      key={category.id} 
-                      variant="default" 
-                      className="animate-fade-in-up overflow-hidden"
-                      style={{ animationDelay: `${index * 0.1}s` }}
-                    >
-                      <CardContent className="p-0">
-                        <div className="flex flex-col md:flex-row">
-                          <div className="flex-1 p-5 md:p-6">
-                            <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
-                              }`}>
-                                <Icon className={`w-6 h-6 ${
-                                  category.status === "attention" ? "text-status-attention" : "text-status-ok"
-                                }`} />
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center gap-2 mb-1">
-                                  <h3 className="font-semibold">{category.name}</h3>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Badge 
-                                        variant={category.status as any}
-                                        className="cursor-help transition-transform hover:scale-105"
-                                      >
-                                        {category.status === "ok" ? "OK" : "Revisar"}
-                                      </Badge>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top" className="max-w-xs">
-                                      {category.status === "ok" ? (
-                                        <p>✅ Este gasto está dentro de los parámetros normales.</p>
-                                      ) : (
-                                        <p>⚠️ Este gasto tuvo un aumento significativo. Te recomendamos verificarlo con la administración.</p>
-                                      )}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                                <p className="text-sm text-muted-foreground">
-                                  {category.explanation || "Sin observaciones"}
-                                </p>
-                              </div>
-                            </div>
-                          </div>
-                          <div className="flex md:flex-col items-center justify-between md:justify-center gap-4 p-5 md:p-6 bg-muted/30 md:w-48 border-t md:border-t-0 md:border-l border-border">
-                            <div className="text-center">
-                              <p className="text-xs text-muted-foreground mb-0.5">Este mes</p>
-                              <p className="text-lg font-bold">{formatCurrency(category.current_amount)}</p>
-                            </div>
-                            {category.previous_amount && (
-                              <div className={`flex items-center gap-1 text-sm font-medium ${
-                                change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
-                              }`}>
-                                {change > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
-                                {change > 0 ? "+" : ""}{change.toFixed(1)}%
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Anomaly Alerts */}
-          {categories.length > 0 && (
-            <div className="mb-8">
-              <AnomalyAlerts categories={categories} threshold={30} />
-            </div>
-          )}
-
-
-          {/* Visual Comparison Chart - Bar chart comparing with previous period */}
-          {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
-            <div className="mb-8">
-              <ComparisonChart
-                data={categories
-                  .filter(c => c.previous_amount !== null)
-                  .map(c => ({
-                    name: c.name,
-                    leftAmount: c.previous_amount || 0,
-                    rightAmount: c.current_amount,
-                    diff: c.current_amount - (c.previous_amount || 0),
-                    changePercent: c.previous_amount 
-                      ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100 
-                      : null
-                  }))
-                  .sort((a, b) => b.rightAmount - a.rightAmount)}
-                leftLabel={previousPeriodLabel ? previousPeriodLabel : "Mes anterior"}
-                rightLabel={analysis.period}
-              />
-            </div>
-          )}
-
-          {/* Historical Evolution Chart - Absolute values */}
-          {analysis.building_name && (
-            <div className="mb-8">
-              <HistoricalEvolutionChart
-                buildingName={analysis.building_name}
-                currentAnalysisId={analysis.id}
-                currentPeriod={analysis.period}
-              />
-            </div>
-          )}
-
-          {/* Evolution Comparison Chart - Percentage with inflation and other buildings */}
-          {evolutionData.length >= 2 && (
-            <div className="mb-8">
-              <EvolutionComparisonChart
-                data={evolutionData}
-                buildingName={analysis.building_name || "Este edificio"}
-                deviation={deviation || undefined}
-                buildingsTrendStats={buildingsTrendStats}
-              />
-            </div>
-          )}
-
-
-          {/* Analysis Notes */}
-          <div className="mb-8">
-            <AnalysisNotes 
-              analysisId={analysis.id} 
-              initialNotes={analysis.notes}
-              onNotesUpdate={(notes) => setAnalysis(prev => prev ? { ...prev, notes } : null)}
-            />
-          </div>
-
-          {/* Info Card */}
-          <Card variant="soft" className="mb-8 animate-fade-in-up">
-            <CardContent className="p-6">
-              <div className="flex gap-4">
-                <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
-                  <Info className="w-5 h-5 text-secondary" />
+            {/* AI Summary */}
+            <Card variant="soft" className="mb-8 animate-fade-in-up border-primary/20 bg-primary/5">
+              <CardContent className="p-4 flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  <Sparkles className="w-4 h-4 text-primary" />
                 </div>
                 <div>
-                  <h3 className="font-semibold mb-1">¿Qué significa esto?</h3>
+                  <p className="text-sm font-medium text-primary mb-1">Resumen IA</p>
                   <p className="text-sm text-muted-foreground">
-                    Los gastos marcados como "a revisar" no necesariamente son incorrectos. 
-                    Pueden deberse a aumentos de tarifas o gastos extraordinarios justificados. 
-                    Te recomendamos revisar las actas del consorcio o consultar con la administración 
-                    si tenés dudas sobre algún ítem específico.
+                    {attentionItems > 0
+                      ? `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. ${attentionItems} categoría${attentionItems > 1 ? 's merecen' : ' merece'} revisión por aumentos significativos.`
+                      : `Tu expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. Todos los rubros están dentro de parámetros normales.`}
                   </p>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          {/* CTA */}
-          <div className="text-center pt-8">
-            <p className="text-muted-foreground mb-4">
-              ¿Querés analizar otra expensa?
-            </p>
-            <Button asChild variant="hero" size="lg">
-              <Link to="/analizar">Subir nueva expensa</Link>
-            </Button>
+            {/* Categories Breakdown */}
+            {categories.length > 0 && (
+              <div className="grid gap-4 mb-8">
+                <h2 className="text-xl font-semibold">Detalle por categoría</h2>
+                <div className="grid gap-4">
+                  {categories.map((category, index) => {
+                    const change = calculateChange(category.current_amount, category.previous_amount);
+                    const Icon = iconMap[category.icon] || Building;
+
+                    return (
+                      <Card
+                        key={category.id}
+                        variant="default"
+                        className="animate-fade-in-up overflow-hidden"
+                        style={{ animationDelay: `${index * 0.1}s` }}
+                      >
+                        <CardContent className="p-0">
+                          <div className="flex flex-col md:flex-row">
+                            <div className="flex-1 p-5 md:p-6">
+                              <div className="flex items-start gap-4">
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                                  }`}>
+                                  <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                    }`} />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <h3 className="font-semibold">{category.name}</h3>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Badge
+                                          variant={category.status as any}
+                                          className="cursor-help transition-transform hover:scale-105"
+                                        >
+                                          {category.status === "ok" ? "OK" : "Revisar"}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top" className="max-w-xs">
+                                        {category.status === "ok" ? (
+                                          <p>✅ Este gasto está dentro de los parámetros normales.</p>
+                                        ) : (
+                                          <p>⚠️ Este gasto tuvo un aumento significativo. Te recomendamos verificarlo con la administración.</p>
+                                        )}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <p className="text-sm text-muted-foreground">
+                                    {category.explanation || "Sin observaciones"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex md:flex-col items-center justify-between md:justify-center gap-4 p-5 md:p-6 bg-muted/30 md:w-48 border-t md:border-t-0 md:border-l border-border">
+                              <div className="text-center">
+                                <p className="text-xs text-muted-foreground mb-0.5">Este mes</p>
+                                <p className="text-lg font-bold">{formatCurrency(category.current_amount)}</p>
+                              </div>
+                              {category.previous_amount && (
+                                <div className={`flex items-center gap-1 text-sm font-medium ${change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                                  }`}>
+                                  {change > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                                  {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Anomaly Alerts */}
+            {categories.length > 0 && (
+              <div className="mb-8">
+                <AnomalyAlerts categories={categories} threshold={30} />
+              </div>
+            )}
+
+
+            {/* Visual Comparison Chart - Bar chart comparing with previous period */}
+            {categories.length > 0 && categories.some(c => c.previous_amount !== null) && (
+              <div className="mb-8">
+                <ComparisonChart
+                  data={categories
+                    .filter(c => c.previous_amount !== null)
+                    .map(c => ({
+                      name: c.name,
+                      leftAmount: c.previous_amount || 0,
+                      rightAmount: c.current_amount,
+                      diff: c.current_amount - (c.previous_amount || 0),
+                      changePercent: c.previous_amount
+                        ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100
+                        : null
+                    }))
+                    .sort((a, b) => b.rightAmount - a.rightAmount)}
+                  leftLabel={previousPeriodLabel ? previousPeriodLabel : "Mes anterior"}
+                  rightLabel={analysis.period}
+                />
+              </div>
+            )}
+
+            {/* Historical Evolution Chart - Absolute values */}
+            {analysis.building_name && (
+              <div className="mb-8">
+                <HistoricalEvolutionChart
+                  buildingName={analysis.building_name}
+                  currentAnalysisId={analysis.id}
+                  currentPeriod={analysis.period}
+                />
+              </div>
+            )}
+
+            {/* Evolution Comparison Chart - Percentage with inflation and other buildings */}
+            {evolutionData.length >= 2 && (
+              <div className="mb-8">
+                <EvolutionComparisonChart
+                  data={evolutionData}
+                  buildingName={analysis.building_name || "Este edificio"}
+                  deviation={deviation || undefined}
+                  buildingsTrendStats={buildingsTrendStats}
+                />
+              </div>
+            )}
+
+
+            {/* Analysis Notes */}
+            <div className="mb-8">
+              <AnalysisNotes
+                analysisId={analysis.id}
+                initialNotes={analysis.notes}
+                onNotesUpdate={(notes) => setAnalysis(prev => prev ? { ...prev, notes } : null)}
+              />
+            </div>
+
+            {/* Info Card */}
+            <Card variant="soft" className="mb-8 animate-fade-in-up">
+              <CardContent className="p-6">
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
+                    <Info className="w-5 h-5 text-secondary" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold mb-1">¿Qué significa esto?</h3>
+                    <p className="text-sm text-muted-foreground">
+                      Los gastos marcados como "a revisar" no necesariamente son incorrectos.
+                      Pueden deberse a aumentos de tarifas o gastos extraordinarios justificados.
+                      Te recomendamos revisar las actas del consorcio o consultar con la administración
+                      si tenés dudas sobre algún ítem específico.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* CTA */}
+            <div className="text-center pt-8">
+              <p className="text-muted-foreground mb-4">
+                ¿Querés analizar otra expensa?
+              </p>
+              <Button asChild variant="hero" size="lg">
+                <Link to="/analizar">Subir nueva expensa</Link>
+              </Button>
+            </div>
           </div>
-        </div>
-      </main>
-    </div>
-  </TooltipProvider>
+        </main>
+      </div>
+    </TooltipProvider>
   );
 };
 

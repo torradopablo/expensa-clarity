@@ -71,15 +71,19 @@ export const HistoricalEvolutionChart = ({
 
         if (error) throw error;
 
-        // If no period_date, sort by created_at
-        const sortedData = (data || []).sort((a, b) => {
-          if (a.period_date && b.period_date) {
-            return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
+        // Limitar a los últimos 15 períodos terminando en el análisis actual
+        let slicedData = data || [];
+        if (slicedData.length > 0) {
+          const currentIdx = slicedData.findIndex((h) => h.id === currentAnalysisId);
+          if (currentIdx !== -1) {
+            const startIdx = Math.max(0, currentIdx - 14); // 15 períodos total
+            slicedData = slicedData.slice(startIdx, currentIdx + 1);
+          } else {
+            slicedData = slicedData.slice(-15);
           }
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        });
+        }
 
-        setHistoricalData(sortedData);
+        setHistoricalData(slicedData);
       } catch (error) {
         console.error("Error fetching historical data:", error);
       } finally {
@@ -88,7 +92,7 @@ export const HistoricalEvolutionChart = ({
     };
 
     fetchHistoricalData();
-  }, [buildingName]);
+  }, [buildingName, currentAnalysisId]);
 
   // Only show if there are at least 2 analyses
   if (isLoading || historicalData.length < 2) {
@@ -107,17 +111,17 @@ export const HistoricalEvolutionChart = ({
   const min = Math.min(...totals);
   const max = Math.max(...totals);
   const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
-  const previousTotal = historicalData.length >= 2 
-    ? historicalData[historicalData.length - 2]?.total_amount 
+  const previousTotal = historicalData.length >= 2
+    ? historicalData[historicalData.length - 2]?.total_amount
     : null;
-  
-  const overallChange = previousTotal 
-    ? ((currentTotal - previousTotal) / previousTotal) * 100 
+
+  const overallChange = previousTotal
+    ? ((currentTotal - previousTotal) / previousTotal) * 100
     : null;
 
   const firstTotal = historicalData[0]?.total_amount;
-  const totalEvolution = firstTotal 
-    ? ((currentTotal - firstTotal) / firstTotal) * 100 
+  const totalEvolution = firstTotal
+    ? ((currentTotal - firstTotal) / firstTotal) * 100
     : null;
 
   return (
@@ -136,7 +140,7 @@ export const HistoricalEvolutionChart = ({
             </div>
           </div>
           {totalEvolution !== null && (
-            <Badge 
+            <Badge
               variant={totalEvolution > 0 ? "attention" : "ok"}
               className="flex items-center gap-1"
             >
