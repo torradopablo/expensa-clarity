@@ -40,7 +40,7 @@ serve(async (req) => {
     // Verify user
     const token = authHeader.replace("Bearer ", "");
     const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
-    
+
     if (claimsError || !claimsData?.claims) {
       return new Response(
         JSON.stringify({ error: "Token inválido" }),
@@ -128,10 +128,16 @@ serve(async (req) => {
     const mpData = await mpResponse.json();
     console.log("MP preference created:", mpData.id);
 
+    // Create service role client for audit logging (bypass RLS)
+    const supabaseService = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
     // Update analysis with payment preference ID
     const { error: updateError } = await supabase
       .from("expense_analyses")
-      .update({ 
+      .update({
         payment_id: mpData.id,
         status: "pending_payment"
       })
@@ -139,6 +145,22 @@ serve(async (req) => {
 
     if (updateError) {
       console.error("Update error:", updateError);
+    }
+
+    // Record in payment_audits table
+    const { error: auditError } = await supabaseService
+      .from("payment_audits")
+      .insert({
+        analysis_id: analysisId,
+        user_id: userId,
+        preference_id: mpData.id,
+        amount: 1500, // Matching the item price
+        status: "pending",
+        raw_response: mpData
+      });
+
+    if (auditError) {
+      console.error("Audit logging error:", auditError);
     }
 
     return new Response(

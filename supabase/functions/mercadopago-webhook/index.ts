@@ -12,7 +12,7 @@ async function verifyWebhookSignature(
   body: string
 ): Promise<boolean> {
   const WEBHOOK_SECRET = Deno.env.get("MERCADOPAGO_WEBHOOK_SECRET");
-  
+
   // If no secret is configured, log warning but allow (for backwards compatibility during setup)
   if (!WEBHOOK_SECRET) {
     console.warn("MERCADOPAGO_WEBHOOK_SECRET not configured - signature verification skipped");
@@ -105,7 +105,7 @@ serve(async (req) => {
   try {
     // Read body for signature verification
     const bodyText = await req.text();
-    
+
     // Log webhook attempt for security monitoring
     console.log("Webhook attempt:", {
       method: req.method,
@@ -245,24 +245,33 @@ serve(async (req) => {
           newStatus = "pending_payment";
       }
 
-      // Update analysis status
-      const { error: updateError } = await supabase
-        .from("expense_analyses")
-        .update({
-          status: newStatus,
-          payment_id: payment.id.toString(),
-        })
-        .eq("id", analysisId);
+      console.log(`Analysis ${analysisId} updated to status: ${newStatus}`);
 
-      if (updateError) {
-        console.error("Error updating analysis:", updateError);
-        return new Response(
-          JSON.stringify({ error: "Error updating analysis" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+      // Fetch user_id for audit logging
+      const { data: analysisData } = await supabase
+        .from("expense_analyses")
+        .select("user_id")
+        .eq("id", analysisId)
+        .single();
+
+      // Record in payment_audits table
+      const { error: auditError } = await supabase
+        .from("payment_audits")
+        .insert({
+          analysis_id: analysisId,
+          user_id: analysisData?.user_id || "00000000-0000-0000-0000-000000000000", // Fallback if not found
+          mp_payment_id: payment.id.toString(),
+          amount: payment.transaction_amount,
+          status: payment.status,
+          payment_method_id: payment.payment_method_id,
+          payment_type_id: payment.payment_type_id,
+          raw_response: payment
+        });
+
+      if (auditError) {
+        console.error("Audit logging error:", auditError);
       }
 
-      console.log(`Analysis ${analysisId} updated to status: ${newStatus}`);
       markWebhookProcessed(webhookKey);
 
       return new Response(
@@ -285,7 +294,7 @@ serve(async (req) => {
       if (orderResponse.ok) {
         const order = await orderResponse.json();
         console.log("Merchant order:", order.id, "status:", order.status);
-        
+
         // Validate external_reference format
         if (order.status === "closed" && order.external_reference) {
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
