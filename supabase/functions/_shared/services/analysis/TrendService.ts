@@ -4,6 +4,7 @@ import { ComparisonService } from "./ComparisonService.ts";
 export interface MarketTrendFilters {
     unit_count_range?: string;
     age_category?: string;
+    neighborhood?: string;
     zone?: string;
     has_amenities?: boolean;
     category?: string;
@@ -59,27 +60,66 @@ export class TrendService {
         if (Object.keys(profileFilters).length > 0) {
             filtersApplied = true;
 
-            let profilesQuery = this.supabase.from("building_profiles").select("id, building_name");
+            // Start with base query
+            let profilesQuery = this.supabase
+                .from("building_profiles")
+                .select("id, building_name");
 
+            // Apply profile attribute filters if provided
             if (filters?.unit_count_range) {
                 profilesQuery = profilesQuery.eq("unit_count_range", filters.unit_count_range);
             }
             if (filters?.age_category) {
                 profilesQuery = profilesQuery.eq("age_category", filters.age_category);
             }
-            if (filters?.zone) {
-                profilesQuery = profilesQuery.eq("zone", filters.zone);
-            }
             if (filters?.has_amenities !== undefined) {
                 profilesQuery = profilesQuery.eq("has_amenities", filters.has_amenities);
             }
 
-            const { data: matchingProfiles, error: profilesError } = await profilesQuery;
+            // Hierarchical geographic filtering: Neighborhood -> Zone -> Global
+            let matchingProfiles: any[] = [];
 
-            if (profilesError) throw profilesError;
+            // 1. Try with Neighborhood + other filters
+            if (filters?.neighborhood) {
+                const { data } = await profilesQuery.eq("neighborhood", filters.neighborhood);
+                matchingProfiles = data || [];
+            }
+
+            // 2. If not enough buildings, try with Zone + other filters
+            if (matchingProfiles.length < 2 && filters?.zone) {
+                // We need to re-create the query to remove the failed neighborhood filter
+                let zoneQuery = this.supabase
+                    .from("building_profiles")
+                    .select("id, building_name")
+                    .eq("zone", filters.zone);
+
+                if (filters?.unit_count_range) zoneQuery = zoneQuery.eq("unit_count_range", filters.unit_count_range);
+                if (filters?.age_category) zoneQuery = zoneQuery.eq("age_category", filters.age_category);
+                if (filters?.has_amenities !== undefined) zoneQuery = zoneQuery.eq("has_amenities", filters.has_amenities);
+
+                const { data } = await zoneQuery;
+                matchingProfiles = data || [];
+            }
+
+            // 3. Fallback to all profiles if still empty and fallback permitted
+            if (matchingProfiles.length < 2 && fallbackIfEmpty) {
+                usedFallback = true;
+                // No geographic filter, just other attributes
+                let globalQuery = this.supabase
+                    .from("building_profiles")
+                    .select("id, building_name");
+
+                if (filters?.unit_count_range) globalQuery = globalQuery.eq("unit_count_range", filters.unit_count_range);
+                if (filters?.age_category) globalQuery = globalQuery.eq("age_category", filters.age_category);
+                if (filters?.has_amenities !== undefined) globalQuery = globalQuery.eq("has_amenities", filters.has_amenities);
+
+                const { data } = await globalQuery;
+                matchingProfiles = data || [];
+            }
+
 
             const matchingBuildingNames = new Set(
-                (matchingProfiles || []).map((p: any) => p.building_name.toLowerCase().trim())
+                matchingProfiles.map((p: any) => p.building_name.toLowerCase().trim())
             );
 
             if (matchingBuildingNames.size > 0) {
@@ -91,12 +131,13 @@ export class TrendService {
                 const buildingsInFiltered = new Set(filteredByProfile.map((a: any) => a.building_name)).size;
                 const periodsInFiltered = new Set(filteredByProfile.map((a: any) => a.period)).size;
 
+                // Requirement: at least 2 buildings and 2 periods for a meaningful trend
                 if (buildingsInFiltered >= 2 && periodsInFiltered >= 2) {
                     filteredAnalyses = filteredByProfile;
                 } else if (fallbackIfEmpty) {
                     usedFallback = true;
                 } else {
-                    filteredAnalyses = filteredByProfile;
+                    filteredAnalyses = []; // Strict: no data for the area
                 }
             } else if (fallbackIfEmpty) {
                 usedFallback = true;

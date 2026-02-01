@@ -197,8 +197,37 @@ serve(async (req) => {
       }
     }
 
+    // Initialize TrendService
+    const { TrendService } = await import("../_shared/services/analysis/TrendService.ts");
+    const trendService = new TrendService(supabase);
+
+    // Fetch building profile for filtering
+    const { data: profile } = await supabase
+      .from('building_profiles')
+      .select('unit_count_range, age_category, neighborhood, zone, has_amenities')
+      .eq('building_name', analysis.building_name)
+      .maybeSingle();
+
+    // Fetch buildings trend via TrendService
+    const filters: any = {};
+    if (profile) {
+      if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
+      if (profile.age_category) filters.age_category = profile.age_category;
+      if (profile.neighborhood) filters.neighborhood = profile.neighborhood;
+      if (profile.zone) filters.zone = profile.zone;
+      if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
+    }
+
+    const { data: trendData, stats: trendStats } = await trendService.getMarketTrend(
+      Object.keys(filters).length > 0 ? filters : {},
+      false // Be strict
+    );
+
+    const buildingsTrend = trendData || [];
+    let buildingsTrendStats: BuildingsTrendStats | null = trendStats || null;
+
     // Fetch inflation data
-    let inflationData = null
+    let inflationData = null;
     try {
       const inflationResponse = await fetch(
         `${supabaseUrl}/functions/v1/fetch-inflation`,
@@ -209,24 +238,17 @@ serve(async (req) => {
             Authorization: `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
           },
         }
-      )
+      );
 
       if (inflationResponse.ok) {
-        const result = await inflationResponse.json()
+        const result = await inflationResponse.json();
         if (result.data) {
-          inflationData = result.data
+          inflationData = result.data;
         }
       }
     } catch (error) {
-      console.log('Failed to fetch inflation data:', error)
+      console.log('Failed to fetch inflation data:', error);
     }
-
-    // Fetch other buildings data for comparison
-    const { data: otherBuildingsData } = await supabase
-      .from('expense_analyses')
-      .select('id, period, total_amount, period_date, building_name, user_id')
-      .neq('building_name', analysis.building_name)
-      .order('period_date', { ascending: true, nullsFirst: false })
 
     // Limit historical data to 15 periods ending at the current analysis
     let slicedHistoricalData = historicalData || []
@@ -243,7 +265,6 @@ serve(async (req) => {
     // Calculate evolution data
     const evolutionData: EvolutionDataPoint[] = []
     let deviation: Deviation | null = null
-    let buildingsTrendStats: BuildingsTrendStats | null = null
 
     if (slicedHistoricalData && slicedHistoricalData.length >= 2) {
       const baseTotal = slicedHistoricalData[0].total_amount
@@ -258,21 +279,9 @@ serve(async (req) => {
       const firstPeriodYYYYMM = periodToYearMonth(slicedHistoricalData[0].period, slicedHistoricalData[0].period_date)
       const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null
 
-      const buildingsAvgByPeriod = new Map<string, number[]>()
-      if (otherBuildingsData) {
-        otherBuildingsData.forEach(b => {
-          if (!buildingsAvgByPeriod.has(b.period)) {
-            buildingsAvgByPeriod.set(b.period, [])
-          }
-          buildingsAvgByPeriod.get(b.period)!.push(b.total_amount)
-        })
-      }
-
       const firstPeriod = slicedHistoricalData[0].period
-      const firstPeriodOtherBuildingsArr = buildingsAvgByPeriod.get(firstPeriod)
-      const baseOtherBuildings = firstPeriodOtherBuildingsArr && firstPeriodOtherBuildingsArr.length > 0
-        ? firstPeriodOtherBuildingsArr.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildingsArr.length
-        : null
+      const baseBuildingsItem = buildingsTrend.find(b => b.period === firstPeriod);
+      const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
 
       const evolution: EvolutionDataPoint[] = slicedHistoricalData.map((h) => {
         const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0
@@ -289,11 +298,10 @@ serve(async (req) => {
         }
 
         let buildingsPercent: number | null = null
-        if (baseOtherBuildings !== null && baseOtherBuildings > 0) {
-          const periodBuildings = buildingsAvgByPeriod.get(h.period)
-          if (periodBuildings && periodBuildings.length > 0) {
-            const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length
-            buildingsPercent = ((avgThisPeriod - baseOtherBuildings) / baseOtherBuildings) * 100
+        if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+          const buildingsItem = buildingsTrend.find(b => b.period === h.period)
+          if (buildingsItem) {
+            buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100
           }
         }
 
@@ -321,17 +329,6 @@ serve(async (req) => {
           fromInflation,
           fromBuildings,
           isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
-        }
-      }
-
-      if (otherBuildingsData) {
-        const uniqueBuildings = new Set(otherBuildingsData.map(b => b.building_name))
-        const uniquePeriods = new Set(otherBuildingsData.map(b => b.period))
-        buildingsTrendStats = {
-          totalBuildings: uniqueBuildings.size,
-          totalAnalyses: otherBuildingsData.length,
-          periodsCount: uniquePeriods.size,
-          filtersApplied: false
         }
       }
     }
