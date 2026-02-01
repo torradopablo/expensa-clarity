@@ -332,18 +332,50 @@ const AnalysisPage = () => {
               }
             }
 
-            // Fetch other buildings data for comparison
-            const { data: otherBuildingsData } = await supabase
-              .from("expense_analyses")
-              .select("id, period, total_amount, period_date, building_name, user_id")
-              .neq("building_name", analysisData.building_name)
-              .order("period_date", { ascending: true, nullsFirst: false });
+            // Fetch building profile for filtering
+            const { data: profile } = await supabase
+              .from("building_profiles")
+              .select("unit_count_range, age_category, neighborhood, zone, has_amenities")
+              .eq("building_name", analysisData.building_name)
+              .maybeSingle();
+
+            // Fetch buildings trend via Edge Function (to bypass RLS and get aggregated data)
+            const filters: Record<string, any> = {};
+            if (profile) {
+              if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
+              if (profile.age_category) filters.age_category = profile.age_category;
+              if (profile.neighborhood) filters.neighborhood = profile.neighborhood;
+              if (profile.zone) filters.zone = profile.zone;
+              if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
+            }
+
+            const trendResponse = await fetch(
+              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+                },
+                body: JSON.stringify({
+                  filters: Object.keys(filters).length > 0 ? filters : undefined,
+                  fallbackIfEmpty: false // Be strict as per user request
+                }),
+              }
+            );
+
+            let buildingsTrend: any[] = [];
+            if (trendResponse.ok) {
+              const result = await trendResponse.json();
+              buildingsTrend = result.data || [];
+              setBuildingsTrendStats(result.stats || null);
+            }
 
             // Calculate evolution data
             if (slicedHistoricalAnalyses.length >= 2) {
               const baseTotal = slicedHistoricalAnalyses[0].total_amount;
 
-              // Create inflation map - use YYYY-MM format like in Evolucion.tsx
+              // Create inflation map
               const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
               if (inflationData) {
                 inflationData.forEach(inf => {
@@ -351,35 +383,19 @@ const AnalysisPage = () => {
                 });
               }
 
-              // Find base inflation value for the first sliced period (same as Evolucion.tsx)
+              // Find base inflation value
               const firstSlicedPeriodData = slicedHistoricalAnalyses[0];
               const firstSlicedPeriodYYYYMM = periodToYearMonth(firstSlicedPeriodData.period, firstSlicedPeriodData.period_date);
-
               const baseInflation = firstSlicedPeriodYYYYMM ? (inflationMap.get(firstSlicedPeriodYYYYMM) ?? null) : null;
 
-              // Calculate other buildings average by period
-              const buildingsAvgByPeriod = new Map<string, number[]>();
-              if (otherBuildingsData) {
-                otherBuildingsData.forEach(b => {
-                  const pKey = b.period;
-                  if (!buildingsAvgByPeriod.has(pKey)) {
-                    buildingsAvgByPeriod.set(pKey, []);
-                  }
-                  buildingsAvgByPeriod.get(pKey)!.push(b.total_amount);
-                });
-              }
-
-              // Get first sliced period averages for other buildings
+              // Find base buildings value from the trend data
               const firstSlicedPeriod = slicedHistoricalAnalyses[0].period;
-              const firstSlicedPeriodOtherBuildingsArr = buildingsAvgByPeriod.get(firstSlicedPeriod);
-              const baseOtherBuildings = firstSlicedPeriodOtherBuildingsArr && firstSlicedPeriodOtherBuildingsArr.length > 0
-                ? firstSlicedPeriodOtherBuildingsArr.reduce((a, b) => a + b, 0) / firstSlicedPeriodOtherBuildingsArr.length
-                : null;
+              const baseBuildingsItem = buildingsTrend.find(b => b.period === firstSlicedPeriod);
+              const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
 
               const evolution: EvolutionDataPoint[] = slicedHistoricalAnalyses.map((h) => {
                 const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0;
 
-                // Calculate inflation percent change from base (same as Evolucion.tsx)
                 let inflationPercent: number | null = null;
                 let inflationEstimated = false;
 
@@ -393,11 +409,10 @@ const AnalysisPage = () => {
                 }
 
                 let buildingsPercent: number | null = null;
-                if (baseOtherBuildings !== null) {
-                  const periodBuildings = buildingsAvgByPeriod.get(h.period);
-                  if (periodBuildings && periodBuildings.length > 0) {
-                    const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length;
-                    buildingsPercent = ((avgThisPeriod - baseOtherBuildings) / baseOtherBuildings) * 100;
+                if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+                  const buildingsItem = buildingsTrend.find(b => b.period === h.period);
+                  if (buildingsItem) {
+                    buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
                   }
                 }
 
@@ -426,18 +441,6 @@ const AnalysisPage = () => {
                   fromInflation,
                   fromBuildings,
                   isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
-                });
-              }
-
-              // Set buildings trend stats
-              if (otherBuildingsData) {
-                const uniqueBuildings = new Set(otherBuildingsData.map(b => b.building_name));
-                const uniquePeriods = new Set(otherBuildingsData.map(b => b.period));
-                setBuildingsTrendStats({
-                  totalBuildings: uniqueBuildings.size,
-                  totalAnalyses: otherBuildingsData.length,
-                  periodsCount: uniquePeriods.size,
-                  filtersApplied: false
                 });
               }
             }

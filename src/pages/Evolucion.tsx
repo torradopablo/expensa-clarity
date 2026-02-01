@@ -167,6 +167,7 @@ interface BuildingProfile {
   building_name: string;
   unit_count_range: string | null;
   age_category: string | null;
+  neighborhood: string | null;
   zone: string | null;
   has_amenities: boolean | null;
 }
@@ -450,7 +451,7 @@ const Evolucion = () => {
     try {
       const { data, error } = await supabase
         .from("building_profiles")
-        .select("id, building_name, unit_count_range, age_category, zone, has_amenities")
+        .select("id, building_name, unit_count_range, age_category, neighborhood, zone, has_amenities")
         .ilike("building_name", buildingName)
         .maybeSingle();
 
@@ -472,6 +473,7 @@ const Evolucion = () => {
       if (profile) {
         if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
         if (profile.age_category) filters.age_category = profile.age_category;
+        if (profile.neighborhood) filters.neighborhood = profile.neighborhood;
         if (profile.zone) filters.zone = profile.zone;
         if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
       }
@@ -492,7 +494,7 @@ const Evolucion = () => {
           },
           body: JSON.stringify({
             filters: hasFilters ? filters : undefined,
-            fallbackIfEmpty: true  // Request fallback to all buildings if no matches
+            fallbackIfEmpty: false  // Request fallback to all buildings if no matches
           }),
         }
       );
