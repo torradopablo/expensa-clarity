@@ -109,6 +109,9 @@ const Stepper = ({ currentStep }: { currentStep: number }) => (
   </div>
 );
 
+const MAX_FILE_SIZE = 15 * 1024 * 1024; // 15MB
+const ACCEPTED_TYPES = ["application/pdf"];
+
 const UploadStep = ({
   file,
   onFileSelect,
@@ -124,6 +127,22 @@ const UploadStep = ({
 }) => {
   const [isDragging, setIsDragging] = useState(false);
 
+  const validateFile = (file: File): boolean => {
+    if (!ACCEPTED_TYPES.includes(file.type)) {
+      toast.error("Formato no válido", {
+        description: "Por favor, subí solo archivos PDF."
+      });
+      return false;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      toast.error("Archivo demasiado grande", {
+        description: "El límite máximo por archivo es de 15MB."
+      });
+      return false;
+    }
+    return true;
+  };
+
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -138,14 +157,14 @@ const UploadStep = ({
     e.preventDefault();
     setIsDragging(false);
     const droppedFile = e.dataTransfer.files[0];
-    if (droppedFile && (droppedFile.type === "application/pdf" || droppedFile.type.startsWith("image/"))) {
+    if (droppedFile && validateFile(droppedFile)) {
       onFileSelect(droppedFile);
     }
   }, [onFileSelect]);
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    if (selectedFile) {
+    if (selectedFile && validateFile(selectedFile)) {
       onFileSelect(selectedFile);
     }
   }, [onFileSelect]);
@@ -156,7 +175,7 @@ const UploadStep = ({
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">Subí tu liquidación de expensas</CardTitle>
           <CardDescription>
-            Aceptamos archivos PDF e imágenes (JPG, PNG)
+            Aceptamos archivos PDF de hasta 15MB
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -173,7 +192,7 @@ const UploadStep = ({
               <input
                 type="file"
                 className="hidden"
-                accept=".pdf,image/*"
+                accept=".pdf"
                 onChange={handleFileInput}
               />
               <div className="flex flex-col items-center gap-4">
@@ -182,10 +201,10 @@ const UploadStep = ({
                 </div>
                 <div className="text-center">
                   <p className="text-lg font-medium">
-                    Arrastrá tu archivo aquí
+                    Arrastrá tu PDF aquí
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    o hacé clic para seleccionar
+                    máximo 15MB
                   </p>
                 </div>
               </div>

@@ -41,13 +41,13 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">1. Aceptación de los Términos</h2>
                 <p className="text-muted-foreground mb-4">
-                  Al acceder y utilizar ExpensaCheck ("el Servicio", "la Plataforma", "nosotros"), usted acepta estar 
-                  legalmente obligado por estos Términos y Condiciones de Uso ("Términos"). Si no está de acuerdo con 
+                  Al acceder y utilizar ExpensaCheck ("el Servicio", "la Plataforma", "nosotros"), usted acepta estar
+                  legalmente obligado por estos Términos y Condiciones de Uso ("Términos"). Si no está de acuerdo con
                   alguna parte de estos Términos, no debe utilizar el Servicio.
                 </p>
                 <p className="text-muted-foreground">
-                  Estos Términos constituyen un acuerdo legal vinculante entre usted ("Usuario", "usted") y ExpensaCheck. 
-                  Nos reservamos el derecho de modificar estos Términos en cualquier momento, notificando a los usuarios 
+                  Estos Términos constituyen un acuerdo legal vinculante entre usted ("Usuario", "usted") y ExpensaCheck.
+                  Nos reservamos el derecho de modificar estos Términos en cualquier momento, notificando a los usuarios
                   a través de la plataforma o por correo electrónico.
                 </p>
               </section>
@@ -58,7 +58,7 @@ const Terminos = () => {
                   ExpensaCheck es una herramienta de análisis de expensas de consorcios que permite a los usuarios:
                 </p>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2 mb-4">
-                  <li>Cargar y procesar documentos de expensas en formato PDF o imagen</li>
+                  <li>Cargar y procesar documentos de expensas en formato PDF</li>
                   <li>Obtener un análisis detallado de los gastos por categoría</li>
                   <li>Comparar gastos entre períodos</li>
                   <li>Identificar variaciones inusuales o puntos de atención</li>
@@ -66,8 +66,8 @@ const Terminos = () => {
                   <li>Almacenar historial de análisis</li>
                 </ul>
                 <p className="text-muted-foreground">
-                  <strong>Importante:</strong> ExpensaCheck es una herramienta informativa y de asistencia. Los análisis 
-                  proporcionados no constituyen asesoramiento legal, contable o financiero profesional. Las interpretaciones 
+                  <strong>Importante:</strong> ExpensaCheck es una herramienta informativa y de asistencia. Los análisis
+                  proporcionados no constituyen asesoramiento legal, contable o financiero profesional. Las interpretaciones
                   y recomendaciones son orientativas y no reemplazan la consulta con profesionales matriculados.
                 </p>
               </section>
@@ -75,7 +75,7 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">3. Registro y Cuenta de Usuario</h2>
                 <p className="text-muted-foreground mb-4">
-                  Para utilizar ciertas funcionalidades del Servicio, debe crear una cuenta proporcionando información 
+                  Para utilizar ciertas funcionalidades del Servicio, debe crear una cuenta proporcionando información
                   veraz, actualizada y completa. Usted es responsable de:
                 </p>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2">
@@ -109,13 +109,13 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">5. Propiedad Intelectual</h2>
                 <p className="text-muted-foreground mb-4">
-                  Todo el contenido, diseño, código, algoritmos, logos, marcas y demás elementos del Servicio son 
-                  propiedad exclusiva de ExpensaCheck o sus licenciantes y están protegidos por las leyes de propiedad 
+                  Todo el contenido, diseño, código, algoritmos, logos, marcas y demás elementos del Servicio son
+                  propiedad exclusiva de ExpensaCheck o sus licenciantes y están protegidos por las leyes de propiedad
                   intelectual aplicables.
                 </p>
                 <p className="text-muted-foreground">
-                  Los documentos que usted carga mantienen su propiedad original. Al cargar contenido, nos otorga una 
-                  licencia limitada, no exclusiva y revocable para procesar dicho contenido únicamente con el fin de 
+                  Los documentos que usted carga mantienen su propiedad original. Al cargar contenido, nos otorga una
+                  licencia limitada, no exclusiva y revocable para procesar dicho contenido únicamente con el fin de
                   proporcionar el Servicio.
                 </p>
               </section>
@@ -123,7 +123,7 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">6. Pagos y Facturación</h2>
                 <p className="text-muted-foreground mb-4">
-                  Ciertos análisis o funcionalidades pueden requerir el pago de una tarifa. Los pagos se procesan a 
+                  Ciertos análisis o funcionalidades pueden requerir el pago de una tarifa. Los pagos se procesan a
                   través de MercadoPago u otros procesadores de pago autorizados. Al realizar un pago:
                 </p>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2 mb-4">
@@ -132,8 +132,8 @@ const Terminos = () => {
                   <li>Reconoce que los precios pueden variar y se informarán antes de confirmar la transacción</li>
                 </ul>
                 <p className="text-muted-foreground">
-                  <strong>Política de reembolsos:</strong> Los reembolsos se evaluarán caso por caso. Si el Servicio no 
-                  funcionó correctamente por causas atribuibles a nosotros, se procederá al reembolso correspondiente 
+                  <strong>Política de reembolsos:</strong> Los reembolsos se evaluarán caso por caso. Si el Servicio no
+                  funcionó correctamente por causas atribuibles a nosotros, se procederá al reembolso correspondiente
                   dentro de los 30 días posteriores a la compra.
                 </p>
               </section>
@@ -141,7 +141,7 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">7. Limitación de Responsabilidad</h2>
                 <p className="text-muted-foreground mb-4">
-                  ExpensaCheck proporciona el Servicio "tal cual" y "según disponibilidad". En la máxima medida permitida 
+                  ExpensaCheck proporciona el Servicio "tal cual" y "según disponibilidad". En la máxima medida permitida
                   por la ley aplicable:
                 </p>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2 mb-4">
@@ -152,7 +152,7 @@ const Terminos = () => {
                   <li>Nuestra responsabilidad total se limita al monto pagado por el usuario en los últimos 12 meses</li>
                 </ul>
                 <p className="text-muted-foreground">
-                  Los análisis de expensas son orientativos y no reemplazan la verificación manual de los documentos 
+                  Los análisis de expensas son orientativos y no reemplazan la verificación manual de los documentos
                   originales ni el asesoramiento profesional.
                 </p>
               </section>
@@ -160,9 +160,9 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">8. Indemnización</h2>
                 <p className="text-muted-foreground">
-                  Usted acepta indemnizar, defender y mantener indemne a ExpensaCheck, sus directores, empleados, 
-                  agentes y afiliados de cualquier reclamo, daño, pérdida, responsabilidad, costo y gasto (incluyendo 
-                  honorarios legales) que surja de: (a) su uso del Servicio; (b) su incumplimiento de estos Términos; 
+                  Usted acepta indemnizar, defender y mantener indemne a ExpensaCheck, sus directores, empleados,
+                  agentes y afiliados de cualquier reclamo, daño, pérdida, responsabilidad, costo y gasto (incluyendo
+                  honorarios legales) que surja de: (a) su uso del Servicio; (b) su incumplimiento de estos Términos;
                   (c) su violación de derechos de terceros; o (d) contenido que usted proporcione a través del Servicio.
                 </p>
               </section>
@@ -170,8 +170,8 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">9. Modificaciones del Servicio</h2>
                 <p className="text-muted-foreground">
-                  Nos reservamos el derecho de modificar, suspender o discontinuar el Servicio (o cualquier parte del 
-                  mismo) en cualquier momento, con o sin previo aviso. No seremos responsables ante usted ni ante 
+                  Nos reservamos el derecho de modificar, suspender o discontinuar el Servicio (o cualquier parte del
+                  mismo) en cualquier momento, con o sin previo aviso. No seremos responsables ante usted ni ante
                   terceros por cualquier modificación, suspensión o discontinuación del Servicio.
                 </p>
               </section>
@@ -179,11 +179,11 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">10. Terminación</h2>
                 <p className="text-muted-foreground mb-4">
-                  Podemos terminar o suspender su acceso al Servicio de inmediato, sin previo aviso ni responsabilidad, 
+                  Podemos terminar o suspender su acceso al Servicio de inmediato, sin previo aviso ni responsabilidad,
                   por cualquier motivo, incluyendo, sin limitación, si usted incumple estos Términos.
                 </p>
                 <p className="text-muted-foreground">
-                  Usted puede cancelar su cuenta en cualquier momento contactándonos. Tras la terminación, su derecho a 
+                  Usted puede cancelar su cuenta en cualquier momento contactándonos. Tras la terminación, su derecho a
                   usar el Servicio cesará inmediatamente.
                 </p>
               </section>
@@ -191,9 +191,9 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">11. Ley Aplicable y Jurisdicción</h2>
                 <p className="text-muted-foreground">
-                  Estos Términos se regirán e interpretarán de acuerdo con las leyes de la República Argentina, sin 
-                  considerar sus disposiciones sobre conflictos de leyes. Cualquier disputa que surja de o en conexión 
-                  con estos Términos será sometida a la jurisdicción exclusiva de los tribunales ordinarios de la 
+                  Estos Términos se regirán e interpretarán de acuerdo con las leyes de la República Argentina, sin
+                  considerar sus disposiciones sobre conflictos de leyes. Cualquier disputa que surja de o en conexión
+                  con estos Términos será sometida a la jurisdicción exclusiva de los tribunales ordinarios de la
                   Ciudad Autónoma de Buenos Aires, República Argentina.
                 </p>
               </section>
@@ -201,14 +201,14 @@ const Terminos = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">12. Disposiciones Generales</h2>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-                  <li><strong>Divisibilidad:</strong> Si alguna disposición de estos Términos es considerada inválida o 
-                  inaplicable, las restantes disposiciones continuarán en pleno vigor y efecto.</li>
-                  <li><strong>Renuncia:</strong> La falta de ejercicio de cualquier derecho establecido en estos Términos 
-                  no constituirá una renuncia a dicho derecho.</li>
-                  <li><strong>Cesión:</strong> Usted no puede ceder ni transferir estos Términos sin nuestro consentimiento 
-                  previo por escrito.</li>
-                  <li><strong>Acuerdo completo:</strong> Estos Términos constituyen el acuerdo completo entre usted y 
-                  ExpensaCheck respecto al uso del Servicio.</li>
+                  <li><strong>Divisibilidad:</strong> Si alguna disposición de estos Términos es considerada inválida o
+                    inaplicable, las restantes disposiciones continuarán en pleno vigor y efecto.</li>
+                  <li><strong>Renuncia:</strong> La falta de ejercicio de cualquier derecho establecido en estos Términos
+                    no constituirá una renuncia a dicho derecho.</li>
+                  <li><strong>Cesión:</strong> Usted no puede ceder ni transferir estos Términos sin nuestro consentimiento
+                    previo por escrito.</li>
+                  <li><strong>Acuerdo completo:</strong> Estos Términos constituyen el acuerdo completo entre usted y
+                    ExpensaCheck respecto al uso del Servicio.</li>
                 </ul>
               </section>
 

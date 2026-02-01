@@ -8,8 +8,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { 
-  CheckCircle2, 
+import {
+  CheckCircle2,
   ArrowLeft,
   TrendingUp,
   TrendingDown,
@@ -65,51 +65,51 @@ const expenseData = {
   total: 125800,
   previousTotal: 98500,
   categories: [
-    { 
-      name: "Sueldo encargado", 
-      icon: Users, 
-      current: 52000, 
-      previous: 45000, 
+    {
+      name: "Sueldo encargado",
+      icon: Users,
+      current: 52000,
+      previous: 45000,
       status: "ok" as const,
       explanation: "Aumento del 15.5% por paritarias. Dentro de lo esperado."
     },
-    { 
-      name: "Electricidad", 
-      icon: Zap, 
-      current: 28500, 
-      previous: 18200, 
+    {
+      name: "Electricidad",
+      icon: Zap,
+      current: 28500,
+      previous: 18200,
       status: "attention" as const,
       explanation: "Subió un 56%. Coincide con el aumento de tarifas de noviembre."
     },
-    { 
-      name: "Agua", 
-      icon: Droplets, 
-      current: 12300, 
-      previous: 11800, 
+    {
+      name: "Agua",
+      icon: Droplets,
+      current: 12300,
+      previous: 11800,
       status: "ok" as const,
       explanation: "Variación mínima del 4.2%."
     },
-    { 
-      name: "Mantenimiento", 
-      icon: Wrench, 
-      current: 18500, 
-      previous: 12000, 
+    {
+      name: "Mantenimiento",
+      icon: Wrench,
+      current: 18500,
+      previous: 12000,
       status: "attention" as const,
       explanation: "Reparación del portón eléctrico incluida este mes."
     },
-    { 
-      name: "Seguro", 
-      icon: Shield, 
-      current: 8200, 
-      previous: 7500, 
+    {
+      name: "Seguro",
+      icon: Shield,
+      current: 8200,
+      previous: 7500,
       status: "ok" as const,
       explanation: "Ajuste anual del 9.3%."
     },
-    { 
-      name: "Administración", 
-      icon: Building, 
-      current: 6300, 
-      previous: 4000, 
+    {
+      name: "Administración",
+      icon: Building,
+      current: 6300,
+      previous: 4000,
       status: "attention" as const,
       explanation: "Aumento del 57.5%. Verificar con la administración."
     },
@@ -155,7 +155,7 @@ const Ejemplo = () => {
                 📋 Este es un ejemplo de análisis
               </Badge>
             </div>
-            
+
             {/* Summary Card */}
             <Card variant="glass" className="mb-8 animate-fade-in-up">
               <CardContent className="p-6 md:p-8">
@@ -187,7 +187,7 @@ const Ejemplo = () => {
                       </Tooltip>
                     </div>
                     <p className="text-muted-foreground text-sm max-w-lg">
-                      Tu expensa tiene algunos aumentos que merecen atención. 
+                      Tu expensa tiene algunos aumentos que merecen atención.
                       A continuación te explicamos cada uno de forma clara.
                     </p>
                   </div>
@@ -212,11 +212,11 @@ const Ejemplo = () => {
                 {expenseData.categories.map((category, index) => {
                   const change = calculateChange(category.current, category.previous);
                   const Icon = category.icon;
-                  
+
                   return (
-                    <Card 
-                      key={category.name} 
-                      variant="default" 
+                    <Card
+                      key={category.name}
+                      variant="default"
                       className="animate-fade-in-up overflow-hidden"
                       style={{ animationDelay: `${index * 0.1}s` }}
                     >
@@ -224,20 +224,18 @@ const Ejemplo = () => {
                         <div className="flex flex-col md:flex-row">
                           <div className="flex-1 p-5 md:p-6">
                             <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
-                              }`}>
-                                <Icon className={`w-6 h-6 ${
-                                  category.status === "attention" ? "text-status-attention" : "text-status-ok"
-                                }`} />
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                                }`}>
+                                <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                  }`} />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-1">
                                   <h3 className="font-semibold">{category.name}</h3>
                                   <Tooltip>
                                     <TooltipTrigger asChild>
-                                      <Badge 
-                                        variant={category.status} 
+                                      <Badge
+                                        variant={category.status}
                                         className="cursor-help transition-transform hover:scale-105"
                                       >
                                         {category.status === "ok" ? "OK" : "Revisar"}
@@ -263,9 +261,8 @@ const Ejemplo = () => {
                               <p className="text-xs text-muted-foreground mb-0.5">Este mes</p>
                               <p className="text-lg font-bold">{formatCurrency(category.current)}</p>
                             </div>
-                            <div className={`flex items-center gap-1 text-sm font-medium ${
-                              change > 20 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
-                            }`}>
+                            <div className={`flex items-center gap-1 text-sm font-medium ${change > 20 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                              }`}>
                               {change > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                               {change > 0 ? "+" : ""}{change.toFixed(1)}%
                             </div>
@@ -288,8 +285,8 @@ const Ejemplo = () => {
                   <div>
                     <h3 className="font-semibold mb-1">¿Qué significa "Revisar"?</h3>
                     <p className="text-sm text-muted-foreground">
-                      Los ítems marcados como "Revisar" tuvieron aumentos mayores al promedio. 
-                      No significa que sean incorrectos, pero vale la pena verificarlos con 
+                      Los ítems marcados como "Revisar" tuvieron aumentos mayores al promedio.
+                      No significa que sean incorrectos, pero vale la pena verificarlos con
                       la administración o las actas del consorcio.
                     </p>
                   </div>
@@ -302,7 +299,7 @@ const Ejemplo = () => {
               <CardContent className="p-8 text-center">
                 <h2 className="text-xl font-bold mb-2">¿Querés analizar tu propia expensa?</h2>
                 <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-                  Subí el PDF o imagen de tu liquidación y recibí un análisis 
+                  Subí el PDF de tu liquidación y recibí un análisis
                   personalizado en menos de 1 minuto.
                 </p>
                 <Button asChild variant="hero" size="lg">

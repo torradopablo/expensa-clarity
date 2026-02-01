@@ -250,7 +250,7 @@ const HowItWorksSection = () => {
     {
       icon: Upload,
       title: "Subí la expensa",
-      description: "Cargá el PDF o imagen de la liquidación. Funciona para tu edificio o los que administrás."
+      description: "Cargá el PDF de la liquidación. Funciona para tu edificio o los que administrás."
     },
     {
       icon: BarChart3,
