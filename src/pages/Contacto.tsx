@@ -82,17 +82,40 @@ const Contacto = () => {
   const onSubmit = async (data: ContactFormData) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke("send-contact-email", {
+      const { data: response, error } = await supabase.functions.invoke("send-contact-email", {
         body: data,
       });
 
-      if (error) throw error;
+      if (error) {
+        // If the error response has detail, use it
+        const errorDetail = error instanceof Error ? error.message : (typeof error === 'object' ? JSON.stringify(error) : String(error));
+        throw new Error(errorDetail);
+      }
 
       setIsSubmitted(true);
       toast.success("¡Mensaje enviado correctamente!");
     } catch (error: any) {
       console.error("Error sending contact form:", error);
-      toast.error("Error al enviar el mensaje. Por favor, intentá de nuevo.");
+
+      let errorMessage = "Error al enviar el mensaje.";
+      console.log("Full error caught:", error);
+
+      const errorStr = error.message || "";
+
+      if (errorStr.includes("RESEND_API_KEY_MISSING")) {
+        errorMessage = "Configuración incompleta: Falta la clave RESEND_API_KEY en Supabase.";
+      } else if (errorStr.includes("ADMIN_DELIVERY_FAILED")) {
+        if (errorStr.includes("verify your domain") || errorStr.includes("Trial mode")) {
+          errorMessage = "Restricción de Resend: El destinatario no está verificado en tu cuenta gratuita.";
+        } else {
+          errorMessage = "Error de entrega: " + (errorStr.split("ADMIN_DELIVERY_FAILED: ")[1] || "Error en el servidor de correo.");
+        }
+      }
+
+      toast.error(errorMessage, {
+        description: "Revisá los logs de Supabase o verificá tu cuenta de Resend.",
+        duration: 8000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -236,9 +259,9 @@ const Contacto = () => {
                         <FormItem className="hidden" aria-hidden="true">
                           <FormLabel>Leave this empty</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              tabIndex={-1} 
+                            <Input
+                              {...field}
+                              tabIndex={-1}
                               autoComplete="off"
                             />
                           </FormControl>
