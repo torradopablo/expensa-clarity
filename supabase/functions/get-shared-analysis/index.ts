@@ -144,11 +144,12 @@ serve(async (req) => {
       )
     }
 
-    // Get historical data for the same building
+    // Get ALL historical data for the same building AND user to find the previous period and build consistent evolution
     const { data: historicalData, error: historicalError } = await supabase
       .from('expense_analyses')
       .select('id, period, total_amount, created_at, period_date')
       .eq('building_name', analysis.building_name)
+      .eq('user_id', analysis.user_id)
       .order('period_date', { ascending: true, nullsFirst: false })
 
     if (historicalError) {
@@ -192,11 +193,6 @@ serve(async (req) => {
       }
     }
 
-    // Get evolution data (inflation and buildings comparison)
-    const evolutionData: EvolutionDataPoint[] = []
-    let deviation: Deviation | null = null
-    let buildingsTrendStats: BuildingsTrendStats | null = null
-
     // Fetch inflation data
     let inflationData = null
     try {
@@ -210,7 +206,7 @@ serve(async (req) => {
           },
         }
       )
-      
+
       if (inflationResponse.ok) {
         const result = await inflationResponse.json()
         if (result.data) {
@@ -228,10 +224,28 @@ serve(async (req) => {
       .neq('building_name', analysis.building_name)
       .order('period_date', { ascending: true, nullsFirst: false })
 
+    // Limit historical data to 15 periods ending at the current analysis
+    let slicedHistoricalData = historicalData || []
+    if (slicedHistoricalData.length > 0) {
+      const currentIdx = slicedHistoricalData.findIndex((h: any) => h.id === analysis.id)
+      if (currentIdx !== -1) {
+        const startIdx = Math.max(0, currentIdx - 14) // 15 periods total including current
+        slicedHistoricalData = slicedHistoricalData.slice(startIdx, currentIdx + 1)
+      } else {
+        // If not found (shouldn't happen), take last 15
+        slicedHistoricalData = slicedHistoricalData.slice(-15)
+      }
+    }
+
+    // Get evolution data (inflation and buildings comparison)
+    const evolutionData: EvolutionDataPoint[] = []
+    let deviation: Deviation | null = null
+    let buildingsTrendStats: BuildingsTrendStats | null = null
+
     // Calculate evolution data if we have historical data
-    if (historicalData && historicalData.length >= 2) {
-      const baseTotal = historicalData[0].total_amount
-      
+    if (slicedHistoricalData && slicedHistoricalData.length >= 2) {
+      const baseTotal = slicedHistoricalData[0].total_amount
+
       // Create inflation map
       const inflationMap = new Map<string, { value: number; is_estimated: boolean }>()
       if (inflationData) {
@@ -243,8 +257,11 @@ serve(async (req) => {
       // Helper to get YYYY-MM from period_date or parse from period string
       const getYYYYMM = (periodDate: string | null, period: string): string | null => {
         if (periodDate) {
-          const date = new Date(periodDate)
-          return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+          // Direct extraction from YYYY-MM-DD string to avoid timezone issues
+          const parts = periodDate.split('-');
+          if (parts.length >= 2) {
+            return `${parts[0]}-${parts[1].padStart(2, '0')}`;
+          }
         }
         // Check if period is already in YYYY-MM format
         if (/^\d{4}-\d{2}$/.test(period)) {
@@ -266,47 +283,49 @@ serve(async (req) => {
         return null
       }
 
-      // Find base inflation value for first period
-      const firstPeriodData = historicalData[0]
+      // Find base inflation value for first sliced period
+      const firstPeriodData = slicedHistoricalData[0]
       const firstPeriodYYYYMM = getYYYYMM(firstPeriodData.period_date, firstPeriodData.period)
-      const baseInflation = firstPeriodYYYYMM ? inflationMap.get(firstPeriodYYYYMM) : null
+      const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null
 
       // Calculate other buildings average by period
       const buildingsAvgByPeriod = new Map<string, number[]>()
       if (otherBuildingsData) {
         otherBuildingsData.forEach(b => {
-          if (!buildingsAvgByPeriod.has(b.period)) {
-            buildingsAvgByPeriod.set(b.period, [])
+          // Use the same getYYYYMM for matching period property across all analyses
+          const pKey = b.period;
+          if (!buildingsAvgByPeriod.has(pKey)) {
+            buildingsAvgByPeriod.set(pKey, [])
           }
-          buildingsAvgByPeriod.get(b.period)!.push(b.total_amount)
+          buildingsAvgByPeriod.get(pKey)!.push(b.total_amount)
         })
       }
 
       // Get first period averages for other buildings
-      const firstPeriod = historicalData[0].period
-      const firstPeriodOtherBuildings = buildingsAvgByPeriod.get(firstPeriod)
-      const baseOtherBuildings = firstPeriodOtherBuildings && firstPeriodOtherBuildings.length > 0
-        ? firstPeriodOtherBuildings.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildings.length
+      const firstPeriod = slicedHistoricalData[0].period
+      const firstPeriodOtherBuildingsArr = buildingsAvgByPeriod.get(firstPeriod)
+      const baseOtherBuildings = firstPeriodOtherBuildingsArr && firstPeriodOtherBuildingsArr.length > 0
+        ? firstPeriodOtherBuildingsArr.reduce((a, b) => a + b, 0) / firstPeriodOtherBuildingsArr.length
         : null
 
-      const evolution: EvolutionDataPoint[] = historicalData.map((h) => {
-        const userPercent = ((h.total_amount - baseTotal) / baseTotal) * 100
-        
+      const evolution: EvolutionDataPoint[] = slicedHistoricalData.map((h) => {
+        const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0
+
         // Calculate inflation percent change from base
         let inflationPercent: number | null = null
         let inflationEstimated = false
-        
+
         const periodYYYYMM = getYYYYMM(h.period_date, h.period)
-        if (periodYYYYMM && baseInflation) {
+        if (periodYYYYMM && baseInflation !== null) {
           const inflationItem = inflationMap.get(periodYYYYMM)
           if (inflationItem) {
             inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100
             inflationEstimated = inflationItem.is_estimated
           }
         }
-        
+
         let buildingsPercent: number | null = null
-        if (baseOtherBuildings) {
+        if (baseOtherBuildings !== null) {
           const periodBuildings = buildingsAvgByPeriod.get(h.period)
           if (periodBuildings && periodBuildings.length > 0) {
             const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length
@@ -328,13 +347,13 @@ serve(async (req) => {
       // Calculate deviation for latest period
       const latestEvolution = evolution[evolution.length - 1]
       if (latestEvolution) {
-        const fromInflation = latestEvolution.inflationPercent !== null 
-          ? latestEvolution.userPercent - latestEvolution.inflationPercent 
+        const fromInflation = latestEvolution.inflationPercent !== null
+          ? latestEvolution.userPercent - latestEvolution.inflationPercent
           : 0
-        const fromBuildings = latestEvolution.buildingsPercent !== null 
-          ? latestEvolution.userPercent - latestEvolution.buildingsPercent 
+        const fromBuildings = latestEvolution.buildingsPercent !== null
+          ? latestEvolution.userPercent - latestEvolution.buildingsPercent
           : 0
-        
+
         deviation = {
           fromInflation,
           fromBuildings,
@@ -357,7 +376,7 @@ serve(async (req) => {
     const responseData = {
       analysis,
       categories: enrichedCategories,
-      historicalData: historicalData || [],
+      historicalData: slicedHistoricalData || [],
       evolutionData,
       deviation,
       buildingsTrendStats

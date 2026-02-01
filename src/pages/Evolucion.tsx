@@ -250,7 +250,10 @@ const Evolucion = () => {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
-    return sorted.map(a => {
+    // Limit to latest 15 periods
+    const sliced = sorted.slice(-15);
+
+    return sliced.map(a => {
       let amount = a.total_amount;
 
       if (selectedCategory !== "all") {
@@ -267,66 +270,86 @@ const Evolucion = () => {
     });
   }, [analyses, selectedBuilding, selectedCategory]);
 
-  // Create comparison chart data
-  const comparisonData = useMemo((): ComparisonDataPoint[] => {
-    if (chartData.length === 0) return [];
+  // Calculate evolutionary comparison data
+  const comparisonData = useMemo(() => {
+    if (chartData.length < 2) return [];
 
-    const baseUserValue = chartData[0].total;
+    const baseTotal = chartData[0].total;
 
-    // Prevent division by zero
-    if (baseUserValue === 0) return [];
-
-    const inflationMap = new Map(inflationData.map(d => [d.period, d]));
-    const buildingsMap = new Map(buildingsTrend.map(d => [d.period, d]));
+    // Create inflation map
+    const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+    if (inflationData) {
+      inflationData.forEach(inf => {
+        inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
+      });
+    }
 
     // Helper to get YYYY-MM from period_date or parse from period string
     const getYYYYMM = (periodDate: string | null, period: string): string | null => {
       if (periodDate) {
-        const date = new Date(periodDate);
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+        // Direct extraction from YYYY-MM-DD string to avoid timezone issues
+        const parts = periodDate.split('-');
+        if (parts.length >= 2) {
+          return `${parts[0]}-${parts[1].padStart(2, '0')}`;
+        }
       }
-      return periodToYYYYMM(period);
+      // Check if period is already in YYYY-MM format
+      if (/^\d{4}-\d{2}$/.test(period)) {
+        return period;
+      }
+      // Parse Spanish period like "enero 2024"
+      const monthsEs: Record<string, number> = {
+        enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
+        julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
+      };
+      const parts = period.toLowerCase().trim().split(/\s+/);
+      if (parts.length >= 2) {
+        const month = monthsEs[parts[0]];
+        if (month !== undefined) {
+          const year = parseInt(parts[1]) || new Date().getFullYear();
+          return `${year}-${String(month + 1).padStart(2, '0')}`;
+        }
+      }
+      return null;
     };
 
     // Find base inflation value for the first user period
     const firstUserPeriodYYYYMM = getYYYYMM(chartData[0].periodDate, chartData[0].period);
-    const baseInflation = firstUserPeriodYYYYMM ? inflationMap.get(firstUserPeriodYYYYMM) : null;
+    const baseInflation = firstUserPeriodYYYYMM ? (inflationMap.get(firstUserPeriodYYYYMM) ?? null) : null;
 
     // Find base buildings value - use period matching for more accurate comparison
     const baseBuildingsData = buildingsTrend.find(b => b.period === chartData[0].period);
-    const baseNormalizedPercent = baseBuildingsData?.normalizedPercent ?? 0;
+    const baseBuildingsAverage = baseBuildingsData?.average ?? null;
 
-    return chartData.map((item) => {
-      // Calculate user percent change from base
-      const userPercent = ((item.total - baseUserValue) / baseUserValue) * 100;
-
-      const periodYYYYMM = getYYYYMM(item.periodDate, item.period);
-      const inflationItem = periodYYYYMM ? inflationMap.get(periodYYYYMM) : null;
+    return chartData.map(d => {
+      const userPercent = baseTotal > 0 ? ((d.total - baseTotal) / baseTotal) * 100 : 0;
 
       let inflationPercent: number | null = null;
       let inflationEstimated = false;
 
-      if (inflationItem && baseInflation) {
-        // Calculate inflation percent change from base (same normalization as user)
-        inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
-        inflationEstimated = inflationItem.is_estimated;
+      const periodYYYYMM = getYYYYMM(d.periodDate, d.period);
+      if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+        const inflationItem = inflationMap.get(periodYYYYMM);
+        if (inflationItem) {
+          inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+          inflationEstimated = inflationItem.is_estimated;
+        }
       }
 
-      const buildingsItem = buildingsMap.get(item.period);
       let buildingsPercent: number | null = null;
-
-      if (buildingsItem && typeof buildingsItem.normalizedPercent === 'number') {
-        // Calculate the relative change from base period
-        // This should give us the % change from the first period, matching userPercent calculation
-        buildingsPercent = buildingsItem.normalizedPercent - baseNormalizedPercent;
+      if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+        const buildingsItem = buildingsTrend.find(b => b.period === d.period);
+        if (buildingsItem) {
+          buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
+        }
       }
 
       return {
-        period: item.period,
+        period: d.period,
         userPercent,
         inflationPercent,
         inflationEstimated,
-        buildingsPercent,
+        buildingsPercent
       };
     });
   }, [chartData, inflationData, buildingsTrend]);

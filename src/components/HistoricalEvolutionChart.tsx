@@ -79,7 +79,20 @@ export const HistoricalEvolutionChart = ({
           return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
         });
 
-        setHistoricalData(sortedData);
+        // Limit to 15 periods ending at the current analysis
+        let slicedData = sortedData;
+        if (sortedData.length > 0) {
+          const currentIdx = sortedData.findIndex((h) => h.id === currentAnalysisId);
+          if (currentIdx !== -1) {
+            const startIdx = Math.max(0, currentIdx - 14); // 15 periods total including current
+            slicedData = sortedData.slice(startIdx, currentIdx + 1);
+          } else {
+            // Fallback to last 15 if for some reason current not found
+            slicedData = sortedData.slice(-15);
+          }
+        }
+
+        setHistoricalData(slicedData);
       } catch (error) {
         console.error("Error fetching historical data:", error);
       } finally {
@@ -107,17 +120,17 @@ export const HistoricalEvolutionChart = ({
   const min = Math.min(...totals);
   const max = Math.max(...totals);
   const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
-  const previousTotal = historicalData.length >= 2 
-    ? historicalData[historicalData.length - 2]?.total_amount 
+  const previousTotal = historicalData.length >= 2
+    ? historicalData[historicalData.length - 2]?.total_amount
     : null;
-  
-  const overallChange = previousTotal 
-    ? ((currentTotal - previousTotal) / previousTotal) * 100 
+
+  const overallChange = previousTotal
+    ? ((currentTotal - previousTotal) / previousTotal) * 100
     : null;
 
   const firstTotal = historicalData[0]?.total_amount;
-  const totalEvolution = firstTotal 
-    ? ((currentTotal - firstTotal) / firstTotal) * 100 
+  const totalEvolution = firstTotal
+    ? ((currentTotal - firstTotal) / firstTotal) * 100
     : null;
 
   return (
@@ -136,7 +149,7 @@ export const HistoricalEvolutionChart = ({
             </div>
           </div>
           {totalEvolution !== null && (
-            <Badge 
+            <Badge
               variant={totalEvolution > 0 ? "attention" : "ok"}
               className="flex items-center gap-1"
             >
