@@ -1,16 +1,15 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CheckCircle2, ArrowLeft } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+import { Logo } from "@/components/layout/ui/logo";
 
 const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
       </div>
@@ -41,13 +40,13 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">1. Introducción</h2>
                 <p className="text-muted-foreground mb-4">
-                  En ExpensaCheck ("nosotros", "nuestro", "la Plataforma") nos comprometemos a proteger su privacidad 
-                  y datos personales. Esta Política de Privacidad describe cómo recopilamos, usamos, almacenamos, 
+                  En ExpensaCheck ("nosotros", "nuestro", "la Plataforma") nos comprometemos a proteger su privacidad
+                  y datos personales. Esta Política de Privacidad describe cómo recopilamos, usamos, almacenamos,
                   protegemos y compartimos su información cuando utiliza nuestro servicio de análisis de expensas.
                 </p>
                 <p className="text-muted-foreground">
-                  Esta política cumple con la Ley de Protección de Datos Personales N° 25.326 de la República Argentina, 
-                  su Decreto Reglamentario N° 1558/2001, y las disposiciones de la Agencia de Acceso a la Información 
+                  Esta política cumple con la Ley de Protección de Datos Personales N° 25.326 de la República Argentina,
+                  su Decreto Reglamentario N° 1558/2001, y las disposiciones de la Agencia de Acceso a la Información
                   Pública (AAIP).
                 </p>
               </section>
@@ -55,7 +54,7 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">2. Responsable del Tratamiento</h2>
                 <p className="text-muted-foreground mb-4">
-                  El responsable del tratamiento de sus datos personales es ExpensaCheck. Para ejercer sus derechos 
+                  El responsable del tratamiento de sus datos personales es ExpensaCheck. Para ejercer sus derechos
                   o realizar consultas sobre el tratamiento de sus datos, puede contactarnos a través de nuestra{" "}
                   <Link to="/contacto" className="text-primary hover:underline">página de contacto</Link>.
                 </p>
@@ -63,7 +62,7 @@ const Privacidad = () => {
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">3. Datos que Recopilamos</h2>
-                
+
                 <h3 className="text-lg font-medium mb-3 mt-6">3.1 Datos proporcionados directamente por usted</h3>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2 mb-4">
                   <li><strong>Datos de registro:</strong> Dirección de correo electrónico, nombre (opcional), contraseña encriptada</li>
@@ -117,11 +116,11 @@ const Privacidad = () => {
 
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">6. Almacenamiento y Seguridad</h2>
-                
+
                 <h3 className="text-lg font-medium mb-3 mt-6">6.1 Ubicación de los datos</h3>
                 <p className="text-muted-foreground mb-4">
-                  Sus datos se almacenan en servidores seguros proporcionados por proveedores de infraestructura en la 
-                  nube de reconocida reputación. Los servidores pueden estar ubicados fuera de Argentina, en jurisdicciones 
+                  Sus datos se almacenan en servidores seguros proporcionados por proveedores de infraestructura en la
+                  nube de reconocida reputación. Los servidores pueden estar ubicados fuera de Argentina, en jurisdicciones
                   que cuentan con niveles de protección de datos adecuados o mediante cláusulas contractuales estándar.
                 </p>
 
@@ -149,14 +148,14 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">7. Compartición de Datos</h2>
                 <p className="text-muted-foreground mb-4">
-                  <strong>No vendemos, alquilamos ni comercializamos sus datos personales.</strong> Podemos compartir 
+                  <strong>No vendemos, alquilamos ni comercializamos sus datos personales.</strong> Podemos compartir
                   información en los siguientes casos limitados:
                 </p>
                 <ul className="list-disc pl-6 text-muted-foreground space-y-2">
-                  <li><strong>Proveedores de servicios:</strong> Procesadores de pago (MercadoPago), servicios de infraestructura 
-                  en la nube, servicios de análisis, bajo acuerdos de confidencialidad</li>
-                  <li><strong>Servicios de IA:</strong> Para procesar documentos utilizamos servicios de inteligencia artificial. 
-                  Los documentos se procesan de forma segura y no se utilizan para entrenar modelos de terceros</li>
+                  <li><strong>Proveedores de servicios:</strong> Procesadores de pago (MercadoPago), servicios de infraestructura
+                    en la nube, servicios de análisis, bajo acuerdos de confidencialidad</li>
+                  <li><strong>Servicios de IA:</strong> Para procesar documentos utilizamos servicios de inteligencia artificial.
+                    Los documentos se procesan de forma segura y no se utilizan para entrenar modelos de terceros</li>
                   <li><strong>Requerimientos legales:</strong> Cuando sea requerido por ley, orden judicial o autoridad competente</li>
                   <li><strong>Protección de derechos:</strong> Para proteger nuestros derechos, seguridad o propiedad</li>
                   <li><strong>Transferencia de negocio:</strong> En caso de fusión, adquisición o venta de activos, con notificación previa</li>
@@ -174,7 +173,7 @@ const Privacidad = () => {
                   <li><strong>Cookies analíticas:</strong> Entender cómo utiliza el servicio para mejorarlo</li>
                 </ul>
                 <p className="text-muted-foreground">
-                  Puede gestionar las cookies a través de la configuración de su navegador. Tenga en cuenta que deshabilitar 
+                  Puede gestionar las cookies a través de la configuración de su navegador. Tenga en cuenta que deshabilitar
                   ciertas cookies puede afectar la funcionalidad del servicio.
                 </p>
               </section>
@@ -194,13 +193,13 @@ const Privacidad = () => {
                 </ul>
                 <p className="text-muted-foreground mb-4">
                   Para ejercer estos derechos, contáctenos a través de nuestra{" "}
-                  <Link to="/contacto" className="text-primary hover:underline">página de contacto</Link>. 
+                  <Link to="/contacto" className="text-primary hover:underline">página de contacto</Link>.
                   Responderemos a su solicitud dentro de los 10 días hábiles establecidos por ley.
                 </p>
                 <p className="text-muted-foreground">
-                  <strong>Nota:</strong> La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA, en su carácter de Órgano de Control 
-                  de la Ley N° 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes 
-                  resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección 
+                  <strong>Nota:</strong> La AGENCIA DE ACCESO A LA INFORMACIÓN PÚBLICA, en su carácter de Órgano de Control
+                  de la Ley N° 25.326, tiene la atribución de atender las denuncias y reclamos que interpongan quienes
+                  resulten afectados en sus derechos por incumplimiento de las normas vigentes en materia de protección
                   de datos personales.
                 </p>
               </section>
@@ -208,10 +207,10 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">10. Datos Sensibles</h2>
                 <p className="text-muted-foreground">
-                  No recopilamos intencionalmente datos sensibles según la definición de la Ley N° 25.326 (datos que 
-                  revelen origen racial y étnico, opiniones políticas, convicciones religiosas, filosóficas o morales, 
-                  afiliación sindical, información referente a la salud o a la vida sexual). Si sus documentos de 
-                  expensas contienen accidentalmente este tipo de información, será procesada únicamente para extraer 
+                  No recopilamos intencionalmente datos sensibles según la definición de la Ley N° 25.326 (datos que
+                  revelen origen racial y étnico, opiniones políticas, convicciones religiosas, filosóficas o morales,
+                  afiliación sindical, información referente a la salud o a la vida sexual). Si sus documentos de
+                  expensas contienen accidentalmente este tipo de información, será procesada únicamente para extraer
                   datos financieros relevantes y no será utilizada para ningún otro fin.
                 </p>
               </section>
@@ -219,8 +218,8 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">11. Menores de Edad</h2>
                 <p className="text-muted-foreground">
-                  El Servicio no está dirigido a menores de 18 años. No recopilamos intencionalmente información de 
-                  menores. Si detectamos que hemos recopilado datos de un menor sin consentimiento parental verificable, 
+                  El Servicio no está dirigido a menores de 18 años. No recopilamos intencionalmente información de
+                  menores. Si detectamos que hemos recopilado datos de un menor sin consentimiento parental verificable,
                   tomaremos medidas para eliminar dicha información.
                 </p>
               </section>
@@ -228,9 +227,9 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">12. Transferencias Internacionales</h2>
                 <p className="text-muted-foreground">
-                  Dado que utilizamos proveedores de servicios en la nube, sus datos pueden ser transferidos y 
-                  almacenados fuera de Argentina. En estos casos, nos aseguramos de que existan salvaguardas 
-                  apropiadas, como cláusulas contractuales estándar aprobadas, para proteger sus datos conforme 
+                  Dado que utilizamos proveedores de servicios en la nube, sus datos pueden ser transferidos y
+                  almacenados fuera de Argentina. En estos casos, nos aseguramos de que existan salvaguardas
+                  apropiadas, como cláusulas contractuales estándar aprobadas, para proteger sus datos conforme
                   a la legislación argentina.
                 </p>
               </section>
@@ -238,9 +237,9 @@ const Privacidad = () => {
               <section className="mb-8">
                 <h2 className="text-xl font-semibold mb-4">13. Cambios a esta Política</h2>
                 <p className="text-muted-foreground">
-                  Podemos actualizar esta Política de Privacidad periódicamente. Le notificaremos sobre cambios 
-                  materiales mediante un aviso en el Servicio o por correo electrónico. Le recomendamos revisar 
-                  esta política regularmente. La fecha de "última actualización" al inicio indica cuándo se 
+                  Podemos actualizar esta Política de Privacidad periódicamente. Le notificaremos sobre cambios
+                  materiales mediante un aviso en el Servicio o por correo electrónico. Le recomendamos revisar
+                  esta política regularmente. La fecha de "última actualización" al inicio indica cuándo se
                   realizó la última modificación.
                 </p>
               </section>
@@ -248,7 +247,7 @@ const Privacidad = () => {
               <section>
                 <h2 className="text-xl font-semibold mb-4">14. Contacto</h2>
                 <p className="text-muted-foreground">
-                  Si tiene preguntas, inquietudes o desea ejercer sus derechos respecto a esta Política de 
+                  Si tiene preguntas, inquietudes o desea ejercer sus derechos respecto a esta Política de
                   Privacidad o el tratamiento de sus datos personales, puede contactarnos a través de nuestra{" "}
                   <Link to="/contacto" className="text-primary hover:underline">página de contacto</Link>.
                 </p>

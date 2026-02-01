@@ -26,14 +26,14 @@ import { CheckCircle2, ArrowLeft, Send, Mail, MessageSquare } from "lucide-react
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
+import { Logo } from "@/components/layout/ui/logo";
+
 const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
       </div>
@@ -82,17 +82,40 @@ const Contacto = () => {
   const onSubmit = async (data: ContactFormData) => {
     setIsSubmitting(true);
     try {
-      const { error } = await supabase.functions.invoke("send-contact-email", {
+      const { data: response, error } = await supabase.functions.invoke("send-contact-email", {
         body: data,
       });
 
-      if (error) throw error;
+      if (error) {
+        // If the error response has detail, use it
+        const errorDetail = error instanceof Error ? error.message : (typeof error === 'object' ? JSON.stringify(error) : String(error));
+        throw new Error(errorDetail);
+      }
 
       setIsSubmitted(true);
       toast.success("¡Mensaje enviado correctamente!");
     } catch (error: any) {
       console.error("Error sending contact form:", error);
-      toast.error("Error al enviar el mensaje. Por favor, intentá de nuevo.");
+
+      let errorMessage = "Error al enviar el mensaje.";
+      console.log("Full error caught:", error);
+
+      const errorStr = error.message || "";
+
+      if (errorStr.includes("RESEND_API_KEY_MISSING")) {
+        errorMessage = "Configuración incompleta: Falta la clave RESEND_API_KEY en Supabase.";
+      } else if (errorStr.includes("ADMIN_DELIVERY_FAILED")) {
+        if (errorStr.includes("verify your domain") || errorStr.includes("Trial mode")) {
+          errorMessage = "Restricción de Resend: El destinatario no está verificado en tu cuenta gratuita.";
+        } else {
+          errorMessage = "Error de entrega: " + (errorStr.split("ADMIN_DELIVERY_FAILED: ")[1] || "Error en el servidor de correo.");
+        }
+      }
+
+      toast.error(errorMessage, {
+        description: "Revisá los logs de Supabase o verificá tu cuenta de Resend.",
+        duration: 8000,
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -236,9 +259,9 @@ const Contacto = () => {
                         <FormItem className="hidden" aria-hidden="true">
                           <FormLabel>Leave this empty</FormLabel>
                           <FormControl>
-                            <Input 
-                              {...field} 
-                              tabIndex={-1} 
+                            <Input
+                              {...field}
+                              tabIndex={-1}
                               autoComplete="off"
                             />
                           </FormControl>

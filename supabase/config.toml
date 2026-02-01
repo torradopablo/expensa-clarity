@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.get-shared-analysis]
 verify_jwt = false
+
+[functions.send-contact-email]
+verify_jwt = false
