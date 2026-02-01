@@ -43,6 +43,7 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
+import { formatPeriod, periodToYearMonth } from "@/services/formatters/date";
 import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { AnalysisNotes } from "@/components/AnalysisNotes";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
@@ -169,22 +170,14 @@ interface BuildingsTrendStats {
   usedFallback?: boolean;
 }
 
-const formatDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: 'numeric',
-    month: 'long',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(dateString));
-};
-
-const formatShortDate = (dateString: string) => {
-  return new Intl.DateTimeFormat('es-AR', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  }).format(new Date(dateString));
+const formatShortCurrency = (value: number) => {
+  if (value >= 1000000) {
+    return `$${(value / 1000000).toFixed(1)}M`;
+  }
+  if (value >= 1000) {
+    return `$${(value / 1000).toFixed(0)}k`;
+  }
+  return `$${value}`;
 };
 
 const AnalysisPage = () => {
@@ -352,38 +345,10 @@ const AnalysisPage = () => {
                 });
               }
 
-              // Helper to get YYYY-MM from period_date or parse from period string (same as Evolucion.tsx)
-              const getYYYYMM = (periodDate: string | null, period: string): string | null => {
-                if (periodDate) {
-                  // Direct extraction from YYYY-MM-DD string to avoid timezone issues
-                  const parts = periodDate.split('-');
-                  if (parts.length >= 2) {
-                    return `${parts[0]}-${parts[1].padStart(2, '0')}`;
-                  }
-                }
-                // Check if period is already in YYYY-MM format
-                if (/^\d{4}-\d{2}$/.test(period)) {
-                  return period;
-                }
-                // Parse Spanish period like "enero 2024"
-                const monthsEs: Record<string, number> = {
-                  enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-                  julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-                };
-                const parts = period.toLowerCase().trim().split(/\s+/);
-                if (parts.length >= 2) {
-                  const month = monthsEs[parts[0]];
-                  if (month !== undefined) {
-                    const year = parseInt(parts[1]) || new Date().getFullYear();
-                    return `${year}-${String(month + 1).padStart(2, '0')}`;
-                  }
-                }
-                return null;
-              };
-
               // Find base inflation value for the first sliced period (same as Evolucion.tsx)
               const firstSlicedPeriodData = slicedHistoricalAnalyses[0];
-              const firstSlicedPeriodYYYYMM = getYYYYMM(firstSlicedPeriodData.period_date, firstSlicedPeriodData.period);
+              const firstSlicedPeriodYYYYMM = periodToYearMonth(firstSlicedPeriodData.period, firstSlicedPeriodData.period_date);
+
               const baseInflation = firstSlicedPeriodYYYYMM ? (inflationMap.get(firstSlicedPeriodYYYYMM) ?? null) : null;
 
               // Calculate other buildings average by period
@@ -412,8 +377,8 @@ const AnalysisPage = () => {
                 let inflationPercent: number | null = null;
                 let inflationEstimated = false;
 
-                const periodYYYYMM = getYYYYMM(h.period_date, h.period);
-                if (periodYYYYMM && baseInflation !== null) {
+                const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
+                if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
                   const inflationItem = inflationMap.get(periodYYYYMM);
                   if (inflationItem) {
                     inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;

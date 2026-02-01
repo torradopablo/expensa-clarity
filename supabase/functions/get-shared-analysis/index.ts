@@ -1,5 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
+
+const MAX_HISTORICAL_PERIODS = 15;
 
 interface Category {
   id: string;
@@ -14,6 +17,7 @@ interface Category {
 interface Analysis {
   id: string;
   building_name: string | null;
+  user_id: string;
   period: string;
   unit: string | null;
   total_amount: number;
@@ -144,7 +148,7 @@ serve(async (req) => {
       )
     }
 
-    // Get ALL historical data for the same building AND user to find the previous period and build consistent evolution
+    // Get ALL historical data for same building and user to build consistent evolution
     const { data: historicalData, error: historicalError } = await supabase
       .from('expense_analyses')
       .select('id, period, total_amount, created_at, period_date')
@@ -160,7 +164,7 @@ serve(async (req) => {
       )
     }
 
-    // Enrich categories with previous period data if needed
+    // Enrich categories with previous period data
     let enrichedCategories = categories || []
     if (historicalData && historicalData.length > 1) {
       const currentIdx = historicalData.findIndex((h: any) => h.id === analysis.id)
@@ -229,24 +233,21 @@ serve(async (req) => {
     if (slicedHistoricalData.length > 0) {
       const currentIdx = slicedHistoricalData.findIndex((h: any) => h.id === analysis.id)
       if (currentIdx !== -1) {
-        const startIdx = Math.max(0, currentIdx - 14) // 15 periods total including current
+        const startIdx = Math.max(0, currentIdx - (MAX_HISTORICAL_PERIODS - 1))
         slicedHistoricalData = slicedHistoricalData.slice(startIdx, currentIdx + 1)
       } else {
-        // If not found (shouldn't happen), take last 15
-        slicedHistoricalData = slicedHistoricalData.slice(-15)
+        slicedHistoricalData = slicedHistoricalData.slice(-MAX_HISTORICAL_PERIODS)
       }
     }
 
-    // Get evolution data (inflation and buildings comparison)
+    // Calculate evolution data
     const evolutionData: EvolutionDataPoint[] = []
     let deviation: Deviation | null = null
     let buildingsTrendStats: BuildingsTrendStats | null = null
 
-    // Calculate evolution data if we have historical data
     if (slicedHistoricalData && slicedHistoricalData.length >= 2) {
       const baseTotal = slicedHistoricalData[0].total_amount
 
-      // Create inflation map
       const inflationMap = new Map<string, { value: number; is_estimated: boolean }>()
       if (inflationData) {
         inflationData.forEach((inf: any) => {
@@ -254,54 +255,19 @@ serve(async (req) => {
         })
       }
 
-      // Helper to get YYYY-MM from period_date or parse from period string
-      const getYYYYMM = (periodDate: string | null, period: string): string | null => {
-        if (periodDate) {
-          // Direct extraction from YYYY-MM-DD string to avoid timezone issues
-          const parts = periodDate.split('-');
-          if (parts.length >= 2) {
-            return `${parts[0]}-${parts[1].padStart(2, '0')}`;
-          }
-        }
-        // Check if period is already in YYYY-MM format
-        if (/^\d{4}-\d{2}$/.test(period)) {
-          return period
-        }
-        // Parse Spanish period like "enero 2024"
-        const monthsEs: Record<string, number> = {
-          enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-          julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-        }
-        const parts = period.toLowerCase().trim().split(/\s+/)
-        if (parts.length >= 2) {
-          const month = monthsEs[parts[0]]
-          if (month !== undefined) {
-            const year = parseInt(parts[1]) || new Date().getFullYear()
-            return `${year}-${String(month + 1).padStart(2, '0')}`
-          }
-        }
-        return null
-      }
-
-      // Find base inflation value for first sliced period
-      const firstPeriodData = slicedHistoricalData[0]
-      const firstPeriodYYYYMM = getYYYYMM(firstPeriodData.period_date, firstPeriodData.period)
+      const firstPeriodYYYYMM = periodToYearMonth(slicedHistoricalData[0].period, slicedHistoricalData[0].period_date)
       const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null
 
-      // Calculate other buildings average by period
       const buildingsAvgByPeriod = new Map<string, number[]>()
       if (otherBuildingsData) {
         otherBuildingsData.forEach(b => {
-          // Use the same getYYYYMM for matching period property across all analyses
-          const pKey = b.period;
-          if (!buildingsAvgByPeriod.has(pKey)) {
-            buildingsAvgByPeriod.set(pKey, [])
+          if (!buildingsAvgByPeriod.has(b.period)) {
+            buildingsAvgByPeriod.set(b.period, [])
           }
-          buildingsAvgByPeriod.get(pKey)!.push(b.total_amount)
+          buildingsAvgByPeriod.get(b.period)!.push(b.total_amount)
         })
       }
 
-      // Get first period averages for other buildings
       const firstPeriod = slicedHistoricalData[0].period
       const firstPeriodOtherBuildingsArr = buildingsAvgByPeriod.get(firstPeriod)
       const baseOtherBuildings = firstPeriodOtherBuildingsArr && firstPeriodOtherBuildingsArr.length > 0
@@ -311,12 +277,10 @@ serve(async (req) => {
       const evolution: EvolutionDataPoint[] = slicedHistoricalData.map((h) => {
         const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0
 
-        // Calculate inflation percent change from base
         let inflationPercent: number | null = null
         let inflationEstimated = false
-
-        const periodYYYYMM = getYYYYMM(h.period_date, h.period)
-        if (periodYYYYMM && baseInflation !== null) {
+        const periodYYYYMM = periodToYearMonth(h.period, h.period_date)
+        if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
           const inflationItem = inflationMap.get(periodYYYYMM)
           if (inflationItem) {
             inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100
@@ -325,7 +289,7 @@ serve(async (req) => {
         }
 
         let buildingsPercent: number | null = null
-        if (baseOtherBuildings !== null) {
+        if (baseOtherBuildings !== null && baseOtherBuildings > 0) {
           const periodBuildings = buildingsAvgByPeriod.get(h.period)
           if (periodBuildings && periodBuildings.length > 0) {
             const avgThisPeriod = periodBuildings.reduce((a, b) => a + b, 0) / periodBuildings.length
@@ -344,7 +308,6 @@ serve(async (req) => {
 
       evolutionData.push(...evolution)
 
-      // Calculate deviation for latest period
       const latestEvolution = evolution[evolution.length - 1]
       if (latestEvolution) {
         const fromInflation = latestEvolution.inflationPercent !== null
@@ -361,7 +324,6 @@ serve(async (req) => {
         }
       }
 
-      // Set buildings trend stats
       if (otherBuildingsData) {
         const uniqueBuildings = new Set(otherBuildingsData.map(b => b.building_name))
         const uniquePeriods = new Set(otherBuildingsData.map(b => b.period))
@@ -373,6 +335,7 @@ serve(async (req) => {
         }
       }
     }
+
     const responseData = {
       analysis,
       categories: enrichedCategories,

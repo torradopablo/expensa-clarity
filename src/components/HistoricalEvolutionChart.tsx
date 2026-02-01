@@ -71,24 +71,15 @@ export const HistoricalEvolutionChart = ({
 
         if (error) throw error;
 
-        // If no period_date, sort by created_at
-        const sortedData = (data || []).sort((a, b) => {
-          if (a.period_date && b.period_date) {
-            return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
-          }
-          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-        });
-
-        // Limit to 15 periods ending at the current analysis
-        let slicedData = sortedData;
-        if (sortedData.length > 0) {
-          const currentIdx = sortedData.findIndex((h) => h.id === currentAnalysisId);
+        // Limitar a los últimos 15 períodos terminando en el análisis actual
+        let slicedData = data || [];
+        if (slicedData.length > 0) {
+          const currentIdx = slicedData.findIndex((h) => h.id === currentAnalysisId);
           if (currentIdx !== -1) {
-            const startIdx = Math.max(0, currentIdx - 14); // 15 periods total including current
-            slicedData = sortedData.slice(startIdx, currentIdx + 1);
+            const startIdx = Math.max(0, currentIdx - 14); // 15 períodos total
+            slicedData = slicedData.slice(startIdx, currentIdx + 1);
           } else {
-            // Fallback to last 15 if for some reason current not found
-            slicedData = sortedData.slice(-15);
+            slicedData = slicedData.slice(-15);
           }
         }
 
@@ -101,7 +92,7 @@ export const HistoricalEvolutionChart = ({
     };
 
     fetchHistoricalData();
-  }, [buildingName]);
+  }, [buildingName, currentAnalysisId]);
 
   // Only show if there are at least 2 analyses
   if (isLoading || historicalData.length < 2) {

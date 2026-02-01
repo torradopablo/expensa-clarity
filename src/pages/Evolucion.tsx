@@ -1,5 +1,9 @@
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import {
+  formatPeriod,
+  periodToYearMonth
+} from "@/services/formatters/date";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -284,37 +288,8 @@ const Evolucion = () => {
       });
     }
 
-    // Helper to get YYYY-MM from period_date or parse from period string
-    const getYYYYMM = (periodDate: string | null, period: string): string | null => {
-      if (periodDate) {
-        // Direct extraction from YYYY-MM-DD string to avoid timezone issues
-        const parts = periodDate.split('-');
-        if (parts.length >= 2) {
-          return `${parts[0]}-${parts[1].padStart(2, '0')}`;
-        }
-      }
-      // Check if period is already in YYYY-MM format
-      if (/^\d{4}-\d{2}$/.test(period)) {
-        return period;
-      }
-      // Parse Spanish period like "enero 2024"
-      const monthsEs: Record<string, number> = {
-        enero: 0, febrero: 1, marzo: 2, abril: 3, mayo: 4, junio: 5,
-        julio: 6, agosto: 7, septiembre: 8, octubre: 9, noviembre: 10, diciembre: 11
-      };
-      const parts = period.toLowerCase().trim().split(/\s+/);
-      if (parts.length >= 2) {
-        const month = monthsEs[parts[0]];
-        if (month !== undefined) {
-          const year = parseInt(parts[1]) || new Date().getFullYear();
-          return `${year}-${String(month + 1).padStart(2, '0')}`;
-        }
-      }
-      return null;
-    };
-
     // Find base inflation value for the first user period
-    const firstUserPeriodYYYYMM = getYYYYMM(chartData[0].periodDate, chartData[0].period);
+    const firstUserPeriodYYYYMM = periodToYearMonth(chartData[0].period, chartData[0].periodDate);
     const baseInflation = firstUserPeriodYYYYMM ? (inflationMap.get(firstUserPeriodYYYYMM) ?? null) : null;
 
     // Find base buildings value - use period matching for more accurate comparison
@@ -327,7 +302,7 @@ const Evolucion = () => {
       let inflationPercent: number | null = null;
       let inflationEstimated = false;
 
-      const periodYYYYMM = getYYYYMM(d.periodDate, d.period);
+      const periodYYYYMM = periodToYearMonth(d.period, d.periodDate);
       if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
         const inflationItem = inflationMap.get(periodYYYYMM);
         if (inflationItem) {
