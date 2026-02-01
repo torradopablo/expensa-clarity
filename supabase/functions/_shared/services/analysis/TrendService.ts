@@ -8,6 +8,8 @@ export interface MarketTrendFilters {
     zone?: string;
     has_amenities?: boolean;
     category?: string;
+    excludeBuilding?: string;
+    excludeUserId?: string;
 }
 
 export class TrendService {
@@ -35,6 +37,7 @@ export class TrendService {
         period, 
         total_amount, 
         building_name, 
+        user_id,
         created_at,
         building_profile_id
         ${category ? ', expense_categories!inner(name, current_amount)' : ''}
@@ -119,7 +122,9 @@ export class TrendService {
 
 
             const matchingBuildingNames = new Set(
-                matchingProfiles.map((p: any) => p.building_name.toLowerCase().trim())
+                matchingProfiles
+                    .filter(p => p.building_name)
+                    .map((p: any) => p.building_name.toLowerCase().trim())
             );
 
             if (matchingBuildingNames.size > 0) {
@@ -146,7 +151,11 @@ export class TrendService {
             }
         }
 
-        const trendResult = ComparisonService.calculateBuildingsTrend(filteredAnalyses as any, undefined);
+        const trendResult = ComparisonService.calculateBuildingsTrend(
+            filteredAnalyses as any,
+            filters?.excludeBuilding,
+            filters?.excludeUserId
+        );
 
         // If category was used, we need to handle the amounts differently in calculateBuildingsTrend
         // or manually adjust it here. ComparisonService.calculateBuildingsTrend uses `total_amount`.

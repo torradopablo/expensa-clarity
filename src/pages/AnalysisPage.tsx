@@ -349,6 +349,10 @@ const AnalysisPage = () => {
               if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
             }
 
+            // Exclude current building only for current user
+            filters.excludeBuilding = analysisData.building_name;
+            filters.excludeUserId = session.user.id;
+
             const trendResponse = await fetch(
               `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
               {
