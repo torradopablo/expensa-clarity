@@ -2,17 +2,18 @@ import { useState, useCallback, useEffect } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  CheckCircle2, 
-  Upload, 
-  FileText, 
+import {
+  CheckCircle2,
+  Upload,
+  FileText,
   ArrowLeft,
   ArrowRight,
   X,
   Loader2,
   CreditCard,
   LogOut,
-  AlertCircle
+  AlertCircle,
+  User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -48,13 +49,17 @@ const Header = () => {
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         {user && (
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-muted-foreground hidden sm:block">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground hidden sm:block mr-2">
               {user.email}
             </span>
-            <Button variant="ghost" size="sm" onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Salir
+            <Button asChild variant="ghost" size="icon" title="Mi Perfil">
+              <Link to="/perfil">
+                <User className="w-4 h-4" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
+              <LogOut className="w-4 h-4" />
             </Button>
           </div>
         )}
@@ -74,12 +79,11 @@ const Stepper = ({ currentStep }: { currentStep: number }) => (
     {steps.map((step, index) => (
       <div key={step.number} className="flex items-center">
         <div className="flex flex-col items-center">
-          <div 
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
-              currentStep >= step.number 
-                ? "bg-gradient-hero text-primary-foreground" 
-                : "bg-muted text-muted-foreground"
-            }`}
+          <div
+            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${currentStep >= step.number
+              ? "bg-gradient-hero text-primary-foreground"
+              : "bg-muted text-muted-foreground"
+              }`}
           >
             {currentStep > step.number ? (
               <CheckCircle2 className="w-5 h-5" />
@@ -95,10 +99,9 @@ const Stepper = ({ currentStep }: { currentStep: number }) => (
           </div>
         </div>
         {index < steps.length - 1 && (
-          <div 
-            className={`w-16 sm:w-24 h-0.5 mx-4 transition-all ${
-              currentStep > step.number ? "bg-primary" : "bg-muted"
-            }`}
+          <div
+            className={`w-16 sm:w-24 h-0.5 mx-4 transition-all ${currentStep > step.number ? "bg-primary" : "bg-muted"
+              }`}
           />
         )}
       </div>
@@ -106,13 +109,13 @@ const Stepper = ({ currentStep }: { currentStep: number }) => (
   </div>
 );
 
-const UploadStep = ({ 
-  file, 
-  onFileSelect, 
-  onFileRemove, 
+const UploadStep = ({
+  file,
+  onFileSelect,
+  onFileRemove,
   onNext,
   isUploading
-}: { 
+}: {
   file: File | null;
   onFileSelect: (file: File) => void;
   onFileRemove: () => void;
@@ -159,11 +162,10 @@ const UploadStep = ({
         <CardContent className="space-y-6">
           {!file ? (
             <label
-              className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
-                isDragging 
-                  ? "border-primary bg-primary-soft" 
-                  : "border-border hover:border-primary hover:bg-muted/50"
-              }`}
+              className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${isDragging
+                ? "border-primary bg-primary-soft"
+                : "border-border hover:border-primary hover:bg-muted/50"
+                }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
               onDrop={handleDrop}
@@ -209,7 +211,7 @@ const UploadStep = ({
               </Button>
             </div>
           )}
-          
+
           <div className="flex justify-between items-center pt-4">
             <Button variant="ghost" asChild>
               <Link to="/">
@@ -217,8 +219,8 @@ const UploadStep = ({
                 Volver
               </Link>
             </Button>
-            <Button 
-              variant="hero" 
+            <Button
+              variant="hero"
               size="lg"
               disabled={!file || isUploading}
               onClick={onNext}
@@ -242,13 +244,13 @@ const UploadStep = ({
   );
 };
 
-const PaymentStep = ({ 
-  onBack, 
+const PaymentStep = ({
+  onBack,
   onNext,
   isProcessing,
   isFreeAnalysis = false,
   isFirstAnalysis = false
-}: { 
+}: {
   onBack: () => void;
   onNext: () => void;
   isProcessing: boolean;
@@ -260,17 +262,17 @@ const PaymentStep = ({
       <Card variant="elevated">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl">
-            {isFreeAnalysis 
+            {isFreeAnalysis
               ? (isFirstAnalysis ? "¡Tu primer análisis es gratis!" : "Análisis gratuito")
               : "Confirmar pago"
             }
           </CardTitle>
           <CardDescription>
-            {isFreeAnalysis 
-              ? (isFirstAnalysis 
-                  ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $1.500 ARS."
-                  : "Tu análisis es gratis"
-                )
+            {isFreeAnalysis
+              ? (isFirstAnalysis
+                ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $1.500 ARS."
+                : "Tu análisis es gratis"
+              )
               : "Pago único y seguro con Mercado Pago"
             }
           </CardDescription>
@@ -284,7 +286,7 @@ const PaymentStep = ({
                   {isFirstAnalysis ? "🎉 Promoción: primer análisis gratis" : "Análisis gratuito"}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  {isFirstAnalysis 
+                  {isFirstAnalysis
                     ? "Aprovechá esta oportunidad para conocer nuestro servicio."
                     : "Tenés acceso a análisis sin costo."
                   }
@@ -335,14 +337,14 @@ const PaymentStep = ({
               </li>
             ))}
           </ul>
-          
+
           <div className="flex justify-between items-center pt-4">
             <Button variant="ghost" onClick={onBack} disabled={isProcessing}>
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver
             </Button>
-            <Button 
-              variant="hero" 
+            <Button
+              variant="hero"
               size="lg"
               onClick={onNext}
               disabled={isProcessing}
@@ -385,7 +387,7 @@ const ProcessingStep = () => (
             "Identificando categorías de gastos",
             "Generando reporte visual"
           ].map((step, index) => (
-            <div 
+            <div
               key={index}
               className="flex items-center gap-3 text-sm text-muted-foreground animate-fade-in"
               style={{ animationDelay: `${index * 0.5}s` }}
@@ -400,11 +402,11 @@ const ProcessingStep = () => (
   </div>
 );
 
-const PaymentSuccessHandler = ({ 
-  analysisId, 
+const PaymentSuccessHandler = ({
+  analysisId,
   file,
-  onProcessingComplete 
-}: { 
+  onProcessingComplete
+}: {
   analysisId: string;
   file: File | null;
   onProcessingComplete: (id: string) => void;
@@ -544,7 +546,7 @@ const Analizar = () => {
           setIsFreeAnalysis(true);
         }
       }
-      
+
       setIsLoading(false);
     };
 
@@ -579,7 +581,7 @@ const Analizar = () => {
           setIsFreeAnalysis(true);
         }
       }
-      
+
       setIsLoading(false);
     });
 
@@ -679,7 +681,7 @@ const Analizar = () => {
         // Store file temporarily before redirect
         // Note: The file object itself can't be persisted across page loads
         // After payment, user will need to re-upload if they closed the tab
-        
+
         // Redirect to Mercado Pago checkout
         window.location.href = data.initPoint;
       } else {
@@ -707,7 +709,7 @@ const Analizar = () => {
       <main className="pt-32 pb-20">
         <div className="container">
           <Stepper currentStep={currentStep} />
-          
+
           {currentStep === 1 && !showPaymentSuccess && (
             <UploadStep
               file={file}
@@ -717,7 +719,7 @@ const Analizar = () => {
               isUploading={isUploading}
             />
           )}
-          
+
           {currentStep === 2 && !showPaymentSuccess && (
             <PaymentStep
               onBack={() => setCurrentStep(1)}
@@ -727,7 +729,7 @@ const Analizar = () => {
               isFirstAnalysis={isFirstAnalysis}
             />
           )}
-          
+
           {currentStep === 3 && showPaymentSuccess && analysisId && (
             <PaymentSuccessHandler
               analysisId={analysisId}

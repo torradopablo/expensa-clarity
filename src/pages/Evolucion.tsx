@@ -26,6 +26,10 @@ import {
   Calendar,
   RefreshCw,
   Sparkles,
+  Plus,
+  Filter,
+  X,
+  User
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -61,7 +65,12 @@ const Header = () => {
           <Button asChild variant="outline" size="sm">
             <Link to="/historial">Ver historial</Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
+            <Link to="/perfil">
+              <User className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>

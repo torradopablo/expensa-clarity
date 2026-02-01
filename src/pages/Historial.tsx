@@ -38,7 +38,8 @@ import {
   ArrowLeftRight,
   Trash2,
   LineChart,
-  Search
+  Search,
+  User
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -62,13 +63,18 @@ const Header = () => {
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         <div className="flex items-center gap-2">
-          <Button asChild>
+          <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
             <Link to="/analizar">
               <Plus className="w-4 h-4 mr-2" />
               Nueva expensa
             </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
+          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
+            <Link to="/perfil">
+              <User className="w-4 h-4" />
+            </Link>
+          </Button>
+          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
             <LogOut className="w-4 h-4" />
           </Button>
         </div>
