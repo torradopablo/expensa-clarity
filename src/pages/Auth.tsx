@@ -183,15 +183,15 @@ const Auth = () => {
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-xs text-muted-foreground mt-6 px-4">
           Al continuar, aceptás nuestros{" "}
-          <a href="#" className="underline hover:text-foreground">
+          <Link to="/terminos" className="underline hover:text-foreground">
             Términos de Servicio
-          </a>{" "}
+          </Link>{" "}
           y{" "}
-          <a href="#" className="underline hover:text-foreground">
+          <Link to="/privacidad" className="underline hover:text-foreground">
             Política de Privacidad
-          </a>
+          </Link>
         </p>
       </div>
     </div>
