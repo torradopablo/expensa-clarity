@@ -7,7 +7,10 @@ export const UUIDSchema = z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}
 export const EmailSchema = z.string().email("Invalid email format");
 
 export const FileUploadSchema = z.object({
-  file: z.instanceof(File, { message: "Invalid file" }),
+  file: z.any()
+    .refine((file) => file instanceof File, "Debe ser un archivo válido")
+    .refine((file) => file.type === "application/pdf", "Solo se permiten archivos PDF")
+    .refine((file) => file.size <= 15 * 1024 * 1024, "El archivo no debe superar los 15MB"),
   analysisId: UUIDSchema,
 });
 
