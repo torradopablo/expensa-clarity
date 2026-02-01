@@ -47,15 +47,26 @@ serve(async (req) => {
             const { data: files } = await supabaseClient
                 .storage
                 .from('expense-files')
-                .list(userId)
+                .list(userId, {
+                    limit: 100,
+                    offset: 0,
+                    sortBy: { column: 'name', order: 'asc' },
+                    search: '',
+                    recursive: true
+                })
 
             if (files && files.length > 0) {
                 const pathsToDelete = files.map(f => `${userId}/${f.name}`)
-                await supabaseClient
+                const { error: removeError } = await supabaseClient
                     .storage
                     .from('expense-files')
                     .remove(pathsToDelete)
-                console.log(`Deleted ${pathsToDelete.length} files for user ${userId}`)
+
+                if (removeError) {
+                    console.error('Error removing files:', removeError)
+                } else {
+                    console.log(`Deleted ${pathsToDelete.length} files for user ${userId}`)
+                }
             }
         } catch (storageError) {
             console.error('Error deleting storage files:', storageError)
