@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
+import { TrendService } from "../_shared/services/analysis/TrendService.ts"
 
 const MAX_HISTORICAL_PERIODS = 15;
 
@@ -198,8 +199,7 @@ serve(async (req) => {
     }
 
     // Initialize TrendService
-    const { TrendService } = await import("../_shared/services/analysis/TrendService.ts");
-    const trendService = new TrendService(supabase);
+    const trendService = new TrendService();
 
     // Fetch building profile for filtering
     const { data: profile } = await supabase
@@ -217,6 +217,8 @@ serve(async (req) => {
       if (profile.zone) filters.zone = profile.zone;
       if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
     }
+    filters.excludeBuilding = analysis.building_name;
+    filters.excludeUserId = analysis.user_id;
 
     const { data: trendData, stats: trendStats } = await trendService.getMarketTrend(
       Object.keys(filters).length > 0 ? filters : {},
@@ -300,7 +302,7 @@ serve(async (req) => {
         let buildingsPercent: number | null = null
         if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
           const buildingsItem = buildingsTrend.find(b => b.period === h.period)
-          if (buildingsItem) {
+          if (buildingsItem && buildingsItem.average !== undefined) {
             buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100
           }
         }

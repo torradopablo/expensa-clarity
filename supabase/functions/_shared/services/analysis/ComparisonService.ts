@@ -52,11 +52,19 @@ export class ComparisonService {
     return matchingBuilding || null;
   }
 
-  static calculateBuildingsTrend(analyses: Array<{ period: string; total_amount: number; building_name: string }>, excludeBuilding?: string) {
-    // Exclude current building from averages
-    const otherBuildings = analyses.filter(
-      (a) => a.building_name?.toLowerCase().trim() !== excludeBuilding?.toLowerCase().trim()
-    );
+  static calculateBuildingsTrend(
+    analyses: Array<{ period: string; total_amount: number; building_name: string; user_id?: string }>,
+    excludeBuilding?: string,
+    excludeUserId?: string
+  ) {
+    // Exclude current building only if it belongs to the current user
+    const otherBuildings = analyses.filter((a) => {
+      const isSameBuilding = a.building_name?.toLowerCase().trim() === excludeBuilding?.toLowerCase().trim();
+      const isSameUser = a.user_id === excludeUserId;
+
+      // Exclude only if BOTH conditions are met (it's the same building AND same user)
+      return !(isSameBuilding && isSameUser);
+    });
 
     // Group by period and calculate average
     const periodMap = new Map<string, { total: number; count: number; buildings: Set<string> }>();

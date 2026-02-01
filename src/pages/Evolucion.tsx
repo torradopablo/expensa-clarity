@@ -482,6 +482,14 @@ const Evolucion = () => {
         filters.category = category;
       }
 
+      if (selectedBuilding !== "all") {
+        const { data: { session } } = await supabase.auth.getSession();
+        filters.excludeBuilding = selectedBuilding;
+        if (session) {
+          filters.excludeUserId = session.user.id;
+        }
+      }
+
       const hasFilters = Object.keys(filters).length > 0;
 
       const response = await fetch(

@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useSessionTimeout } from "@/hooks/useSessionTimeout";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Analizar from "./pages/Analizar";
@@ -17,7 +18,14 @@ import Contacto from "./pages/Contacto";
 import SharedAnalysis from "./pages/SharedAnalysis";
 import Perfil from "./pages/Perfil";
 import NotFound from "./pages/NotFound";
+
 const queryClient = new QueryClient();
+
+const SessionManager = () => {
+  // Configured for 60 minutes of inactivity
+  useSessionTimeout(60 * 60 * 1000);
+  return null;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -25,6 +33,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <SessionManager />
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/auth" element={<Auth />} />
