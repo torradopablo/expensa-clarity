@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { CheckCircle2, Mail, Lock, User, ArrowRight, Loader2 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Logo } from "@/components/layout/ui/logo";
 
 const Auth = () => {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ const Auth = () => {
         });
 
         if (error) throw error;
-        
+
         toast.success("¡Bienvenido de vuelta!");
         navigate("/analizar");
       } else {
@@ -46,7 +47,7 @@ const Auth = () => {
         });
 
         if (error) throw error;
-        
+
         toast.success("¡Cuenta creada exitosamente!");
         navigate("/analizar");
       }
@@ -76,9 +77,7 @@ const Auth = () => {
       <div className="w-full max-w-md animate-fade-in-up">
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <div className="w-10 h-10 rounded-xl bg-gradient-hero flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-primary-foreground" />
-            </div>
+            <Logo className="w-10 h-10" />
             <span className="text-2xl font-bold">ExpensaCheck</span>
           </Link>
           <h1 className="text-2xl font-bold">

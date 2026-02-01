@@ -22,6 +22,8 @@ import {
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
+import { Logo } from "@/components/layout/ui/logo";
+
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [session, setSession] = useState<any>(null);
@@ -42,9 +44,7 @@ const Header = () => {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
 
@@ -496,9 +496,7 @@ const Footer = () => (
     <div className="container">
       <div className="flex flex-col md:flex-row items-center justify-between gap-6">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-lg font-semibold">ExpensaCheck</span>
         </div>
         <p className="text-sm text-muted-foreground text-center">

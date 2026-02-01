@@ -10,8 +10,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { 
-  CheckCircle2, 
+import {
+  CheckCircle2,
   TrendingUp,
   TrendingDown,
   AlertTriangle,
@@ -136,14 +136,14 @@ interface BuildingsTrendStats {
   usedFallback?: boolean;
 }
 
+import { Logo } from "@/components/layout/ui/logo";
+
 const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         <Button asChild size="sm">
@@ -157,12 +157,12 @@ const Header = () => {
 };
 
 // Inline HistoricalEvolutionChart for shared view (no auth required)
-const SharedHistoricalChart = ({ 
-  historicalData, 
-  currentAnalysisId, 
+const SharedHistoricalChart = ({
+  historicalData,
+  currentAnalysisId,
   currentPeriod,
-  buildingName 
-}: { 
+  buildingName
+}: {
   historicalData: HistoricalDataPoint[];
   currentAnalysisId: string;
   currentPeriod: string;
@@ -183,10 +183,10 @@ const SharedHistoricalChart = ({
   const min = Math.min(...totals);
   const max = Math.max(...totals);
   const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
-  
+
   const firstTotal = historicalData[0]?.total_amount;
-  const totalEvolution = firstTotal 
-    ? ((currentTotal - firstTotal) / firstTotal) * 100 
+  const totalEvolution = firstTotal
+    ? ((currentTotal - firstTotal) / firstTotal) * 100
     : null;
 
   return (
@@ -205,7 +205,7 @@ const SharedHistoricalChart = ({
             </div>
           </div>
           {totalEvolution !== null && (
-            <Badge 
+            <Badge
               variant={totalEvolution > 0 ? "attention" : "ok"}
               className="flex items-center gap-1"
             >
@@ -355,7 +355,7 @@ const SharedAnalysis = () => {
 
       try {
         console.log("Fetching shared analysis for token:", token);
-        
+
         // Use edge function for all operations (bypasses RLS and works for both logged in and anonymous users)
         const { data: analysisResult, error: analysisError } = await supabaseFunctions
           .functions.invoke('get-shared-analysis', {
@@ -366,7 +366,7 @@ const SharedAnalysis = () => {
 
         if (analysisError) {
           console.error("Edge function error:", analysisError);
-          
+
           // Handle specific error cases from edge function
           if (analysisError.message?.includes("Link not found")) {
             setError("Este enlace no existe o ya no está disponible");
@@ -552,11 +552,11 @@ const SharedAnalysis = () => {
                   {categories.map((category, index) => {
                     const change = calculateChange(category.current_amount, category.previous_amount);
                     const Icon = iconMap[category.icon] || Building;
-                    
+
                     return (
-                      <Card 
-                        key={category.id} 
-                        variant="default" 
+                      <Card
+                        key={category.id}
+                        variant="default"
                         className="animate-fade-in-up overflow-hidden"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
@@ -564,12 +564,10 @@ const SharedAnalysis = () => {
                           <div className="flex flex-col md:flex-row">
                             <div className="flex-1 p-5 md:p-6">
                               <div className="flex items-start gap-4">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                                  category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
-                                }`}>
-                                  <Icon className={`w-6 h-6 ${
-                                    category.status === "attention" ? "text-status-attention" : "text-status-ok"
-                                  }`} />
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                                  }`}>
+                                  <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                    }`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2 mb-1">
@@ -590,9 +588,8 @@ const SharedAnalysis = () => {
                                 <p className="text-lg font-bold">{formatCurrency(category.current_amount)}</p>
                               </div>
                               {category.previous_amount && (
-                                <div className={`flex items-center gap-1 text-sm font-medium ${
-                                  change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
-                                }`}>
+                                <div className={`flex items-center gap-1 text-sm font-medium ${change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                                  }`}>
                                   {change > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
                                   {change > 0 ? "+" : ""}{change.toFixed(1)}%
                                 </div>
@@ -619,8 +616,8 @@ const SharedAnalysis = () => {
                       leftAmount: c.previous_amount || 0,
                       rightAmount: c.current_amount,
                       diff: c.current_amount - (c.previous_amount || 0),
-                      changePercent: c.previous_amount 
-                        ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100 
+                      changePercent: c.previous_amount
+                        ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100
                         : null
                     }))
                     .sort((a, b) => b.rightAmount - a.rightAmount)}

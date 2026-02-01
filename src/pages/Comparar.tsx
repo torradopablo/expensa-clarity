@@ -6,8 +6,8 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ComparisonChart } from "@/components/ComparisonChart";
-import { 
-  CheckCircle2, 
+import {
+  CheckCircle2,
   ArrowLeft,
   TrendingUp,
   TrendingDown,
@@ -34,6 +34,8 @@ const iconMap: Record<string, any> = {
   building: Building,
 };
 
+import { Logo } from "@/components/layout/ui/logo";
+
 const Header = () => {
   const navigate = useNavigate();
 
@@ -46,9 +48,7 @@ const Header = () => {
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
       <div className="container flex items-center justify-between h-16">
         <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-gradient-hero flex items-center justify-center">
-            <CheckCircle2 className="w-5 h-5 text-primary-foreground" />
-          </div>
+          <Logo className="w-8 h-8" />
           <span className="text-xl font-semibold">ExpensaCheck</span>
         </Link>
         <div className="flex items-center gap-2">
@@ -105,7 +105,7 @@ const CompararPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [analyses, setAnalyses] = useState<Analysis[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const leftId = searchParams.get("left");
   const rightId = searchParams.get("right");
 
@@ -260,8 +260,8 @@ const CompararPage = () => {
     );
   }
 
-  const totalDiff = leftAnalysis && rightAnalysis 
-    ? rightAnalysis.total_amount - leftAnalysis.total_amount 
+  const totalDiff = leftAnalysis && rightAnalysis
+    ? rightAnalysis.total_amount - leftAnalysis.total_amount
     : 0;
   const totalChangePercent = leftAnalysis && rightAnalysis && leftAnalysis.total_amount > 0
     ? calculateChange(rightAnalysis.total_amount, leftAnalysis.total_amount)
@@ -306,9 +306,9 @@ const CompararPage = () => {
                   </Select>
                 </div>
 
-                <Button 
-                  variant="outline" 
-                  size="icon" 
+                <Button
+                  variant="outline"
+                  size="icon"
                   onClick={swapSelections}
                   disabled={!leftId || !rightId}
                   className="mb-0.5"
@@ -357,9 +357,8 @@ const CompararPage = () => {
                     </div>
 
                     <div className="flex flex-col items-center gap-2">
-                      <div className={`text-lg font-semibold flex items-center gap-1 ${
-                        totalDiff > 0 ? "text-status-attention" : totalDiff < 0 ? "text-status-ok" : "text-muted-foreground"
-                      }`}>
+                      <div className={`text-lg font-semibold flex items-center gap-1 ${totalDiff > 0 ? "text-status-attention" : totalDiff < 0 ? "text-status-ok" : "text-muted-foreground"
+                        }`}>
                         {totalDiff > 0 ? <TrendingUp className="w-5 h-5" /> : totalDiff < 0 ? <TrendingDown className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
                         {totalDiff > 0 ? "+" : ""}{formatCurrency(totalDiff)}
                       </div>
@@ -381,7 +380,7 @@ const CompararPage = () => {
               {/* Bar Chart Comparison */}
               {categoryComparison.length > 0 && (
                 <div className="mb-8">
-                  <ComparisonChart 
+                  <ComparisonChart
                     data={categoryComparison}
                     leftLabel={`${leftAnalysis.building_name || "Edificio"} - ${leftAnalysis.period}`}
                     rightLabel={`${rightAnalysis.building_name || "Edificio"} - ${rightAnalysis.period}`}
@@ -399,8 +398,8 @@ const CompararPage = () => {
                   const isSignificant = cat.changePercent !== null && Math.abs(cat.changePercent) > 20;
 
                   return (
-                    <Card 
-                      key={cat.name} 
+                    <Card
+                      key={cat.name}
                       className={`animate-fade-in-up ${isSignificant && isIncrease ? "border-status-attention/50" : ""}`}
                       style={{ animationDelay: `${index * 0.05}s` }}
                     >
@@ -415,9 +414,8 @@ const CompararPage = () => {
                               <Icon className="w-4 h-4 text-muted-foreground" />
                               <span className="text-sm font-medium">{cat.name}</span>
                             </div>
-                            <div className={`text-xs flex items-center gap-1 ${
-                              isIncrease ? "text-status-attention" : isDecrease ? "text-status-ok" : "text-muted-foreground"
-                            }`}>
+                            <div className={`text-xs flex items-center gap-1 ${isIncrease ? "text-status-attention" : isDecrease ? "text-status-ok" : "text-muted-foreground"
+                              }`}>
                               {isIncrease ? <TrendingUp className="w-3 h-3" /> : isDecrease ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
                               {cat.changePercent !== null ? (
                                 <span>{cat.changePercent > 0 ? "+" : ""}{cat.changePercent.toFixed(1)}%</span>
