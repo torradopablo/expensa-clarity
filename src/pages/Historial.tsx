@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,7 +28,6 @@ import {
   ArrowRight,
   TrendingUp,
   TrendingDown,
-  AlertTriangle,
   History,
   FileText,
   LogOut,
@@ -44,6 +43,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useAnalysis } from "@/hooks/useAnalysis";
+import type { Analysis } from "@/types/analysis";
 
 import { Logo } from "@/components/layout/ui/logo";
 
@@ -105,24 +106,9 @@ const calculateChange = (current: number, previous: number | null) => {
   return ((current - previous) / previous) * 100;
 };
 
-interface Analysis {
-  id: string;
-  building_name: string | null;
-  period: string;
-  period_date: string | null;
-  unit: string | null;
-  total_amount: number;
-  previous_total: number | null;
-  status: string;
-  created_at: string;
-  file_url: string | null;
-}
-
-
 const Historial = () => {
   const navigate = useNavigate();
-  const [analyses, setAnalyses] = useState<Analysis[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const { analyses, loading, deleteAnalysis } = useAnalysis();
 
   // Selection states for comparison
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -148,8 +134,6 @@ const Historial = () => {
     if (!analysisToDelete) return;
 
     setIsDeleting(true);
-    let fileDeleted = false;
-    let fileDeleteError = false;
 
     try {
       // First delete the file from storage if it exists
@@ -165,49 +149,22 @@ const Historial = () => {
         }
 
         if (filePath) {
-          const { error: storageError } = await supabase.storage
+          await supabase.storage
             .from('expense-files')
             .remove([filePath]);
-
-          if (storageError) {
-            console.error("Error deleting file from storage:", storageError);
-            fileDeleteError = true;
-          } else {
-            fileDeleted = true;
-          }
         }
       }
 
       // Delete related categories
-      const { error: categoriesError } = await supabase
+      await supabase
         .from("expense_categories")
         .delete()
         .eq("analysis_id", analysisToDelete.id);
 
-      if (categoriesError) throw categoriesError;
+      // Then delete the analysis using the hook
+      await deleteAnalysis(analysisToDelete.id);
 
-      // Then delete the analysis
-      const { error: analysisError } = await supabase
-        .from("expense_analyses")
-        .delete()
-        .eq("id", analysisToDelete.id);
-
-      if (analysisError) throw analysisError;
-
-      setAnalyses(prev => prev.filter(a => a.id !== analysisToDelete.id));
-
-      // Show appropriate success message
-      if (fileDeleted) {
-        toast.success("Análisis y archivo eliminados correctamente", {
-          description: "El documento también fue eliminado del almacenamiento."
-        });
-      } else if (fileDeleteError) {
-        toast.success("Análisis eliminado", {
-          description: "El archivo no pudo ser eliminado del almacenamiento."
-        });
-      } else {
-        toast.success("Análisis eliminado correctamente");
-      }
+      toast.success("Análisis eliminado correctamente");
     } catch (error: any) {
       console.error("Error deleting analysis:", error);
       toast.error("Error al eliminar el análisis");
@@ -246,14 +203,16 @@ const Historial = () => {
 
   // Get unique buildings and periods for filter options
   const buildings = useMemo(() => {
-    const unique = [...new Set(analyses.map(a => a.building_name).filter(Boolean))];
+    const completedAnalyses = analyses.filter(a => a.status === "completed");
+    const unique = [...new Set(completedAnalyses.map(a => a.building_name).filter(Boolean))];
     return unique.sort();
   }, [analyses]);
 
 
   // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
-    const filtered = analyses.filter(analysis => {
+    const completedAnalyses = analyses.filter(a => a.status === "completed");
+    const filtered = completedAnalyses.filter(analysis => {
       // Search query filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
@@ -269,7 +228,6 @@ const Historial = () => {
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
-
 
       return true;
     });
@@ -289,35 +247,7 @@ const Historial = () => {
     setBuildingFilter("all");
   };
 
-  useEffect(() => {
-    const fetchAnalyses = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        navigate("/auth");
-        return;
-      }
-
-      try {
-        const { data, error } = await supabase
-          .from("expense_analyses")
-          .select("*")
-          .eq("status", "completed")
-          .order("created_at", { ascending: false });
-
-        if (error) throw error;
-        setAnalyses(data || []);
-      } catch (error: any) {
-        console.error("Error fetching analyses:", error);
-        toast.error("Error al cargar el historial");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchAnalyses();
-  }, [navigate]);
-
-  if (isLoading) {
+  if (loading && analyses.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-soft">
         <Header />
@@ -348,7 +278,7 @@ const Historial = () => {
               <div>
                 <h1 className="text-2xl font-bold">Historial de expensas</h1>
                 <p className="text-muted-foreground text-sm">
-                  {analyses.length} {analyses.length === 1 ? "análisis realizado" : "análisis realizados"}
+                  {filteredAnalyses.length} {filteredAnalyses.length === 1 ? "análisis realizado" : "análisis realizados"}
                 </p>
               </div>
             </div>
@@ -359,7 +289,7 @@ const Historial = () => {
                   Ver evolución
                 </Link>
               </Button>
-              {analyses.length >= 2 && (
+              {filteredAnalyses.length >= 2 && (
                 <>
                   {selectionMode ? (
                     <>
@@ -387,7 +317,7 @@ const Historial = () => {
           </div>
 
           {/* Search and Filters Section */}
-          {analyses.length > 0 && (
+          {analyses.some(a => a.status === "completed") && (
             <Card variant="soft" className="mb-6 animate-fade-in-up">
               <CardContent className="p-4">
                 {/* Search bar */}
@@ -440,14 +370,14 @@ const Historial = () => {
                 </div>
                 {hasActiveFilters && (
                   <p className="text-xs text-muted-foreground mt-3">
-                    Mostrando {filteredAnalyses.length} de {analyses.length} análisis
+                    Mostrando {filteredAnalyses.length} de {analyses.filter(a => a.status === "completed").length} análisis
                   </p>
                 )}
               </CardContent>
             </Card>
           )}
 
-          {analyses.length === 0 ? (
+          {analyses.filter(a => a.status === "completed").length === 0 ? (
             <Card variant="soft" className="animate-fade-in-up">
               <CardContent className="p-12 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
@@ -582,7 +512,7 @@ const Historial = () => {
           )}
 
           {/* Comparison hint */}
-          {analyses.length >= 2 && (
+          {filteredAnalyses.length >= 2 && (
             <Card variant="soft" className="mt-8 animate-fade-in-up">
               <CardContent className="p-6">
                 <div className="flex gap-4">

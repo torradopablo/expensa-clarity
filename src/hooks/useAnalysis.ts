@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
-import { useSupabaseClient } from "@supabase/auth-ui-react";
+import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Analysis, Category, BuildingProfile } from "../types/analysis";
 
 export interface UseAnalysisState {
@@ -22,63 +23,32 @@ export interface UseAnalysisActions {
   reset: () => void;
 }
 
-export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
-  const supabase = useSupabaseClient();
-  const [state, setState] = useState<UseAnalysisState>({
-    analyses: [],
-    categories: [],
-    buildingProfiles: [],
-    loading: false,
-    error: null,
-  });
+export function useAnalysis() {
+  const queryClient = useQueryClient();
 
-  const setLoading = useCallback((loading: boolean) => {
-    setState(prev => ({ ...prev, loading }));
-  }, []);
-
-  const setError = useCallback((error: string | null) => {
-    setState(prev => ({ ...prev, error }));
-  }, []);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  const reset = useCallback(() => {
-    setState({
-      analyses: [],
-      categories: [],
-      buildingProfiles: [],
-      loading: false,
-      error: null,
-    });
-  }, []);
-
-  const fetchAnalyses = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  // Queries
+  const {
+    data: analyses = [],
+    isLoading: loadingAnalyses,
+    error: errorAnalyses,
+    refetch: fetchAnalyses
+  } = useQuery({
+    queryKey: ["analyses"],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_analyses")
         .select("*")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
+      return data as Analysis[];
+    },
+  });
 
-      setState(prev => ({ ...prev, analyses: data || [] }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al cargar análisis");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const fetchCategories = useCallback(async (analysisId: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  // Categories query (needs a specific ID, so we might keep it dynamic or use a placeholder)
+  const fetchCategoriesQuery = (analysisId: string) => useQuery({
+    queryKey: ["categories", analysisId],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_categories")
         .select("*")
@@ -86,51 +56,38 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
         .order("current_amount", { ascending: false });
 
       if (error) throw error;
+      return data as Category[];
+    },
+    enabled: !!analysisId,
+  });
 
-      setState(prev => ({ ...prev, categories: data || [] }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al cargar categorías");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const createAnalysis = useCallback(async (data: Partial<Analysis>) => {
-    try {
-      setLoading(true);
-      setError(null);
+  // Mutations
+  const createMutation = useMutation({
+    mutationFn: async (data: Partial<Analysis>) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
 
       const { data: result, error } = await supabase
         .from("expense_analyses")
         .insert({
           ...data,
+          user_id: user.id,
           status: "pending",
           created_at: new Date().toISOString(),
-        })
+        } as any)
         .select()
         .single();
 
       if (error) throw error;
+      return result as Analysis;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["analyses"] });
+    },
+  });
 
-      setState(prev => ({
-        ...prev,
-        analyses: [result, ...prev.analyses]
-      }));
-
-      return result;
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al crear análisis");
-      return null;
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const updateAnalysis = useCallback(async (id: string, data: Partial<Analysis>) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const updateMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<Analysis> }) => {
       const { error } = await supabase
         .from("expense_analyses")
         .update({
@@ -140,44 +97,28 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
         .eq("id", id);
 
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["analyses"] });
+    },
+  });
 
-      setState(prev => ({
-        ...prev,
-        analyses: prev.analyses.map(analysis =>
-          analysis.id === id ? { ...analysis, ...data } : analysis
-        )
-      }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al actualizar análisis");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const deleteAnalysis = useCallback(async (id: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("expense_analyses")
         .delete()
         .eq("id", id);
 
       if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["analyses"] });
+    },
+  });
 
-      setState(prev => ({
-        ...prev,
-        analyses: prev.analyses.filter(analysis => analysis.id !== id)
-      }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al eliminar análisis");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const uploadFile = useCallback(async (file: File, analysisId: string): Promise<string | null> => {
+  // Helper actions
+  const uploadFile = async (file: File, analysisId: string): Promise<string | null> => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Usuario no autenticado");
@@ -195,18 +136,15 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
 
       return filePath;
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al subir archivo");
+      console.error("Error al subir archivo:", error);
       return null;
     }
-  }, [supabase, setError]);
+  };
 
-  const processExpense = useCallback(async (file: File, analysisId: string) => {
+  const processExpense = async (file: File, analysisId: string) => {
     try {
-      setLoading(true);
-      setError(null);
-
       // Update status to processing
-      await updateAnalysis(analysisId, { status: "processing" });
+      await updateMutation.mutateAsync({ id: analysisId, data: { status: "processing" } });
 
       // Upload file
       const filePath = await uploadFile(file, analysisId);
@@ -238,28 +176,29 @@ export function useAnalysis(): UseAnalysisState & UseAnalysisActions {
       }
 
       // Update status to completed
-      await updateAnalysis(analysisId, { status: "completed" });
-      
+      await updateMutation.mutateAsync({ id: analysisId, data: { status: "completed" } });
+
       // Refresh analyses
-      await fetchAnalyses();
+      queryClient.invalidateQueries({ queryKey: ["analyses"] });
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al procesar archivo");
-      await updateAnalysis(analysisId, { status: "error" });
-    } finally {
-      setLoading(false);
+      console.error("Error al procesar archivo:", error);
+      await updateMutation.mutateAsync({ id: analysisId, data: { status: "error" } });
     }
-  }, [supabase, updateAnalysis, uploadFile, fetchAnalyses, setLoading, setError]);
+  };
 
   return {
-    ...state,
-    fetchAnalyses,
-    fetchCategories,
-    createAnalysis,
-    updateAnalysis,
-    deleteAnalysis,
+    analyses,
+    loading: loadingAnalyses || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
+    error: errorAnalyses ? (errorAnalyses as Error).message : null,
+    fetchAnalyses: async () => { await fetchAnalyses(); },
+    createAnalysis: createMutation.mutateAsync,
+    updateAnalysis: (id: string, data: Partial<Analysis>) => updateMutation.mutateAsync({ id, data }),
+    deleteAnalysis: deleteMutation.mutateAsync,
     uploadFile,
     processExpense,
-    clearError,
-    reset,
+    clearError: () => { }, // Handled by React Query's error state
+    reset: () => {
+      queryClient.resetQueries({ queryKey: ["analyses"] });
+    },
   };
 }

@@ -28,7 +28,36 @@ export class TrendService {
     }
 
     async getMarketTrend(filters?: MarketTrendFilters, fallbackIfEmpty = true) {
-        const category = filters?.category;
+        const category = filters?.category || 'total';
+        const filterKey = JSON.stringify({ ...filters, fallbackIfEmpty });
+
+        // 1. Try to fetch from cache table if it exists
+        try {
+            const { data: cachedTrend, error: cacheError } = await this.supabase
+                .from("market_trends_cache")
+                .select("data, stats, created_at")
+                .eq("filter_key", filterKey)
+                .single();
+
+            if (!cacheError && cachedTrend) {
+                const cacheAge = Date.now() - new Date(cachedTrend.created_at).getTime();
+                // If cache is less than 24 hours old, return it
+                if (cacheAge < 24 * 60 * 60 * 1000) {
+                    console.log("Returning cached market trend data.");
+                    return {
+                        success: true,
+                        data: cachedTrend.data,
+                        stats: cachedTrend.stats,
+                        cached: true
+                    };
+                }
+            }
+        } catch (err) {
+            console.log("Cache table might not exist yet, proceeding with calculation.");
+        }
+
+        // 2. Original calculation logic
+        const queryCategory = filters?.category;
 
         // Build the query
         let query = this.supabase
@@ -40,13 +69,13 @@ export class TrendService {
         user_id,
         created_at,
         building_profile_id
-        ${category ? ', expense_categories!inner(name, current_amount)' : ''}
+        ${queryCategory ? ', expense_categories!inner(name, current_amount)' : ''}
       `)
             .eq("status", "completed")
             .not("building_name", "is", null);
 
-        if (category) {
-            query = query.eq("expense_categories.name", category);
+        if (queryCategory) {
+            query = query.eq("expense_categories.name", queryCategory);
         }
 
         const { data: allAnalyses, error } = await query.order("created_at", { ascending: true });
@@ -59,6 +88,8 @@ export class TrendService {
 
         const profileFilters = { ...filters };
         delete profileFilters.category;
+        delete (profileFilters as any).excludeBuilding;
+        delete (profileFilters as any).excludeUserId;
 
         if (Object.keys(profileFilters).length > 0) {
             filtersApplied = true;
@@ -90,7 +121,6 @@ export class TrendService {
 
             // 2. If not enough buildings, try with Zone + other filters
             if (matchingProfiles.length < 2 && filters?.zone) {
-                // We need to re-create the query to remove the failed neighborhood filter
                 let zoneQuery = this.supabase
                     .from("building_profiles")
                     .select("id, building_name")
@@ -107,7 +137,6 @@ export class TrendService {
             // 3. Fallback to all profiles if still empty and fallback permitted
             if (matchingProfiles.length < 2 && fallbackIfEmpty) {
                 usedFallback = true;
-                // No geographic filter, just other attributes
                 let globalQuery = this.supabase
                     .from("building_profiles")
                     .select("id, building_name");
@@ -136,13 +165,12 @@ export class TrendService {
                 const buildingsInFiltered = new Set(filteredByProfile.map((a: any) => a.building_name)).size;
                 const periodsInFiltered = new Set(filteredByProfile.map((a: any) => a.period)).size;
 
-                // Requirement: at least 2 buildings and 2 periods for a meaningful trend
                 if (buildingsInFiltered >= 2 && periodsInFiltered >= 2) {
                     filteredAnalyses = filteredByProfile;
                 } else if (fallbackIfEmpty) {
                     usedFallback = true;
                 } else {
-                    filteredAnalyses = []; // Strict: no data for the area
+                    filteredAnalyses = [];
                 }
             } else if (fallbackIfEmpty) {
                 usedFallback = true;
@@ -157,15 +185,8 @@ export class TrendService {
             filters?.excludeUserId
         );
 
-        // If category was used, we need to handle the amounts differently in calculateBuildingsTrend
-        // or manually adjust it here. ComparisonService.calculateBuildingsTrend uses `total_amount`.
-        // Let's update it to respect the category amount if present.
-
-        const trendData = trendResult.trend;
-
-        return {
-            success: true,
-            data: trendData,
+        const result = {
+            data: trendResult.trend,
             stats: {
                 totalBuildings: trendResult.stats.totalBuildings,
                 totalAnalyses: trendResult.stats.totalAnalyses,
@@ -173,6 +194,26 @@ export class TrendService {
                 filtersApplied,
                 usedFallback
             }
+        };
+
+        // 3. Update cache if possible
+        try {
+            await this.supabase
+                .from("market_trends_cache")
+                .upsert({
+                    filter_key: filterKey,
+                    data: result.data,
+                    stats: result.stats,
+                    created_at: new Date().toISOString()
+                });
+        } catch (err) {
+            // Silently fail if table doesn't exist
+        }
+
+        return {
+            success: true,
+            ...result,
+            cached: false
         };
     }
 }

@@ -13,25 +13,10 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { AlertTriangle, TrendingUp, TrendingDown, Info } from "lucide-react";
-
-interface TrendDataPoint {
-  period: string;
-  userPercent: number;
-  inflationPercent: number | null;
-  inflationEstimated?: boolean;
-  buildingsPercent: number | null;
-}
-
-interface BuildingsTrendStats {
-  totalBuildings: number;
-  totalAnalyses: number;
-  periodsCount: number;
-  filtersApplied: boolean;
-  usedFallback?: boolean;
-}
+import type { BuildingsTrendStats, EvolutionData } from "@/types/analysis";
 
 interface EvolutionComparisonChartProps {
-  data: TrendDataPoint[];
+  data: EvolutionData[];
   buildingName: string;
   categoryName?: string;
   deviation?: {
@@ -125,8 +110,8 @@ export const EvolutionComparisonChart = ({
                 <Badge
                   variant="outline"
                   className={`text-xs ${buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback
-                      ? "border-primary/50 text-primary bg-primary/10"
-                      : "border-muted-foreground/30"
+                    ? "border-primary/50 text-primary bg-primary/10"
+                    : "border-muted-foreground/30"
                     }`}
                 >
                   <Info className="w-3 h-3 mr-1" />
@@ -248,10 +233,10 @@ export const EvolutionComparisonChart = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
             {/* vs Inflation card */}
             <div className={`flex items-center gap-3 p-3 rounded-lg ${deviation.fromInflation > 5
-                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
-                : deviation.fromInflation <= 0
-                  ? "bg-status-ok-bg border border-status-ok/30"
-                  : "bg-muted"
+              ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
+              : deviation.fromInflation <= 0
+                ? "bg-status-ok-bg border border-status-ok/30"
+                : "bg-muted"
               }`}>
               {deviation.fromInflation > 5 ? (
                 <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -263,7 +248,7 @@ export const EvolutionComparisonChart = ({
               <div>
                 <p className="text-xs text-muted-foreground">vs Inflación</p>
                 <p className={`font-semibold ${deviation.fromInflation > 5 ? "text-red-600 dark:text-red-400" :
-                    deviation.fromInflation <= 0 ? "text-status-ok" : ""
+                  deviation.fromInflation <= 0 ? "text-status-ok" : ""
                   }`}>
                   {deviation.fromInflation > 0 ? "+" : ""}{deviation.fromInflation.toFixed(1)} pp
                   {deviation.fromInflation <= 0 && " ✓"}
@@ -272,10 +257,10 @@ export const EvolutionComparisonChart = ({
             </div>
             {/* vs Other buildings card */}
             <div className={`flex items-center gap-3 p-3 rounded-lg ${deviation.fromBuildings > 5
-                ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
-                : deviation.fromBuildings <= 0
-                  ? "bg-status-ok-bg border border-status-ok/30"
-                  : "bg-muted"
+              ? "bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800"
+              : deviation.fromBuildings <= 0
+                ? "bg-status-ok-bg border border-status-ok/30"
+                : "bg-muted"
               }`}>
               {deviation.fromBuildings > 5 ? (
                 <TrendingUp className="w-5 h-5 text-red-600 dark:text-red-400" />
@@ -287,7 +272,7 @@ export const EvolutionComparisonChart = ({
               <div>
                 <p className="text-xs text-muted-foreground">vs Otros edificios</p>
                 <p className={`font-semibold ${deviation.fromBuildings > 5 ? "text-red-600 dark:text-red-400" :
-                    deviation.fromBuildings <= 0 ? "text-status-ok" : ""
+                  deviation.fromBuildings <= 0 ? "text-status-ok" : ""
                   }`}>
                   {deviation.fromBuildings > 0 ? "+" : ""}{deviation.fromBuildings.toFixed(1)} pp
                   {deviation.fromBuildings <= 0 && " ✓"}
@@ -307,13 +292,13 @@ export const EvolutionComparisonChart = ({
 
         {analysis && !isLoadingAnalysis && (
           <div className={`p-4 rounded-lg border ${alertLevel === "critical" || alertLevel === "high"
-              ? "bg-status-attention-bg border-status-attention/30"
-              : "bg-primary-soft border-primary/20"
+            ? "bg-status-attention-bg border-status-attention/30"
+            : "bg-primary-soft border-primary/20"
             }`}>
             <div className="flex items-start gap-3">
               <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${alertLevel === "critical" || alertLevel === "high"
-                  ? "bg-status-attention/20"
-                  : "bg-primary/20"
+                ? "bg-status-attention/20"
+                : "bg-primary/20"
                 }`}>
                 {alertLevel === "critical" || alertLevel === "high" ? (
                   <AlertTriangle className="w-4 h-4 text-status-attention" />

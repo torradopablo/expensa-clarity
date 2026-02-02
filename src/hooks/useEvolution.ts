@@ -1,5 +1,6 @@
-import { useState, useCallback } from "react";
-import { useSupabaseClient } from "@supabase/auth-ui-react";
+import { useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { Analysis, EvolutionData, DeviationAnalysis, InflationData, BuildingsTrendStats } from "../types/analysis";
 
 export interface UseEvolutionState {
@@ -20,204 +21,108 @@ export interface UseEvolutionActions {
   reset: () => void;
 }
 
-export function useEvolution(): UseEvolutionState & UseEvolutionActions {
-  const supabase = useSupabaseClient();
-  const [state, setState] = useState<UseEvolutionState>({
-    evolutionData: [],
-    deviation: null,
-    inflationData: [],
-    buildingsTrendStats: null,
-    loading: false,
-    error: null,
-  });
+export function useEvolution() {
+  const queryClient = useQueryClient();
 
-  const setLoading = useCallback((loading: boolean) => {
-    setState(prev => ({ ...prev, loading }));
-  }, []);
-
-  const setError = useCallback((error: string | null) => {
-    setState(prev => ({ ...prev, error }));
-  }, []);
-
-  const clearError = useCallback(() => {
-    setError(null);
-  }, []);
-
-  const reset = useCallback(() => {
-    setState({
-      evolutionData: [],
-      deviation: null,
-      inflationData: [],
-      buildingsTrendStats: null,
-      loading: false,
-      error: null,
-    });
-  }, []);
-
-  const calculateEvolution = useCallback((analyses: Analysis[]) => {
-    if (analyses.length < 2) {
-      setState(prev => ({ ...prev, evolutionData: [], deviation: null }));
-      return;
-    }
-
-    try {
-      setLoading(true);
-      setError(null);
-
-      // Sort analyses by period_date or created_at
-      const sortedAnalyses = [...analyses].sort((a, b) => {
-        if (a.period_date && b.period_date) {
-          return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
-        }
-        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      });
-
-      const baseTotal = sortedAnalyses[0]?.total_amount || 0;
-      const evolutionData: EvolutionData[] = [];
-
-      for (const analysis of sortedAnalyses) {
-        const userPercent = baseTotal > 0 ? ((analysis.total_amount - baseTotal) / baseTotal) * 100 : 0;
-        
-        evolutionData.push({
-          period: analysis.period,
-          userPercent: parseFloat(userPercent.toFixed(1)),
-          inflationPercent: null, // Will be filled when inflation data is available
-          inflationEstimated: false,
-          buildingsPercent: null, // Will be filled when buildings trend is available
-        });
-      }
-
-      setState(prev => ({ ...prev, evolutionData }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al calcular evolución");
-    } finally {
-      setLoading(false);
-    }
-  }, [setLoading, setError]);
-
-  const fetchInflationData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
+  // Queries
+  const {
+    data: inflationData = [],
+    isLoading: loadingInflation,
+    error: errorInflation
+  } = useQuery({
+    queryKey: ["inflation"],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from("inflation_data")
         .select("*")
         .order("period", { ascending: true });
 
       if (error) throw error;
+      return data as InflationData[];
+    },
+    staleTime: 1000 * 60 * 60 * 24, // 24 hours, inflation data is mostly static
+  });
 
-      setState(prev => ({ ...prev, inflationData: data || [] }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al cargar datos de inflación");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const fetchBuildingsTrend = useCallback(async (buildingName?: string) => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase
-        .from("expense_analyses")
-        .select("building_name, period, total_amount")
-        .eq("status", "completed")
-        .order("period", { ascending: true });
+  const {
+    data: buildingsTrendStats = null,
+    isLoading: loadingTrend,
+    error: errorTrend
+  } = useQuery({
+    queryKey: ["buildings-trend"],
+    queryFn: async () => {
+      const { data, error } = await supabase.functions.invoke("get-buildings-trend", {
+        body: {
+          filters: {}, // Optional: could pass profile filters here
+          fallbackIfEmpty: true
+        }
+      });
 
       if (error) throw error;
+      return data.stats as BuildingsTrendStats;
+    },
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
 
-      // Calculate buildings trend statistics
-      const analyses = data || [];
-      const totalBuildings = new Set(analyses.map(a => a.building_name)).size;
-      const totalAnalyses = analyses.length;
-      
-      // Group by building and calculate average increase
-      const buildingIncreases = new Map<string, number[]>();
-      
-      analyses.forEach(analysis => {
-        if (!buildingIncreases.has(analysis.building_name)) {
-          buildingIncreases.set(analysis.building_name, []);
-        }
-        buildingIncreases.get(analysis.building_name)?.push(analysis.total_amount);
-      });
+  // This part calculates client-side evolution based on analyses provided
+  // We can keep it as a local state or just a derived value if we want to be more react-query like
+  // But for now, let's keep the logic but derived from params if possible
 
-      const increases: number[] = [];
-      buildingIncreases.forEach(amounts => {
-        if (amounts.length >= 2) {
-          const base = amounts[0];
-          const latest = amounts[amounts.length - 1];
-          const increase = ((latest - base) / base) * 100;
-          increases.push(increase);
-        }
-      });
+  const calculateEvolution = useCallback((analyses: Analysis[]) => {
+    if (analyses.length < 2) return [];
 
-      const averageIncrease = increases.length > 0 
-        ? increases.reduce((sum, inc) => sum + inc, 0) / increases.length 
-        : 0;
-      
-      const medianIncrease = increases.length > 0
-        ? increases.sort((a, b) => a - b)[Math.floor(increases.length / 2)]
-        : 0;
-
-      const buildingsTrendStats: BuildingsTrendStats = {
-        totalBuildings,
-        totalAnalyses,
-        averageIncrease: parseFloat(averageIncrease.toFixed(1)),
-        medianIncrease: parseFloat(medianIncrease.toFixed(1)),
-      };
-
-      setState(prev => ({ ...prev, buildingsTrendStats }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al cargar tendencias de edificios");
-    } finally {
-      setLoading(false);
-    }
-  }, [supabase, setLoading, setError]);
-
-  const calculateDeviation = useCallback(() => {
-    const { evolutionData, inflationData, buildingsTrendStats } = state;
-    
-    if (evolutionData.length < 2) {
-      setState(prev => ({ ...prev, deviation: null }));
-      return;
-    }
-
-    try {
-      const lastPoint = evolutionData[evolutionData.length - 1];
-      
-      // Calculate deviation from inflation
-      let fromInflation = 0;
-      if (lastPoint.inflationPercent !== null) {
-        fromInflation = lastPoint.userPercent - lastPoint.inflationPercent;
+    const sortedAnalyses = [...analyses].sort((a, b) => {
+      if (a.period_date && b.period_date) {
+        return new Date(a.period_date).getTime() - new Date(b.period_date).getTime();
       }
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
 
-      // Calculate deviation from buildings average
-      let fromBuildings = 0;
-      if (buildingsTrendStats) {
-        fromBuildings = lastPoint.userPercent - buildingsTrendStats.averageIncrease;
-      }
-
-      const deviation: DeviationAnalysis = {
-        fromInflation: parseFloat(fromInflation.toFixed(1)),
-        fromBuildings: parseFloat(fromBuildings.toFixed(1)),
-        isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10,
+    const baseTotal = sortedAnalyses[0]?.total_amount || 0;
+    return sortedAnalyses.map(analysis => {
+      const userPercent = baseTotal > 0 ? ((analysis.total_amount - baseTotal) / baseTotal) * 100 : 0;
+      return {
+        period: analysis.period,
+        userPercent: parseFloat(userPercent.toFixed(1)),
+        inflationPercent: null,
+        inflationEstimated: false,
+        buildingsPercent: null,
       };
+    }) as EvolutionData[];
+  }, []);
 
-      setState(prev => ({ ...prev, deviation }));
-    } catch (error) {
-      setError(error instanceof Error ? error.message : "Error al calcular desviación");
+  const calculateDeviation = useCallback((evolutionData: EvolutionData[], stats: BuildingsTrendStats | null) => {
+    if (evolutionData.length < 2) return null;
+
+    const lastPoint = evolutionData[evolutionData.length - 1];
+    let fromInflation = 0;
+    if (lastPoint.inflationPercent !== null) {
+      fromInflation = lastPoint.userPercent - lastPoint.inflationPercent;
     }
-  }, [state, setError]);
+
+    let fromBuildings = 0;
+    if (stats) {
+      fromBuildings = lastPoint.userPercent - stats.averageIncrease;
+    }
+
+    return {
+      fromInflation: parseFloat(fromInflation.toFixed(1)),
+      fromBuildings: parseFloat(fromBuildings.toFixed(1)),
+      isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10,
+    } as DeviationAnalysis;
+  }, []);
 
   return {
-    ...state,
+    inflationData,
+    buildingsTrendStats,
+    loading: loadingInflation || loadingTrend,
+    error: (errorInflation || errorTrend) ? ((errorInflation || errorTrend) as Error).message : null,
     calculateEvolution,
-    fetchInflationData,
-    fetchBuildingsTrend,
     calculateDeviation,
-    clearError,
-    reset,
+    fetchInflationData: async () => { queryClient.invalidateQueries({ queryKey: ["inflation"] }); },
+    fetchBuildingsTrend: async () => { queryClient.invalidateQueries({ queryKey: ["buildings-trend"] }); },
+    reset: () => {
+      queryClient.resetQueries({ queryKey: ["inflation"] });
+      queryClient.resetQueries({ queryKey: ["buildings-trend"] });
+    },
   };
 }
