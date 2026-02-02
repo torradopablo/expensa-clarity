@@ -20,56 +20,99 @@ serve(async (req) => {
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
+
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Get current date info
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const currentPeriod = `${currentYear}-${currentMonth.toString().padStart(2, "0")}`;
 
     // Check what inflation data we already have
     const { data: existingData, error: fetchError } = await supabase
       .from("inflation_data")
       .select("period, value, is_estimated")
-      .order("period", { ascending: true });
+      .order("period", { ascending: false });
 
     if (fetchError) {
       console.error("Error fetching existing data:", fetchError);
       throw fetchError;
     }
 
+    // Determine if we need to update
+    // We update if:
+    // 1. Data is empty
+    // 2. The most recent non-estimated period is older than 2 months ago
+    // 3. We haven't estimated up to the current month
+
+    const nonEstimatedData = (existingData || []).filter(d => !d.is_estimated);
+    const latestNonEstimated = nonEstimatedData[0];
+    const latestPeriod = (existingData || [])[0];
+
+    let needsUpdate = false;
+
+    if (!latestNonEstimated) {
+      needsUpdate = true;
+    } else {
+      // If the latest real data is older than 2 months, try to refresh
+      const [ly, lm] = latestNonEstimated.period.split("-").map(Number);
+      const latestDate = new Date(ly, lm - 1, 1);
+      const monthsDiff = (now.getFullYear() - latestDate.getFullYear()) * 12 + (now.getMonth() - latestDate.getMonth());
+
+      if (monthsDiff >= 2) {
+        needsUpdate = true;
+      }
+    }
+
+    // Even if no "real" update is needed, check if we need more estimates
+    if (!needsUpdate && latestPeriod && latestPeriod.period < currentPeriod) {
+      needsUpdate = true;
+    }
+
+    if (!needsUpdate && existingData && existingData.length > 0) {
+      console.log("Inflation data is up to date, skipping API call.");
+      return new Response(
+        JSON.stringify({ success: true, data: existingData.sort((a, b) => a.period.localeCompare(b.period)), cached: true }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const existingPeriods = new Set((existingData || []).map(d => d.period));
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth() + 1;
 
     // Fetch inflation data from Argentina's official API
-    // IPC (Consumer Price Index) - series 101.1_I2NG_2016_M_22
     let apiData: { date: string; value: number }[] = [];
-    
-    try {
-      const response = await fetch(
-        "https://apis.datos.gob.ar/series/api/series/?ids=101.1_I2NG_2016_M_22&format=json&limit=500"
-      );
-      
-      if (response.ok) {
-        const json = await response.json();
-        if (json.data && Array.isArray(json.data)) {
-          apiData = json.data.map((item: [string, number]) => ({
-            date: item[0],
-            value: item[1]
-          })).filter((item: { date: string; value: number }) => item.value !== null);
+
+    if (needsUpdate) {
+      try {
+        console.log("Fetching fresh inflation data from API...");
+        const response = await fetch(
+          "https://apis.datos.gob.ar/series/api/series/?ids=101.1_I2NG_2016_M_22&format=json&limit=500"
+        );
+
+        if (response.ok) {
+          const json = await response.json();
+          if (json.data && Array.isArray(json.data)) {
+            apiData = json.data.map((item: [string, number]) => ({
+              date: item[0],
+              value: item[1]
+            })).filter((item: { date: string; value: number }) => item.value !== null);
+          }
         }
+      } catch (apiError) {
+        console.error("Error fetching from API:", apiError);
       }
-    } catch (apiError) {
-      console.error("Error fetching from API:", apiError);
-      // Continue with existing data and estimates
     }
 
     const dataToInsert: InflationDataPoint[] = [];
 
     // Process API data
     for (const item of apiData) {
-      // API returns dates like "2024-01-01"
-      const period = item.date.substring(0, 7); // "2024-01"
-      
-      if (!existingPeriods.has(period)) {
+      const period = item.date.substring(0, 7);
+
+      // Upsert: if it was estimated before, now we have real data
+      const existing = (existingData || []).find(d => d.period === period);
+      if (!existing || existing.is_estimated) {
         dataToInsert.push({
           period,
           value: item.value,
@@ -79,13 +122,15 @@ serve(async (req) => {
       }
     }
 
-    // Get all data to calculate estimates for missing periods
-    const allData = [...(existingData || []).filter(d => !d.is_estimated), ...dataToInsert.filter(d => !d.is_estimated)];
-    allData.sort((a, b) => a.period.localeCompare(b.period));
+    // Calculate estimates for missing periods
+    const allRealData = [
+      ...(existingData || []).filter(d => !d.is_estimated && !dataToInsert.find(ni => ni.period === d.period)),
+      ...dataToInsert.filter(d => !d.is_estimated)
+    ];
+    allRealData.sort((a, b) => a.period.localeCompare(b.period));
 
-    if (allData.length >= 2) {
-      // Calculate average monthly growth rate from last 12 months
-      const recentData = allData.slice(-13); // Last 13 to calculate 12 month-over-month changes
+    if (allRealData.length >= 2) {
+      const recentData = allRealData.slice(-13);
       let totalGrowth = 0;
       let growthCount = 0;
 
@@ -95,38 +140,37 @@ serve(async (req) => {
         growthCount++;
       }
 
-      const avgMonthlyGrowth = growthCount > 0 ? totalGrowth / growthCount : 0.03; // Default 3% if no data
+      const avgMonthlyGrowth = growthCount > 0 ? totalGrowth / growthCount : 0.03;
 
-      // Generate estimates for future months (up to 3 months ahead)
-      const lastRealData = allData[allData.length - 1];
+      const lastRealData = allRealData[allRealData.length - 1];
       const [lastYear, lastMonth] = lastRealData.period.split("-").map(Number);
-      
+
       let currentValue = lastRealData.value;
       let year = lastYear;
       let month = lastMonth;
 
-      for (let i = 0; i < 3; i++) {
+      // Estimate up to 2 months ahead of now
+      const maxEstimateYear = now.getMonth() === 11 ? currentYear + 1 : currentYear;
+      const maxEstimateMonth = (now.getMonth() + 2) % 12 + 1;
+      const maxEstimatePeriod = `${maxEstimateYear}-${maxEstimateMonth.toString().padStart(2, "0")}`;
+
+      while (`${year}-${month.toString().padStart(2, "0")}` < maxEstimatePeriod) {
         month++;
         if (month > 12) {
           month = 1;
           year++;
         }
 
-        // Don't estimate beyond current month
-        if (year > currentYear || (year === currentYear && month > currentMonth)) {
-          break;
-        }
-
         const period = `${year}-${month.toString().padStart(2, "0")}`;
-        
-        if (!existingPeriods.has(period)) {
+
+        const existing = (existingData || []).find(d => d.period === period);
+        if (!existing) {
           currentValue = currentValue * (1 + avgMonthlyGrowth);
           dataToInsert.push({
             period,
             value: Math.round(currentValue * 100) / 100,
             is_estimated: true
           });
-          existingPeriods.add(period);
         }
       }
     }
@@ -137,10 +181,7 @@ serve(async (req) => {
         .from("inflation_data")
         .upsert(dataToInsert, { onConflict: "period" });
 
-      if (insertError) {
-        console.error("Error inserting inflation data:", insertError);
-        throw insertError;
-      }
+      if (insertError) throw insertError;
     }
 
     // Return all inflation data
@@ -152,10 +193,11 @@ serve(async (req) => {
     if (finalError) throw finalError;
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         data: finalData,
-        newRecords: dataToInsert.length
+        newRecords: dataToInsert.length,
+        cached: false
       }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );

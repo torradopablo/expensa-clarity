@@ -20,6 +20,9 @@ export interface Analysis {
   period_date: string | null;
   file_url: string | null;
   scanned_at: string | null;
+  expense_categories?: Category[];
+  evolution_analysis?: string | null;
+  deviation_stats?: any | null;
 }
 
 export interface EvolutionData {
@@ -64,6 +67,9 @@ export interface BuildingsTrendStats {
   totalAnalyses: number;
   averageIncrease: number;
   medianIncrease: number;
+  periodsCount?: number;
+  filtersApplied?: boolean;
+  usedFallback?: boolean;
 }
 
 export interface SharedAnalysis {
