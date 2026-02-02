@@ -1,4 +1,4 @@
-import { createSupabaseClient } from "../../config/supabase.ts";
+import { createSupabaseClient, createServiceClient } from "../../config/supabase.ts";
 import { ComparisonService } from "./ComparisonService.ts";
 
 export interface MarketTrendFilters {
@@ -20,6 +20,7 @@ export class TrendService {
     }
 
     async getInflationData() {
+        // Inflation data is public read usually, or authenticated. Can stay as is.
         const { data, error } = await this.supabase
             .from("inflation_data")
             .select("period, value, is_estimated")
@@ -28,12 +29,17 @@ export class TrendService {
     }
 
     async getMarketTrend(filters?: MarketTrendFilters, fallbackIfEmpty = true) {
+        // Use service role client for aggregation to bypass RLS
+        const adminSupabase = createServiceClient();
+
         const category = filters?.category || 'total';
         const filterKey = JSON.stringify({ ...filters, fallbackIfEmpty });
 
         // 1. Try to fetch from cache table if it exists
+        // Cache table has RLS enabled but no policies, so it's only accessible by service role.
+        // We must use adminSupabase here as well.
         try {
-            const { data: cachedTrend, error: cacheError } = await this.supabase
+            const { data: cachedTrend, error: cacheError } = await adminSupabase
                 .from("market_trends_cache")
                 .select("data, stats, created_at")
                 .eq("filter_key", filterKey)
@@ -53,14 +59,14 @@ export class TrendService {
                 }
             }
         } catch (err) {
-            console.log("Cache table might not exist yet, proceeding with calculation.");
+            console.log("Cache error or miss", err);
         }
 
-        // 2. Original calculation logic
+        // 2. Original calculation logic REFACTORED to use adminSupabase
         const queryCategory = filters?.category;
 
-        // Build the query
-        let query = this.supabase
+        // Build the query using admin client
+        let query = adminSupabase
             .from("expense_analyses")
             .select(`
         period, 
