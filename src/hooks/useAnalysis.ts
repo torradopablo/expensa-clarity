@@ -37,7 +37,7 @@ export function useAnalysis() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("expense_analyses")
-        .select("*")
+        .select("*, expense_categories(*)")
         .order("created_at", { ascending: false });
 
       if (error) throw error;
