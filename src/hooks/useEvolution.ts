@@ -21,7 +21,7 @@ export interface UseEvolutionActions {
   reset: () => void;
 }
 
-export function useEvolution() {
+export function useEvolution(category?: string) {
   const queryClient = useQueryClient();
 
   // Queries
@@ -43,22 +43,33 @@ export function useEvolution() {
     staleTime: 1000 * 60 * 60 * 24, // 24 hours, inflation data is mostly static
   });
 
+
   const {
-    data: buildingsTrendStats = null,
+    data: buildingsTrendData = null,
     isLoading: loadingTrend,
     error: errorTrend
   } = useQuery({
-    queryKey: ["buildings-trend"],
+    queryKey: ["buildings-trend", category],
     queryFn: async () => {
+      const filters: any = {};
+
+      // Only add category filter if it's not "all"
+      if (category && category !== "all") {
+        filters.category = category;
+      }
+
       const { data, error } = await supabase.functions.invoke("get-buildings-trend", {
         body: {
-          filters: {}, // Optional: could pass profile filters here
+          filters,
           fallbackIfEmpty: true
         }
       });
 
       if (error) throw error;
-      return data.stats as BuildingsTrendStats;
+      return {
+        trend: data.data || [],
+        stats: data.stats as BuildingsTrendStats
+      };
     },
     staleTime: 1000 * 60 * 60, // 1 hour
   });
@@ -124,7 +135,8 @@ export function useEvolution() {
 
   return {
     inflationData,
-    buildingsTrendStats,
+    buildingsTrend: buildingsTrendData?.trend || [],
+    buildingsTrendStats: buildingsTrendData?.stats || null,
     loading: loadingInflation || loadingTrend,
     error: (errorInflation || errorTrend) ? ((errorInflation || errorTrend) as Error).message : null,
     calculateEvolution,

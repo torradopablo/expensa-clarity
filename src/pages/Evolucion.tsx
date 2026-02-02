@@ -94,12 +94,6 @@ const Evolucion = () => {
   const [isExporting, setIsExporting] = useState(false);
 
   const { analyses, loading: loadingAnalyses } = useAnalysis();
-  const {
-    inflationData,
-    buildingsTrendStats,
-    loading: loadingEvolution,
-    calculateEvolution
-  } = useEvolution();
 
   const [selectedBuilding, setSelectedBuilding] = useState<string>(
     searchParams.get("edificio") || "all"
@@ -109,6 +103,14 @@ const Evolucion = () => {
   );
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [deviation, setDeviation] = useState<any | null>(null);
+
+  const {
+    inflationData,
+    buildingsTrend,
+    buildingsTrendStats,
+    loading: loadingEvolution,
+    calculateEvolution
+  } = useEvolution(selectedCategory);
 
   const exportToPDF = async () => {
     setIsExporting(true);
@@ -313,6 +315,11 @@ const Evolucion = () => {
     const firstPeriod = periodToYearMonth(baseEvolution[0].period, null);
     const baseInflation = firstPeriod ? inflationMap.get(firstPeriod) : null;
 
+    // Create a map of buildings trend by period
+    const buildingsTrendMap = new Map(
+      buildingsTrend.map((t: any) => [t.period, t.normalizedPercent])
+    );
+
     return baseEvolution.map(point => {
       const yyyymm = periodToYearMonth(point.period, (point as any).periodDate);
 
@@ -324,13 +331,16 @@ const Evolucion = () => {
         }
       }
 
+      // Get buildings percent for this specific period
+      const buildingsPercent = buildingsTrendMap.get(point.period) ?? null;
+
       return {
         ...point,
         inflationPercent: infPercent,
-        buildingsPercent: buildingsTrendStats ? buildingsTrendStats.averageIncrease : null
+        buildingsPercent
       } as EvolutionData;
     });
-  }, [analyses, selectedBuilding, selectedCategory, inflationData, buildingsTrendStats, calculateEvolution]);
+  }, [analyses, selectedBuilding, selectedCategory, inflationData, buildingsTrend, buildingsTrendStats, calculateEvolution]);
 
   // Update AI analysis based on selected building
   useEffect(() => {
