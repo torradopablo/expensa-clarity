@@ -118,12 +118,10 @@ const Evolucion = () => {
 
       const filtersCard = document.getElementById("filters-card");
       const pdfFilterSummary = document.getElementById("pdf-filter-summary");
-      const footer = document.getElementById("pdf-footer");
 
       // 1. Prepare View for Capture
       if (filtersCard) filtersCard.style.display = "none";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "block";
-      if (footer) footer.style.display = "flex";
 
       // 2. Set fixed width for consistency
       const originalWidth = element.style.width;
@@ -149,7 +147,6 @@ const Evolucion = () => {
 
       if (filtersCard) filtersCard.style.display = "";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "none";
-      if (footer) footer.style.display = "none";
 
       // 4. Generate PDF
       const imgData = canvas.toDataURL("image/png");
@@ -162,19 +159,41 @@ const Evolucion = () => {
       const pdfWidth = 210;
       const pdfHeight = 297;
       const margin = 10;
+      const footerHeight = 15; // Space reserved for footer
+
       const printWidth = pdfWidth - (margin * 2);
-      const pageHeight = pdfHeight - (margin * 2); // Effective height without margins
 
       const imgHeight = (canvas.height * printWidth) / canvas.width;
       let heightLeft = imgHeight;
       let printedHeight = 0;
       let pageNumber = 1;
 
-      // --- First Page ---
-      // We fill the first page fully (minus margins)
-      const firstPageCap = pageHeight;
+      // Helper to draw footer
+      const drawFooter = (pageNo: number) => {
+        const footerY = pdfHeight - 10;
+        pdf.setDrawColor(220, 220, 220);
+        pdf.line(margin, footerY - 5, pdfWidth - margin, footerY - 5);
 
-      pdf.addImage(imgData, "PNG", margin, margin, printWidth, imgHeight);
+        pdf.setFontSize(8);
+        pdf.setTextColor(100);
+        pdf.text("ExpensaCheck", margin, footerY);
+        pdf.text(`Generado el ${new Date().toLocaleDateString()}`, pdfWidth - margin, footerY, { align: "right" });
+        pdf.text(`Pág ${pageNo}`, pdfWidth / 2, footerY, { align: "center" });
+      };
+
+      // --- First Page ---
+      // Content area on Page 1: from [margin] to [pdfHeight - margin - footerHeight]
+      const startY = margin;
+      const maxContentY = pdfHeight - margin - footerHeight;
+      const firstPageCap = maxContentY - startY; // Available height for content
+
+      pdf.addImage(imgData, "PNG", margin, startY, printWidth, imgHeight);
+
+      // MASK BOTTOM (to protect footer)
+      pdf.setFillColor(255, 255, 255);
+      pdf.rect(0, maxContentY, pdfWidth, pdfHeight - maxContentY, "F");
+
+      drawFooter(1);
 
       heightLeft -= firstPageCap;
       printedHeight += firstPageCap;
@@ -184,23 +203,26 @@ const Evolucion = () => {
         pageNumber++;
         pdf.addPage();
 
-        const headerHeight = 8; // mm reserved for header
-        const startY = margin + headerHeight;
-        const availableHeight = pdfHeight - margin - startY;
+        const headerHeight = 8;
+        const pageStartY = margin + headerHeight;
+        const pageMaxContentY = pdfHeight - margin - footerHeight;
+        const availableHeight = pageMaxContentY - pageStartY;
 
-        // Position image shifted UP by what we already printed.
-        // The top of image lands at: startY - printedHeight
-        pdf.addImage(imgData, "PNG", margin, startY - printedHeight, printWidth, imgHeight);
+        pdf.addImage(imgData, "PNG", margin, pageStartY - printedHeight, printWidth, imgHeight);
 
-        // MASK: Cover the top area (from 0 to startY) with white to hide previous content
-        // that spills over due to negative addImage offset
+        // MASK TOP (Cover previous content above header)
         pdf.setFillColor(255, 255, 255);
-        pdf.rect(0, 0, pdfWidth, startY, "F");
+        pdf.rect(0, 0, pdfWidth, pageStartY, "F");
 
-        // Header (drawn on top of mask)
+        // MASK BOTTOM (Cover future content below footer area)
+        pdf.rect(0, pageMaxContentY, pdfWidth, pdfHeight - pageMaxContentY, "F");
+
+        // Header
         pdf.setFontSize(9);
         pdf.setTextColor(150);
-        pdf.text(`ExpensaCheck - Informe de Evolución - Pág ${pageNumber}`, margin, margin);
+        pdf.text(`ExpensaCheck - Informe de Evolución`, margin, margin);
+
+        drawFooter(pageNumber);
 
         heightLeft -= availableHeight;
         printedHeight += availableHeight;
@@ -660,16 +682,7 @@ const Evolucion = () => {
               </>
             )}
 
-            {/* Hidden Footer for PDF Export */}
-            <div id="pdf-footer" className="hidden mt-8 pt-6 border-t border-border flex flex-row items-center justify-between">
-              <div className="flex items-center gap-2.5 opacity-90">
-                <Logo className="w-6 h-6 grayscale" />
-                <span className="text-sm font-semibold text-muted-foreground leading-none pt-0.5">ExpensaCheck</span>
-              </div>
-              <p className="text-xs text-muted-foreground ml-auto">
-                Generado el {new Date().toLocaleDateString()} a las {new Date().toLocaleTimeString()}
-              </p>
-            </div>
+            {/* Footer removed, handled by jsPDF */}
           </div>
         </div>
       </main>
