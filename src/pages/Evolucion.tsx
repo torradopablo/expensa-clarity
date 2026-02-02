@@ -110,7 +110,7 @@ const Evolucion = () => {
     buildingsTrendStats,
     loading: loadingEvolution,
     calculateEvolution
-  } = useEvolution(selectedCategory);
+  } = useEvolution(selectedCategory, selectedBuilding);
 
   const exportToPDF = async () => {
     setIsExporting(true);

@@ -21,7 +21,7 @@ export interface UseEvolutionActions {
   reset: () => void;
 }
 
-export function useEvolution(category?: string) {
+export function useEvolution(category?: string, buildingName?: string) {
   const queryClient = useQueryClient();
 
   // Queries
@@ -44,18 +44,29 @@ export function useEvolution(category?: string) {
   });
 
 
+
   const {
     data: buildingsTrendData = null,
     isLoading: loadingTrend,
     error: errorTrend
   } = useQuery({
-    queryKey: ["buildings-trend", category],
+    queryKey: ["buildings-trend", category, buildingName],
     queryFn: async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       const filters: any = {};
 
       // Only add category filter if it's not "all"
       if (category && category !== "all") {
         filters.category = category;
+      }
+
+      // Exclude current user's building from comparison
+      if (buildingName && buildingName !== "all") {
+        filters.excludeBuilding = buildingName;
+      }
+
+      if (session?.user?.id) {
+        filters.excludeUserId = session.user.id;
       }
 
       const { data, error } = await supabase.functions.invoke("get-buildings-trend", {
