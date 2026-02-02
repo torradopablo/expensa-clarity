@@ -204,7 +204,7 @@ export class TrendService {
 
         // 3. Update cache if possible
         try {
-            await this.supabase
+            await adminSupabase
                 .from("market_trends_cache")
                 .upsert({
                     filter_key: filterKey,
