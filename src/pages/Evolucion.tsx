@@ -304,7 +304,7 @@ const Evolucion = () => {
     const baseEvolution = calculateEvolution(analyses.filter(a =>
       a.status === "completed" &&
       (selectedBuilding === "all" || a.building_name === selectedBuilding)
-    ));
+    ), selectedCategory);
 
     if (baseEvolution.length < 2) return [];
 
@@ -330,7 +330,7 @@ const Evolucion = () => {
         buildingsPercent: buildingsTrendStats ? buildingsTrendStats.averageIncrease : null
       } as EvolutionData;
     });
-  }, [analyses, selectedBuilding, inflationData, buildingsTrendStats, calculateEvolution]);
+  }, [analyses, selectedBuilding, selectedCategory, inflationData, buildingsTrendStats, calculateEvolution]);
 
   // Update AI analysis based on selected building
   useEffect(() => {

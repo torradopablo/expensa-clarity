@@ -13,7 +13,7 @@ export interface UseEvolutionState {
 }
 
 export interface UseEvolutionActions {
-  calculateEvolution: (analyses: Analysis[]) => void;
+  calculateEvolution: (analyses: Analysis[], category?: string) => void;
   fetchInflationData: () => Promise<void>;
   fetchBuildingsTrend: (buildingName?: string) => Promise<void>;
   calculateDeviation: () => void;
@@ -67,7 +67,7 @@ export function useEvolution() {
   // We can keep it as a local state or just a derived value if we want to be more react-query like
   // But for now, let's keep the logic but derived from params if possible
 
-  const calculateEvolution = useCallback((analyses: Analysis[]) => {
+  const calculateEvolution = useCallback((analyses: Analysis[], category?: string) => {
     if (analyses.length < 2) return [];
 
     const sortedAnalyses = [...analyses].sort((a, b) => {
@@ -77,11 +77,22 @@ export function useEvolution() {
       return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
     });
 
-    const baseTotal = sortedAnalyses[0]?.total_amount || 0;
+    const getAmount = (analysis: Analysis) => {
+      if (category && category !== "all") {
+        const cat = analysis.expense_categories?.find(c => c.name === category);
+        return cat ? cat.current_amount : 0;
+      }
+      return analysis.total_amount;
+    };
+
+    const baseAmount = getAmount(sortedAnalyses[0]);
+
     return sortedAnalyses.map(analysis => {
-      const userPercent = baseTotal > 0 ? ((analysis.total_amount - baseTotal) / baseTotal) * 100 : 0;
+      const currentAmount = getAmount(analysis);
+      const userPercent = baseAmount > 0 ? ((currentAmount - baseAmount) / baseAmount) * 100 : 0;
       return {
         period: analysis.period,
+        periodDate: analysis.period_date, // Pass period_date specifically for date utils
         userPercent: parseFloat(userPercent.toFixed(1)),
         inflationPercent: null,
         inflationEstimated: false,
