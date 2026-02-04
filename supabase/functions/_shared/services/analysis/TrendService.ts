@@ -1,5 +1,6 @@
 import { createSupabaseClient, createServiceClient } from "../../config/supabase.ts";
 import { ComparisonService } from "./ComparisonService.ts";
+import { InflationCacheService } from "../cache/InflationCacheService.ts";
 
 export interface MarketTrendFilters {
     unit_count_range?: string;
@@ -20,12 +21,26 @@ export class TrendService {
     }
 
     async getInflationData() {
-        // Inflation data is public read usually, or authenticated. Can stay as is.
+        // Try cache first
+        const inflationCacheService = new InflationCacheService();
+        const cachedInflation = await inflationCacheService.getCachedInflationData();
+        
+        if (cachedInflation) {
+            return { data: cachedInflation.data, error: null, cached: true };
+        }
+
+        // Fallback to database
         const { data, error } = await this.supabase
             .from("inflation_data")
             .select("period, value, is_estimated")
             .order("period", { ascending: true });
-        return { data, error };
+        
+        // Cache the result for future requests
+        if (data && !error) {
+            await inflationCacheService.cacheInflationData(data);
+        }
+        
+        return { data, error, cached: false };
     }
 
     async getMarketTrend(filters?: MarketTrendFilters, fallbackIfEmpty = true) {

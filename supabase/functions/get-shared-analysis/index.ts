@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
 import { TrendService } from "../_shared/services/analysis/TrendService.ts"
+import { SharedAnalysisCacheService } from "../_shared/services/cache/SharedAnalysisCacheService.ts"
 
 const MAX_HISTORICAL_PERIODS = 15;
 
@@ -84,9 +85,25 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Initialize cache service
+    const cacheService = new SharedAnalysisCacheService()
+
     console.log('Looking for shared link with token:', token)
 
-    // Find the shared link
+    // 1. Try to get from cache first
+    const cachedResult = await cacheService.getCachedAnalysis(token)
+    if (cachedResult) {
+      console.log('Returning cached analysis data')
+      return new Response(
+        JSON.stringify(cachedResult.data),
+        { 
+          status: 200, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } 
+        }
+      )
+    }
+
+    // 2. Find the shared link
     const { data: linkData, error: linkError } = await supabase
       .from('shared_analysis_links')
       .select('*')
@@ -346,9 +363,15 @@ serve(async (req) => {
 
     console.log('Returning analysis data successfully')
 
+    // 3. Cache the result for future requests
+    await cacheService.cacheAnalysis(linkData.analysis_id, token, responseData)
+
     return new Response(
       JSON.stringify(responseData),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } 
+      }
     )
 
   } catch (error) {
