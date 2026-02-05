@@ -11,7 +11,7 @@ interface CacheEntry {
 
 export class SharedAnalysisCacheService {
   private adminSupabase = createServiceClient();
-  private CACHE_TTL_HOURS = 24; // 24 horas de caché
+  private CACHE_TTL_MINUTES = 15; // 15 minutos para asegurar datos frescos
 
   async getCachedAnalysis(token: string): Promise<{ data: any; cached: boolean } | null> {
     try {
@@ -60,7 +60,7 @@ export class SharedAnalysisCacheService {
   ): Promise<void> {
     try {
       const expiresAt = new Date();
-      expiresAt.setHours(expiresAt.getHours() + this.CACHE_TTL_HOURS);
+      expiresAt.setMinutes(expiresAt.getMinutes() + this.CACHE_TTL_MINUTES);
 
       await this.adminSupabase
         .from("shared_analysis_cache")
@@ -83,12 +83,13 @@ export class SharedAnalysisCacheService {
 
   async invalidateCache(analysisId: string): Promise<void> {
     try {
+      // Invalidar TODOS los cachés para este análisis (por si hay múltiples tokens)
       await this.adminSupabase
         .from("shared_analysis_cache")
         .delete()
         .eq("analysis_id", analysisId);
 
-      console.log(`Cache invalidated for analysis: ${analysisId}`);
+      console.log(`All cache entries invalidated for analysis: ${analysisId}`);
 
     } catch (error) {
       console.log("Cache invalidation error:", error);

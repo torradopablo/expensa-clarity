@@ -720,6 +720,16 @@ Analizá tu expensa en ExpensaCheck`;
       const newReplyData = (responseData as any).comment;
       setComments(prev => [...prev, newReplyData]);
       
+      // Invalidate cache for this analysis to ensure share shows updated comments
+      try {
+        await supabase.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
+      
       // Reset form
       setOwnerReply('');
       setReplyingTo(null);
@@ -803,6 +813,16 @@ Analizá tu expensa en ExpensaCheck`;
       // Add new comment to local state
       const newCommentData = (responseData as any).comment;
       setComments(prev => [...prev, newCommentData]);
+      
+      // Invalidate cache for this analysis to ensure share shows updated comments
+      try {
+        await supabase.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
       
       // Reset form
       setNewComment({ author_name: '', author_email: '', comment: '' });

@@ -478,6 +478,16 @@ const SharedAnalysis = () => {
       const newReplyData = responseData.comment;
       setComments(prev => [...prev, newReplyData]);
       
+      // Invalidate cache to ensure updated comments are shown
+      try {
+        await supabaseFunctions.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: analysis?.id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
+      
       // Reset form
       setOwnerReply('');
       setReplyingTo(null);
@@ -514,6 +524,7 @@ const SharedAnalysis = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
         },
         body: JSON.stringify({
           token,
@@ -533,6 +544,16 @@ const SharedAnalysis = () => {
       // Add the new comment to the local state
       const newCommentData = responseData.comment;
       setComments(prev => [...prev, newCommentData]);
+      
+      // Invalidate cache to ensure updated comments are shown
+      try {
+        await supabaseFunctions.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: analysis?.id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
       
       // Reset form
       setNewComment({ author_name: '', author_email: '', comment: '' });

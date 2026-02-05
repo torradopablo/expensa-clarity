@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import { SharedAnalysisCacheService } from "../_shared/services/cache/SharedAnalysisCacheService.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -7,9 +8,9 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-const MAX_COMMENTS_PER_HOUR = 3;
-const MAX_COMMENTS_PER_DAY = 10;
-const MAX_COMMENTS_PER_MONTH = 30;
+const MAX_COMMENTS_PER_HOUR = 3; // Reducido de 5 a 3
+const MAX_COMMENTS_PER_DAY = 10; // Nuevo límite diario
+const MAX_COMMENTS_PER_MONTH = 30; // Nuevo límite mensual
 
 interface CommentRequest {
   token: string;
@@ -59,7 +60,7 @@ serve(async (req) => {
       )
     }
 
-    // Create Supabase client with SERVICE_ROLE_KEY for bypassing RLS
+    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
@@ -106,12 +107,27 @@ serve(async (req) => {
       )
     }
 
-    // Validar restricción temporal
+    // Validar restricción temporal: permitir comentarios dentro de una ventana razonable
     const analysisDate = analysis.period_date ? new Date(analysis.period_date) : parsePeriodToDate(analysis.period);
     const now = new Date();
     
+    console.log('Date validation:', {
+      analysisId: linkData.analysis_id,
+      analysisPeriod: analysis.period,
+      analysisPeriodDate: analysis.period_date,
+      parsedAnalysisDate: analysisDate.toISOString(),
+      currentDate: now.toISOString(),
+      isSameMonth: isSameMonth(analysisDate, now)
+    });
+    
+    // Permitir comentarios si:
+    // 1. Es el mismo mes del análisis, O
+    // 2. El análisis es de hasta 1 mes en el futuro (reducido de 2), O
+    // 3. El análisis es de hasta 1 mes en el pasado (reducido de 3)
     const monthsDiff = (now.getFullYear() - analysisDate.getFullYear()) * 12 + 
                      (now.getMonth() - analysisDate.getMonth());
+    
+    console.log('Months difference:', monthsDiff);
     
     if (monthsDiff < -1 || monthsDiff > 1) {
       return new Response(
@@ -120,31 +136,43 @@ serve(async (req) => {
       )
     }
 
-    // Rate limiting por ANÁLISIS (no global)
+    // Rate limiting: máximo 5 comentarios por hora por IP
+    // Extraer la primera IP válida de los headers (puede venir como lista separada por comas)
+    const forwardedFor = req.headers.get('x-forwarded-for');
+    const realIP = req.headers.get('x-real-ip');
+    
+    let clientIP = 'unknown';
+    if (forwardedFor) {
+      // x-forwarded-for puede tener múltiples IPs: "client, proxy1, proxy2"
+      // Tomamos la primera (la del cliente original)
+      clientIP = forwardedFor.split(',')[0].trim();
+    } else if (realIP) {
+      clientIP = realIP.trim();
+    }
+    
+    console.log('Client IP for rate limiting:', { original: forwardedFor, real: realIP, parsed: clientIP });
+    
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
     
+    // Rate limiting GLOBAL (no por IP) - previene ataques coordinados
     const { data: recentHourComments, error: hourError } = await supabase
       .from('analysis_comments')
       .select('id')
-      .eq('analysis_id', linkData.analysis_id)
       .gte('created_at', oneHourAgo.toISOString());
     
     const { data: recentDayComments, error: dayError } = await supabase
       .from('analysis_comments')
       .select('id')
-      .eq('analysis_id', linkData.analysis_id)
       .gte('created_at', oneDayAgo.toISOString());
     
     const { data: recentMonthComments, error: monthError } = await supabase
       .from('analysis_comments')
       .select('id')
-      .eq('analysis_id', linkData.analysis_id)
       .gte('created_at', oneMonthAgo.toISOString());
 
-    console.log('Per-analysis rate limiting check:', {
-      analysisId: linkData.analysis_id,
+    console.log('Global rate limiting check:', {
       hourCount: recentHourComments?.length || 0,
       dayCount: recentDayComments?.length || 0,
       monthCount: recentMonthComments?.length || 0
@@ -154,30 +182,19 @@ serve(async (req) => {
       console.error('Rate limiting check error:', { hourError, dayError, monthError });
     } else if (recentHourComments && recentHourComments.length >= MAX_COMMENTS_PER_HOUR) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_HOUR} comments per hour for this analysis.` }),
+        JSON.stringify({ error: `Global rate limit exceeded. Maximum ${MAX_COMMENTS_PER_HOUR} comments per hour for all users.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else if (recentDayComments && recentDayComments.length >= MAX_COMMENTS_PER_DAY) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_DAY} comments per day for this analysis.` }),
+        JSON.stringify({ error: `Global rate limit exceeded. Maximum ${MAX_COMMENTS_PER_DAY} comments per day for all users.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else if (recentMonthComments && recentMonthComments.length >= MAX_COMMENTS_PER_MONTH) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_MONTH} comments per month for this analysis.` }),
+        JSON.stringify({ error: `Global rate limit exceeded. Maximum ${MAX_COMMENTS_PER_MONTH} comments per month for all users.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
-    }
-
-    // Extraer IP del cliente
-    const forwardedFor = req.headers.get('x-forwarded-for');
-    const realIP = req.headers.get('x-real-ip');
-    
-    let clientIP = 'unknown';
-    if (forwardedFor) {
-      clientIP = forwardedFor.split(',')[0].trim();
-    } else if (realIP) {
-      clientIP = realIP.trim();
     }
 
     // Insertar el comentario
@@ -203,11 +220,9 @@ serve(async (req) => {
       )
     }
 
-    // Invalidar caché directamente sin usar SharedAnalysisCacheService
-    await supabase
-      .from("shared_analysis_cache")
-      .delete()
-      .eq("analysis_id", linkData.analysis_id);
+    // Invalidar caché del análisis para incluir nuevo comentario
+    const cacheService = new SharedAnalysisCacheService();
+    await cacheService.invalidateCache(linkData.analysis_id);
 
     console.log(`Comment added for analysis ${linkData.analysis_id} by ${author_name}`);
 
@@ -231,6 +246,7 @@ serve(async (req) => {
 
 // Funciones helper
 function parsePeriodToDate(period: string): Date {
+  // Asumir formato "YYYY-MM" o "MM/YYYY" o similar
   const parts = period.split(/[-/]/);
   if (parts.length === 2) {
     const year = parseInt(parts[0].length === 4 ? parts[0] : parts[1]);
@@ -238,4 +254,9 @@ function parsePeriodToDate(period: string): Date {
     return new Date(year, month - 1, 1);
   }
   return new Date();
+}
+
+function isSameMonth(date1: Date, date2: Date): boolean {
+  return date1.getFullYear() === date2.getFullYear() && 
+         date1.getMonth() === date2.getMonth();
 }

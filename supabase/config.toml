@@ -27,5 +27,8 @@ verify_jwt = false
 [functions.add-owner-comment]
 verify_jwt = false
 
+[functions.invalidate-share-cache]
+verify_jwt = false
+
 [functions.cache-maintenance]
 verify_jwt = false

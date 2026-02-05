@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
 import { TrendService } from "../_shared/services/analysis/TrendService.ts"
 import { SharedAnalysisCacheService } from "../_shared/services/cache/SharedAnalysisCacheService.ts"
@@ -181,7 +181,7 @@ serve(async (req) => {
     const { data: comments, error: commentsError } = await supabase
       .from('analysis_comments')
       .select('id, author_name, author_email, comment, created_at, is_owner_comment, user_id, parent_comment_id')
-      .eq('token', token)
+      .eq('analysis_id', linkData.analysis_id)
       .order('created_at', { ascending: true })
 
     if (commentsError) {
