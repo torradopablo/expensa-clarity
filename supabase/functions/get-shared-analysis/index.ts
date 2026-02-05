@@ -50,6 +50,17 @@ interface Deviation {
   isSignificant: boolean;
 }
 
+interface AnalysisComment {
+  id: string;
+  author_name: string;
+  author_email: string | null;
+  comment: string;
+  created_at: string;
+  is_owner_comment: boolean;
+  user_id: string | null;
+  parent_comment_id: string | null;
+}
+
 interface BuildingsTrendStats {
   totalBuildings: number;
   totalAnalyses: number;
@@ -164,6 +175,18 @@ serve(async (req) => {
         JSON.stringify({ error: 'Failed to fetch categories' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Get comments for this analysis (incluyendo comentarios de owner)
+    const { data: comments, error: commentsError } = await supabase
+      .from('analysis_comments')
+      .select('id, author_name, author_email, comment, created_at, is_owner_comment, user_id, parent_comment_id')
+      .eq('token', token)
+      .order('created_at', { ascending: true })
+
+    if (commentsError) {
+      console.log('Comments error:', commentsError)
+      // No fallar si hay error en comentarios, solo loggear
     }
 
     // Get ALL historical data for same building and user to build consistent evolution
@@ -358,7 +381,8 @@ serve(async (req) => {
       historicalData: slicedHistoricalData || [],
       evolutionData,
       deviation,
-      buildingsTrendStats
+      buildingsTrendStats,
+      comments: comments || []
     }
 
     console.log('Returning analysis data successfully')

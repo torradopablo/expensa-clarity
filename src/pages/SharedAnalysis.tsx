@@ -23,7 +23,10 @@ import {
   Shield,
   Lock,
   ExternalLink,
-  History
+  History,
+  MessageSquare,
+  Send,
+  User
 } from "lucide-react";
 import { createClient } from "@supabase/supabase-js";
 import { Sparkles } from "lucide-react";
@@ -97,13 +100,15 @@ interface Category {
 
 interface Analysis {
   id: string;
-  building_name: string | null;
+  user_id: string;
+  building_name: string;
+  building_address: string;
   period: string;
-  unit: string | null;
+  period_date: string;
   total_amount: number;
-  previous_total: number | null;
-  status: string;
+  categories_count: number;
   created_at: string;
+  owner_notes?: string;
 }
 
 interface HistoricalDataPoint {
@@ -126,6 +131,17 @@ interface Deviation {
   fromInflation: number;
   fromBuildings: number;
   isSignificant: boolean;
+}
+
+interface AnalysisComment {
+  id: string;
+  author_name: string;
+  author_email: string | null;
+  comment: string;
+  created_at: string;
+  is_owner_comment: boolean;
+  user_id: string | null;
+  parent_comment_id: string | null;
 }
 
 interface BuildingsTrendStats {
@@ -342,8 +358,18 @@ const SharedAnalysis = () => {
   const [evolutionData, setEvolutionData] = useState<EvolutionDataPoint[]>([]);
   const [deviation, setDeviation] = useState<Deviation | null>(null);
   const [buildingsTrendStats, setBuildingsTrendStats] = useState<BuildingsTrendStats | null>(null);
+  const [comments, setComments] = useState<AnalysisComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Form state for new comment
+  const [newComment, setNewComment] = useState({ author_name: '', author_email: '', comment: '' });
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+  
+  // State for owner reply
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [ownerReply, setOwnerReply] = useState('');
 
   useEffect(() => {
     const fetchSharedAnalysis = async () => {
@@ -391,6 +417,7 @@ const SharedAnalysis = () => {
           setEvolutionData(analysisResult.evolutionData || []);
           setDeviation(analysisResult.deviation || null);
           setBuildingsTrendStats(analysisResult.buildingsTrendStats || null);
+          setComments(analysisResult.comments || []);
         } else {
           console.log("No analysis data in response");
           setError("No se pudo cargar el análisis");
@@ -405,6 +432,128 @@ const SharedAnalysis = () => {
 
     fetchSharedAnalysis();
   }, [token]);
+
+  // Function to submit owner reply
+  const handleOwnerReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!replyingTo || !ownerReply.trim()) {
+      setCommentError("Por favor escribe una respuesta");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      console.log('Submitting owner reply:', {
+        token: token?.substring(0, 10) + '...',
+        user_id: 'owner-user-id', // Esto debería venir del auth real
+        parent_comment_id: replyingTo,
+        comment: ownerReply.trim()
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-owner-comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          token,
+          user_id: 'owner-user-id', // Esto debería venir del auth real
+          parent_comment_id: replyingTo,
+          comment: ownerReply.trim()
+        })
+      });
+
+      const responseData = await response.json();
+      console.log('Response from owner-reply:', { status: response.status, data: responseData });
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Add new reply to local state
+      const newReplyData = responseData.comment;
+      setComments(prev => [...prev, newReplyData]);
+      
+      // Reset form
+      setOwnerReply('');
+      setReplyingTo(null);
+      
+    } catch (err: any) {
+      console.error('Error submitting owner reply:', err);
+      setCommentError(err.message || 'Error al enviar la respuesta');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  // Function to submit a new comment
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!token || !newComment.author_name.trim() || !newComment.comment.trim()) {
+      setCommentError("Por favor completa tu nombre y el comentario");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      console.log('Submitting comment:', {
+        token: token?.substring(0, 10) + '...',
+        author_name: newComment.author_name.trim(),
+        author_email: newComment.author_email.trim() || undefined,
+        comment: newComment.comment.trim()
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-analysis-comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          token,
+          author_name: newComment.author_name.trim(),
+          author_email: newComment.author_email.trim() || undefined,
+          comment: newComment.comment.trim()
+        })
+      });
+
+      const responseData = await response.json();
+      console.log('Response from add-comment:', { status: response.status, data: responseData });
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Add the new comment to the local state
+      const newCommentData = responseData.comment;
+      setComments(prev => [...prev, newCommentData]);
+      
+      // Reset form
+      setNewComment({ author_name: '', author_email: '', comment: '' });
+      
+    } catch (err: any) {
+      console.error('Error submitting comment:', err);
+      setCommentError(err.message || 'Error al enviar el comentario');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (isLoading) {
     return (
@@ -650,6 +799,225 @@ const SharedAnalysis = () => {
                 />
               </div>
             )}
+
+            {/* Owner's Notes Section */}
+            {analysis?.owner_notes && (
+              <Card variant="glass" className="mb-8 animate-fade-in-up">
+                <CardHeader>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-primary-soft flex items-center justify-center">
+                      <MessageSquare className="w-5 h-5 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-lg">Notas del Owner</CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Información adicional proporcionada por el dueño del análisis
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed">{analysis.owner_notes}</p>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Comments Section */}
+            <Card variant="glass" className="mb-8 animate-fade-in-up">
+              <CardHeader>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center">
+                    <MessageSquare className="w-5 h-5 text-secondary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg">Comentarios</CardTitle>
+                    <p className="text-sm text-muted-foreground">
+                      {comments.length} comentario{comments.length !== 1 ? 's' : ''} sobre este análisis
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {/* Comment Form */}
+                <form onSubmit={handleCommentSubmit} className="mb-6 p-4 bg-muted/30 rounded-lg">
+                  <div className="grid gap-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Tu nombre *</label>
+                        <input
+                          type="text"
+                          value={newComment.author_name}
+                          onChange={(e) => setNewComment(prev => ({ ...prev, author_name: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="Juan Pérez"
+                          maxLength={100}
+                          required
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-2">Email (opcional)</label>
+                        <input
+                          type="email"
+                          value={newComment.author_email}
+                          onChange={(e) => setNewComment(prev => ({ ...prev, author_email: e.target.value }))}
+                          className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                          placeholder="juan@ejemplo.com"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Tu comentario *</label>
+                      <textarea
+                        value={newComment.comment}
+                        onChange={(e) => setNewComment(prev => ({ ...prev, comment: e.target.value }))}
+                        className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                        rows={3}
+                        placeholder="¿Qué opinas sobre este análisis de expensas?"
+                        maxLength={500}
+                        required
+                      />
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {newComment.comment.length}/500 caracteres
+                      </div>
+                    </div>
+                    {commentError && (
+                      <div className="text-sm text-status-attention bg-status-attention-bg p-3 rounded-lg">
+                        {commentError}
+                      </div>
+                    )}
+                    <div className="flex gap-2">
+                      <Button 
+                        type="submit" 
+                        disabled={isSubmittingComment}
+                        className="w-full md:w-auto"
+                      >
+                        Enviar comentario
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+
+                {/* Comments List */}
+                {comments.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                    <p>Sé el primero en comentar sobre este análisis</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="border-l-4 border-primary/20 pl-4 py-3">
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                              comment.is_owner_comment 
+                                ? 'bg-primary text-white' 
+                                : 'bg-primary/10'
+                            }`}>
+                              {comment.is_owner_comment ? (
+                                <span className="text-xs font-bold">O</span>
+                              ) : (
+                                <User className="w-4 h-4 text-primary" />
+                              )}
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">
+                                {comment.is_owner_comment ? 'Owner' : comment.author_name}
+                              </p>
+                              <p className="text-xs text-muted-foreground">{formatDate(comment.created_at)}</p>
+                            </div>
+                          </div>
+                          {/* Reply button for owner */}
+                          {analysis?.user_id === 'owner-user-id' && !comment.is_owner_comment && (
+                            <button
+                              onClick={() => setReplyingTo(comment.id)}
+                              className="text-xs text-primary hover:text-primary/80 transition-colors"
+                            >
+                              Responder
+                            </button>
+                          )}
+                        </div>
+                        <p className="text-sm leading-relaxed">{comment.comment}</p>
+                        
+                        {/* Owner Reply Form */}
+                        {replyingTo === comment.id && (
+                          <div className="mt-3 p-3 bg-muted/30 rounded-lg border-l-4 border-primary/30">
+                            <form onSubmit={handleOwnerReply} className="space-y-3">
+                              <div>
+                                <label className="block text-sm font-medium mb-2">Tu respuesta como Owner:</label>
+                                <textarea
+                                  value={ownerReply}
+                                  onChange={(e) => setOwnerReply(e.target.value)}
+                                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
+                                  rows={3}
+                                  placeholder="Responde al comentario..."
+                                  maxLength={1000}
+                                  required
+                                />
+                                <div className="text-xs text-muted-foreground mt-1">
+                                  {ownerReply.length}/1000 caracteres
+                                </div>
+                              </div>
+                              {commentError && (
+                                <div className="text-sm text-status-attention bg-status-attention-bg p-3 rounded-lg">
+                                  {commentError}
+                                </div>
+                              )}
+                              <div className="flex gap-2">
+                                <Button 
+                                  type="submit" 
+                                  disabled={isSubmittingComment}
+                                  size="sm"
+                                >
+                                  {isSubmittingComment ? (
+                                    <>
+                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                      <span>Enviando...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Send className="w-4 h-4 mr-2" />
+                                      <span>Enviar respuesta</span>
+                                    </>
+                                  )}
+                                </Button>
+                                <Button 
+                                  type="button" 
+                                  variant="outline" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setReplyingTo(null);
+                                    setOwnerReply('');
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                              </div>
+                            </form>
+                          </div>
+                        )}
+                        
+                        {/* Show replies */}
+                        {comments.filter(c => c.parent_comment_id === comment.id).map((reply) => (
+                          <div key={reply.id} className="ml-8 mt-3 p-3 bg-muted/20 rounded-lg border-l-4 border-primary/20">
+                            <div className="flex items-center gap-2 mb-2">
+                              <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
+                                <span className="text-xs font-bold">O</span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-xs text-primary">Owner</p>
+                                <p className="text-xs text-muted-foreground">{formatDate(reply.created_at)}</p>
+                              </div>
+                            </div>
+                            <p className="text-sm leading-relaxed">{reply.comment}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
             {/* CTA */}
             <Card variant="soft" className="animate-fade-in-up">
