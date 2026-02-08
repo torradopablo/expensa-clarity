@@ -107,9 +107,9 @@ serve(async (req) => {
       console.log('Returning cached analysis data')
       return new Response(
         JSON.stringify(cachedResult.data),
-        { 
-          status: 200, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' } 
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
         }
       )
     }
@@ -192,9 +192,10 @@ serve(async (req) => {
     // Get ALL historical data for same building and user to build consistent evolution
     const { data: historicalData, error: historicalError } = await supabase
       .from('expense_analyses')
-      .select('id, period, total_amount, created_at, period_date')
+      .select('id, period, total_amount, created_at, period_date, expense_categories(name, current_amount)')
       .eq('building_name', analysis.building_name)
       .eq('user_id', analysis.user_id)
+      .eq('status', 'completed')
       .order('period_date', { ascending: true, nullsFirst: false })
 
     if (historicalError) {
@@ -267,6 +268,30 @@ serve(async (req) => {
 
     const buildingsTrend = trendData || [];
     let buildingsTrendStats: BuildingsTrendStats | null = trendStats || null;
+
+    // Fetch trends for all other categories found in historical data
+    const uniqueCategories = new Set<string>();
+    if (historicalData) {
+      historicalData.forEach((h: any) => {
+        h.expense_categories?.forEach((c: any) => uniqueCategories.add(c.name));
+      });
+    }
+
+    const categoryTrends: Record<string, any> = {
+      all: { data: buildingsTrend, stats: buildingsTrendStats }
+    };
+
+    // Limit to top 15 categories to avoid excessive queries (usually it's around 5-10)
+    const categoriesToFetch = Array.from(uniqueCategories).slice(0, 15);
+
+    for (const catName of categoriesToFetch) {
+      const catFilters = { ...filters, category: catName };
+      const { data: catTrendData, stats: catTrendStats } = await trendService.getMarketTrend(
+        catFilters,
+        true // Use fallback for categories to ensure we have data
+      );
+      categoryTrends[catName] = { data: catTrendData || [], stats: catTrendStats || null };
+    }
 
     // Fetch inflation data
     let inflationData = null;
@@ -382,7 +407,9 @@ serve(async (req) => {
       evolutionData,
       deviation,
       buildingsTrendStats,
-      comments: comments || []
+      comments: comments || [],
+      inflationData,
+      categoryTrends
     }
 
     console.log('Returning analysis data successfully')
@@ -392,9 +419,9 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(responseData),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
       }
     )
 

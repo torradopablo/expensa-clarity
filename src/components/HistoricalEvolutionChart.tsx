@@ -18,6 +18,7 @@ interface HistoricalEvolutionChartProps {
   buildingName: string | null;
   currentAnalysisId: string;
   currentPeriod: string;
+  category?: string;
 }
 
 interface HistoricalData {
@@ -26,6 +27,7 @@ interface HistoricalData {
   total_amount: number;
   created_at: string;
   period_date: string | null;
+  expense_categories?: { name: string; current_amount: number }[];
 }
 
 const formatCurrency = (value: number) => {
@@ -51,6 +53,7 @@ export const HistoricalEvolutionChart = ({
   buildingName,
   currentAnalysisId,
   currentPeriod,
+  category = "all",
 }: HistoricalEvolutionChartProps) => {
   const [historicalData, setHistoricalData] = useState<HistoricalData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -65,8 +68,9 @@ export const HistoricalEvolutionChart = ({
       try {
         const { data, error } = await supabase
           .from("expense_analyses")
-          .select("id, period, total_amount, created_at, period_date")
+          .select("id, period, total_amount, created_at, period_date, expense_categories(name, current_amount)")
           .eq("building_name", buildingName)
+          .eq("status", "completed")
           .order("period_date", { ascending: true, nullsFirst: false });
 
         if (error) throw error;
@@ -99,20 +103,26 @@ export const HistoricalEvolutionChart = ({
     return null;
   }
 
+  const getAmount = (item: HistoricalData) => {
+    if (category === "all") return item.total_amount;
+    const cat = item.expense_categories?.find(c => c.name === category);
+    return cat ? cat.current_amount : 0;
+  };
+
   const chartData = historicalData.map((item) => ({
     period: item.period,
-    total: item.total_amount,
+    total: getAmount(item),
     isCurrent: item.id === currentAnalysisId,
   }));
 
   // Calculate statistics
-  const totals = historicalData.map((d) => d.total_amount);
+  const totals = historicalData.map((d) => getAmount(d));
   const average = totals.reduce((a, b) => a + b, 0) / totals.length;
   const min = Math.min(...totals);
   const max = Math.max(...totals);
-  const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
+  const currentTotal = getAmount(historicalData.find((d) => d.id === currentAnalysisId)!);
   const previousTotal = historicalData.length >= 2
-    ? historicalData[historicalData.length - 2]?.total_amount
+    ? getAmount(historicalData[historicalData.length - 2])
     : null;
 
   const overallChange = previousTotal
@@ -133,7 +143,9 @@ export const HistoricalEvolutionChart = ({
               <History className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Evolución histórica</CardTitle>
+              <CardTitle className="text-lg">
+                {category === "all" ? "Evolución histórica" : `Evolución: ${category}`}
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {historicalData.length} análisis de {buildingName}
               </p>

@@ -43,6 +43,13 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Sparkles } from "lucide-react";
@@ -154,6 +161,7 @@ interface HistoricalDataPoint {
   period: string;
   total_amount: number;
   period_date: string | null;
+  expense_categories?: { name: string; current_amount: number }[];
 }
 
 interface EvolutionDataPoint {
@@ -228,6 +236,11 @@ const AnalysisPage = () => {
   const [ownerReply, setOwnerReply] = useState('');
   const [user, setUser] = useState<any>(null);
   const [sharedToken, setSharedToken] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [inflationDataRaw, setInflationDataRaw] = useState<any[]>([]);
+  const [buildingsTrendRaw, setBuildingsTrendRaw] = useState<any[]>([]);
+  const [isBuildingsTrendLoading, setIsBuildingsTrendLoading] = useState(false);
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -295,9 +308,10 @@ const AnalysisPage = () => {
           // Fetch historical analyses for this building
           const { data: historicalAnalyses } = await supabase
             .from("expense_analyses")
-            .select("id, period, total_amount, period_date")
+            .select("id, period, total_amount, period_date, expense_categories(name, current_amount)")
             .eq("user_id", session.user.id)
             .eq("building_name", analysisData.building_name)
+            .eq("status", "completed")
             .order("period_date", { ascending: true, nullsFirst: false });
 
           if (historicalAnalyses && historicalAnalyses.length > 0) {
@@ -313,7 +327,14 @@ const AnalysisPage = () => {
               }
             }
 
-            setHistoricalData(slicedHistoricalAnalyses);
+            setHistoricalData(slicedHistoricalAnalyses as HistoricalDataPoint[]);
+
+            // Extract unique categories across all historical periods
+            const allCatNames = new Set<string>();
+            slicedHistoricalAnalyses.forEach(h => {
+              h.expense_categories?.forEach((c: any) => allCatNames.add(c.name));
+            });
+            setAvailableCategories(Array.from(allCatNames).sort());
 
             // Enrich previous-period data for older analyses (when previous_* fields are null)
             const globalCurrentIdx = historicalAnalyses.findIndex((h) => h.id === analysisData.id);
@@ -376,121 +397,9 @@ const AnalysisPage = () => {
               }
             }
 
-            // Fetch building profile for filtering
-            const { data: profile } = await supabase
-              .from("building_profiles")
-              .select("unit_count_range, age_category, neighborhood, zone, has_amenities")
-              .eq("building_name", analysisData.building_name)
-              .maybeSingle();
-
-            // Fetch buildings trend via Edge Function (to bypass RLS and get aggregated data)
-            const filters: Record<string, any> = {};
-            if (profile) {
-              if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
-              if (profile.age_category) filters.age_category = profile.age_category;
-              if (profile.neighborhood) filters.neighborhood = profile.neighborhood;
-              if (profile.zone) filters.zone = profile.zone;
-              if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
-            }
-
-            // Exclude current building only for current user
-            filters.excludeBuilding = analysisData.building_name;
-            filters.excludeUserId = session.user.id;
-
-            const trendResponse = await fetch(
-              `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-                },
-                body: JSON.stringify({
-                  filters: Object.keys(filters).length > 0 ? filters : undefined,
-                  fallbackIfEmpty: false // Be strict as per user request
-                }),
-              }
-            );
-
-            let buildingsTrend: any[] = [];
-            if (trendResponse.ok) {
-              const result = await trendResponse.json();
-              buildingsTrend = result.data || [];
-              setBuildingsTrendStats(result.stats || null);
-            }
-
-            // Calculate evolution data
-            if (slicedHistoricalAnalyses.length >= 2) {
-              const baseTotal = slicedHistoricalAnalyses[0].total_amount;
-
-              // Create inflation map
-              const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
-              if (inflationData) {
-                inflationData.forEach(inf => {
-                  inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
-                });
-              }
-
-              // Find base inflation value
-              const firstSlicedPeriodData = slicedHistoricalAnalyses[0];
-              const firstSlicedPeriodYYYYMM = periodToYearMonth(firstSlicedPeriodData.period, firstSlicedPeriodData.period_date);
-              const baseInflation = firstSlicedPeriodYYYYMM ? (inflationMap.get(firstSlicedPeriodYYYYMM) ?? null) : null;
-
-              // Find base buildings value from the trend data
-              const firstSlicedPeriod = slicedHistoricalAnalyses[0].period;
-              const baseBuildingsItem = buildingsTrend.find(b => b.period === firstSlicedPeriod);
-              const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
-
-              const evolution: EvolutionDataPoint[] = slicedHistoricalAnalyses.map((h) => {
-                const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0;
-
-                let inflationPercent: number | null = null;
-                let inflationEstimated = false;
-
-                const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
-                if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
-                  const inflationItem = inflationMap.get(periodYYYYMM);
-                  if (inflationItem) {
-                    inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
-                    inflationEstimated = inflationItem.is_estimated;
-                  }
-                }
-
-                let buildingsPercent: number | null = null;
-                if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
-                  const buildingsItem = buildingsTrend.find(b => b.period === h.period);
-                  if (buildingsItem) {
-                    buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
-                  }
-                }
-
-                return {
-                  period: h.period,
-                  userPercent,
-                  inflationPercent,
-                  inflationEstimated,
-                  buildingsPercent
-                };
-              });
-
-              setEvolutionData(evolution);
-
-              // Calculate deviation for latest period
-              const latestEvolution = evolution[evolution.length - 1];
-              if (latestEvolution) {
-                const fromInflation = latestEvolution.inflationPercent !== null
-                  ? latestEvolution.userPercent - latestEvolution.inflationPercent
-                  : 0;
-                const fromBuildings = latestEvolution.buildingsPercent !== null
-                  ? latestEvolution.userPercent - latestEvolution.buildingsPercent
-                  : 0;
-
-                setDeviation({
-                  fromInflation,
-                  fromBuildings,
-                  isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
-                });
-              }
+            // Store inflation data
+            if (inflationData) {
+              setInflationDataRaw(inflationData);
             }
           }
         }
@@ -504,6 +413,153 @@ const AnalysisPage = () => {
 
     fetchAnalysis();
   }, [id, navigate]);
+
+  // Second effect: Fetch building trends when category or analysis changes
+  useEffect(() => {
+    const fetchBuildingTrends = async () => {
+      if (!analysis?.building_name) return;
+
+      setIsBuildingsTrendLoading(true);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) return;
+
+        // Fetch building profile for filtering
+        const { data: profile } = await supabase
+          .from("building_profiles")
+          .select("unit_count_range, age_category, neighborhood, zone, has_amenities")
+          .eq("building_name", analysis.building_name)
+          .maybeSingle();
+
+        const filters: Record<string, any> = {};
+        if (profile) {
+          if (profile.unit_count_range) filters.unit_count_range = profile.unit_count_range;
+          if (profile.age_category) filters.age_category = profile.age_category;
+          if (profile.neighborhood) filters.neighborhood = profile.neighborhood;
+          if (profile.zone) filters.zone = profile.zone;
+          if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
+        }
+
+        // Add category filter
+        if (selectedCategory && selectedCategory !== "all") {
+          filters.category = selectedCategory;
+        }
+
+        filters.excludeBuilding = analysis.building_name;
+        filters.excludeUserId = session.user.id;
+
+        const trendResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            },
+            body: JSON.stringify({
+              filters: Object.keys(filters).length > 0 ? filters : undefined,
+              fallbackIfEmpty: true // More lenient when filtering by category
+            }),
+          }
+        );
+
+        if (trendResponse.ok) {
+          const result = await trendResponse.json();
+          setBuildingsTrendRaw(result.data || []);
+          setBuildingsTrendStats(result.stats || null);
+        }
+      } catch (error) {
+        console.error("Error fetching building trends:", error);
+      } finally {
+        setIsBuildingsTrendLoading(false);
+      }
+    };
+
+    fetchBuildingTrends();
+  }, [analysis?.building_name, selectedCategory]);
+
+  // Third effect: Recalculate evolution data when anything changes
+  useEffect(() => {
+    if (historicalData.length < 2) return;
+
+    const getAmount = (h: HistoricalDataPoint) => {
+      if (selectedCategory === "all") return h.total_amount;
+      const cat = h.expense_categories?.find(c => c.name === selectedCategory);
+      return cat ? cat.current_amount : 0;
+    };
+
+    const baseAmount = getAmount(historicalData[0]);
+
+    // Create inflation map
+    const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+    if (inflationDataRaw) {
+      inflationDataRaw.forEach(inf => {
+        inflationMap.set(inf.period, { value: inf.value, is_estimated: inf.is_estimated });
+      });
+    }
+
+    // Find base inflation value
+    const firstPeriod = historicalData[0];
+    const firstPeriodYYYYMM = periodToYearMonth(firstPeriod.period, firstPeriod.period_date);
+    const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null;
+
+    // Find base buildings average
+    const firstPeriodLabel = historicalData[0].period;
+    const baseBuildingsItem = buildingsTrendRaw.find(b => b.period === firstPeriodLabel);
+    const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
+
+    const evolution: EvolutionDataPoint[] = historicalData.map((h) => {
+      const currentAmount = getAmount(h);
+      const userPercent = baseAmount > 0 ? ((currentAmount - baseAmount) / baseAmount) * 100 : 0;
+
+      let inflationPercent: number | null = null;
+      let inflationEstimated = false;
+
+      const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
+      if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+        const inflationItem = inflationMap.get(periodYYYYMM);
+        if (inflationItem) {
+          inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+          inflationEstimated = inflationItem.is_estimated;
+        }
+      }
+
+      let buildingsPercent: number | null = null;
+      if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+        const buildingsItem = buildingsTrendRaw.find(b => b.period === h.period);
+        if (buildingsItem) {
+          buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
+        }
+      }
+
+      return {
+        period: h.period,
+        userPercent,
+        inflationPercent,
+        inflationEstimated,
+        buildingsPercent
+      };
+    });
+
+    setEvolutionData(evolution);
+
+    // Calculate deviation for latest period
+    const latestEvolution = evolution[evolution.length - 1];
+    if (latestEvolution) {
+      const fromInflation = latestEvolution.inflationPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.inflationPercent
+        : 0;
+      const fromBuildings = latestEvolution.buildingsPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.buildingsPercent
+        : 0;
+
+      setDeviation({
+        fromInflation,
+        fromBuildings,
+        isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
+      });
+    }
+  }, [selectedCategory, historicalData, inflationDataRaw, buildingsTrendRaw]);
 
   if (isLoading) {
     return (
@@ -1096,20 +1152,65 @@ Analizá tu expensa en ExpensaCheck`;
               </div>
             )}
 
+            {/* Evolution Section Filter */}
+            {analysis.building_name && (
+              <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold">Evolución y Tendencias</h3>
+                    <p className="text-sm text-muted-foreground">Análisis histórico comparado con el mercado e inflación</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 min-w-[280px]">
+                  <label htmlFor="category-filter" className="text-xs font-semibold text-muted-foreground px-1 uppercase tracking-wider">
+                    Análisis específico por rubro
+                  </label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger id="category-filter" className="bg-background/50 backdrop-blur-md border-border/50 h-11 rounded-xl focus:ring-primary/20 transition-all font-medium shadow-sm">
+                      <SelectValue placeholder="Todos los rubros" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      <SelectItem value="all" className="font-semibold text-primary">📊 Todos los rubros (Total)</SelectItem>
+                      {availableCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Historical Evolution Chart - Absolute values */}
             {analysis.building_name && (
-              <div className="mb-8">
+              <div className="mb-8 relative">
+                {isBuildingsTrendLoading && (
+                  <div className="absolute inset-0 z-10 bg-background/20 backdrop-blur-[1px] flex items-center justify-center rounded-[2rem]">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  </div>
+                )}
                 <HistoricalEvolutionChart
                   buildingName={analysis.building_name}
                   currentAnalysisId={analysis.id}
                   currentPeriod={analysis.period}
+                  category={selectedCategory}
                 />
               </div>
             )}
 
             {/* Evolution Comparison Chart - Percentage with inflation and other buildings */}
             {evolutionData.length >= 2 && (
-              <div className="mb-12">
+              <div className="mb-12 relative">
+                {isBuildingsTrendLoading && (
+                  <div className="absolute inset-0 z-10 bg-background/20 backdrop-blur-[1px] flex items-center justify-center rounded-[2rem]">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                  </div>
+                )}
                 <EvolutionComparisonChart
                   data={evolutionData}
                   buildingName={analysis.building_name || "Este edificio"}
@@ -1182,14 +1283,14 @@ Analizá tu expensa en ExpensaCheck`;
                     {comments.map((comment) => (
                       <div key={comment.id} className="group animate-fade-in-up">
                         <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
-                            ? 'bg-primary/5 border-primary/20'
-                            : 'bg-card/20 border-border/50'
+                          ? 'bg-primary/5 border-primary/20'
+                          : 'bg-card/20 border-border/50'
                           }`}>
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${comment.is_owner_comment
-                                  ? 'bg-primary border-primary/20 text-white'
-                                  : 'bg-muted border-border/50'
+                                ? 'bg-primary border-primary/20 text-white'
+                                : 'bg-muted border-border/50'
                                 }`}>
                                 {comment.is_owner_comment ? (
                                   <Building className="w-6 h-6" />

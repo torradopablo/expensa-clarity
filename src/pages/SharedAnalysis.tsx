@@ -26,8 +26,17 @@ import {
   History,
   MessageSquare,
   Send,
-  User
+  User,
+  Loader2
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { periodToYearMonth } from "@/services/formatters/date";
 import { createClient } from "@supabase/supabase-js";
 import { Sparkles } from "lucide-react";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
@@ -120,6 +129,7 @@ interface HistoricalDataPoint {
   total_amount: number;
   created_at: string;
   period_date: string | null;
+  expense_categories?: { name: string; current_amount: number }[];
 }
 
 interface EvolutionDataPoint {
@@ -182,30 +192,38 @@ const SharedHistoricalChart = ({
   historicalData,
   currentAnalysisId,
   currentPeriod,
-  buildingName
+  buildingName,
+  category = "all"
 }: {
   historicalData: HistoricalDataPoint[];
   currentAnalysisId: string;
   currentPeriod: string;
   buildingName: string | null;
+  category?: string;
 }) => {
   if (historicalData.length < 2) {
     return null;
   }
 
+  const getAmount = (h: HistoricalDataPoint) => {
+    if (category === "all") return h.total_amount;
+    const cat = h.expense_categories?.find(c => c.name === category);
+    return cat ? cat.current_amount : 0;
+  };
+
   const chartData = historicalData.map((item) => ({
     period: item.period,
-    total: item.total_amount,
+    total: getAmount(item),
     isCurrent: item.id === currentAnalysisId,
   }));
 
-  const totals = historicalData.map((d) => d.total_amount);
+  const totals = historicalData.map((d) => getAmount(d));
   const average = totals.reduce((a, b) => a + b, 0) / totals.length;
   const min = Math.min(...totals);
   const max = Math.max(...totals);
-  const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
+  const currentTotal = getAmount(historicalData.find((d) => d.id === currentAnalysisId)!);
 
-  const firstTotal = historicalData[0]?.total_amount;
+  const firstTotal = getAmount(historicalData[0]);
   const totalEvolution = firstTotal
     ? ((currentTotal - firstTotal) / firstTotal) * 100
     : null;
@@ -219,7 +237,9 @@ const SharedHistoricalChart = ({
               <History className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Evolución histórica</CardTitle>
+              <CardTitle className="text-lg">
+                {category === "all" ? "Evolución histórica" : `Evolución: ${category}`}
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {historicalData.length} análisis de {buildingName}
               </p>
@@ -367,6 +387,11 @@ const SharedAnalysis = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [inflationDataRaw, setInflationDataRaw] = useState<any[]>([]);
+  const [categoryTrends, setCategoryTrends] = useState<Record<string, any>>({});
+
   // Form state for new comment
   const [newComment, setNewComment] = useState({ author_name: '', author_email: '', comment: '' });
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
@@ -423,6 +448,17 @@ const SharedAnalysis = () => {
           setDeviation(analysisResult.deviation || null);
           setBuildingsTrendStats(analysisResult.buildingsTrendStats || null);
           setComments(analysisResult.comments || []);
+
+          // Store raw data for local filtering
+          setInflationDataRaw(analysisResult.inflationData || []);
+          setCategoryTrends(analysisResult.categoryTrends || {});
+
+          // Extract unique categories across all historical periods
+          const allCatNames = new Set<string>();
+          (analysisResult.historicalData || []).forEach((h: any) => {
+            h.expense_categories?.forEach((c: any) => allCatNames.add(c.name));
+          });
+          setAvailableCategories(Array.from(allCatNames).sort());
         } else {
           console.log("No analysis data in response");
           setError("No se pudo cargar el análisis");
@@ -437,6 +473,97 @@ const SharedAnalysis = () => {
 
     fetchSharedAnalysis();
   }, [token]);
+
+  // Recalculate evolution locally based on selected category
+  useEffect(() => {
+    if (historicalData.length < 2) return;
+
+    const getAmount = (h: HistoricalDataPoint) => {
+      if (selectedCategory === "all") return h.total_amount;
+      const cat = h.expense_categories?.find(c => c.name === selectedCategory);
+      return cat ? cat.current_amount : 0;
+    };
+
+    const baseAmount = getAmount(historicalData[0]);
+
+    // Create inflation map
+    const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+    if (inflationDataRaw) {
+      inflationDataRaw.forEach(inf => {
+        const periodKey = inf.period;
+        if (periodKey) {
+          inflationMap.set(periodKey, { value: inf.value, is_estimated: inf.is_estimated });
+        }
+      });
+    }
+
+    // Find base inflation value
+    const firstPeriod = historicalData[0];
+    const firstPeriodYYYYMM = periodToYearMonth(firstPeriod.period, firstPeriod.period_date);
+    const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null;
+
+    // Find custom category trend data
+    const activeTrend = categoryTrends[selectedCategory] || { data: [], stats: null };
+    const buildingsTrendRaw = activeTrend.data || [];
+
+    // Find base buildings average
+    const firstPeriodLabel = historicalData[0].period;
+    const baseBuildingsItem = buildingsTrendRaw.find((b: any) => b.period === firstPeriodLabel);
+    const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
+
+    const evolution: EvolutionDataPoint[] = historicalData.map((h) => {
+      const currentAmount = getAmount(h);
+      const userPercent = baseAmount > 0 ? ((currentAmount - baseAmount) / baseAmount) * 100 : 0;
+
+      let inflationPercent: number | null = null;
+      let inflationEstimated = false;
+
+      const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
+      if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+        const inflationItem = inflationMap.get(periodYYYYMM);
+        if (inflationItem) {
+          inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+          inflationEstimated = inflationItem.is_estimated;
+        }
+      }
+
+      let buildingsPercent: number | null = null;
+      if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+        const buildingsItem = buildingsTrendRaw.find((b: any) => b.period === h.period);
+        if (buildingsItem) {
+          buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
+        }
+      }
+
+      return {
+        period: h.period,
+        userPercent,
+        inflationPercent,
+        inflationEstimated,
+        buildingsPercent
+      };
+    });
+
+    setEvolutionData(evolution);
+    setBuildingsTrendStats(activeTrend.stats || null);
+
+    // Calculate deviation for latest period
+    const latestEvolution = evolution[evolution.length - 1];
+    if (latestEvolution) {
+      const fromInflation = latestEvolution.inflationPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.inflationPercent
+        : 0;
+      const fromBuildings = latestEvolution.buildingsPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.buildingsPercent
+        : 0;
+
+      setDeviation({
+        fromInflation,
+        fromBuildings,
+        isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
+      });
+    }
+  }, [selectedCategory, historicalData, inflationDataRaw, categoryTrends]);
 
   // Function to submit owner reply
   const handleOwnerReply = async (e: React.FormEvent) => {
@@ -812,6 +939,40 @@ const SharedAnalysis = () => {
               </div>
             )}
 
+            {/* Evolution Section Filter */}
+            {analysis.building_name && (
+              <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold font-heading">Evolución y Tendencias</h3>
+                    <p className="text-sm text-muted-foreground">Análisis histórico comparado con el mercado e inflación</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 min-w-[280px]">
+                  <label htmlFor="category-filter" className="text-xs font-semibold text-muted-foreground px-1 uppercase tracking-wider">
+                    Análisis específico por rubro
+                  </label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger id="category-filter" className="bg-background/50 backdrop-blur-md border-border/50 h-11 rounded-xl focus:ring-primary/20 transition-all font-medium shadow-sm">
+                      <SelectValue placeholder="Todos los rubros" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      <SelectItem value="all" className="font-semibold text-primary">📊 Todos los rubros (Total)</SelectItem>
+                      {availableCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Historical Evolution Chart */}
             {historicalData.length >= 2 && (
               <div className="mb-8">
@@ -820,6 +981,7 @@ const SharedAnalysis = () => {
                   currentAnalysisId={analysis.id}
                   currentPeriod={analysis.period}
                   buildingName={analysis.building_name}
+                  category={selectedCategory}
                 />
               </div>
             )}
@@ -930,8 +1092,8 @@ const SharedAnalysis = () => {
                         {commentError}
                       </div>
                     )}
-                    <Button 
-                      type="submit" 
+                    <Button
+                      type="submit"
                       disabled={isSubmittingComment}
                       variant="hero"
                       className="w-full md:w-auto px-8 py-6 h-auto text-lg rounded-xl shadow-xl shadow-primary/20"
@@ -954,18 +1116,16 @@ const SharedAnalysis = () => {
                   <div className="space-y-6">
                     {comments.map((comment) => (
                       <div key={comment.id} className="group animate-fade-in-up">
-                        <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${
-                          comment.is_owner_comment 
-                            ? 'bg-primary/5 border-primary/20' 
-                            : 'bg-card/20 border-border/50'
-                        }`}>
+                        <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
+                          ? 'bg-primary/5 border-primary/20'
+                          : 'bg-card/20 border-border/50'
+                          }`}>
                           <div className="flex items-start justify-between mb-4">
                             <div className="flex items-center gap-3">
-                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${
-                                comment.is_owner_comment 
-                                  ? 'bg-primary border-primary/20 text-white' 
-                                  : 'bg-muted border-border/50'
-                              }`}>
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${comment.is_owner_comment
+                                ? 'bg-primary border-primary/20 text-white'
+                                : 'bg-muted border-border/50'
+                                }`}>
                                 {comment.is_owner_comment ? (
                                   <Building className="w-6 h-6" />
                                 ) : (
@@ -1019,8 +1179,8 @@ const SharedAnalysis = () => {
                                   </div>
                                 )}
                                 <div className="flex gap-3">
-                                  <Button 
-                                    type="submit" 
+                                  <Button
+                                    type="submit"
                                     disabled={isSubmittingComment}
                                     size="sm"
                                     className="h-10 px-6 rounded-lg shadow-lg shadow-primary/20"
@@ -1037,9 +1197,9 @@ const SharedAnalysis = () => {
                                       </>
                                     )}
                                   </Button>
-                                  <Button 
-                                    type="button" 
-                                    variant="outline" 
+                                  <Button
+                                    type="button"
+                                    variant="outline"
                                     size="sm"
                                     className="h-10 px-6 rounded-lg border-border/50"
                                     onClick={() => {
@@ -1053,7 +1213,7 @@ const SharedAnalysis = () => {
                               </form>
                             </div>
                           )}
-                          
+
                           {/* Replies list */}
                           {comments.filter(c => c.parent_comment_id === comment.id).map((reply) => (
                             <div key={reply.id} className="ml-8 md:ml-12 mt-4 p-5 bg-primary/5 backdrop-blur-md rounded-[1.25rem] border border-primary/20 shadow-sm animate-fade-in-up">
