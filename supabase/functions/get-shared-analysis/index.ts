@@ -26,6 +26,10 @@ interface Analysis {
   previous_total: number | null;
   status: string;
   created_at: string;
+  building_address?: string;
+  period_date?: string;
+  owner_notes?: string;
+  is_owner_view?: boolean;
 }
 
 interface HistoricalDataPoint {
@@ -34,6 +38,7 @@ interface HistoricalDataPoint {
   total_amount: number;
   created_at: string;
   period_date: string | null;
+  expense_categories?: { name: string; current_amount: number }[];
 }
 
 interface EvolutionDataPoint {
@@ -73,6 +78,15 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const name = parts[0];
+  const domain = parts[1];
+  if (name.length <= 2) return `${name}***@${domain}`;
+  return `${name.substring(0, 2)}***@${domain}`;
 }
 
 serve(async (req) => {
@@ -147,12 +161,12 @@ serve(async (req) => {
 
     console.log('Link found, fetching analysis:', linkData.analysis_id)
 
-    // Get the analysis
-    const { data: analysis, error: analysisError } = await supabase
+    // Get the analysis - Restrict fields for security
+    const { data: analysis, error: analysisError } = (await supabase
       .from('expense_analyses')
-      .select('*')
+      .select('id, building_name, building_address, period, period_date, total_amount, previous_total, unit, status, created_at, owner_notes')
       .eq('id', linkData.analysis_id)
-      .single()
+      .single()) as { data: Analysis | null, error: any }
 
     if (analysisError || !analysis) {
       console.log('Analysis not found:', analysisError)
@@ -161,6 +175,10 @@ serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+
+    // Assign a placeholder user_id if needed by the frontend comparison logic, 
+    // but don't leak the real UUID from the private user
+    analysis.user_id = 'shared-view';
 
     // Get categories for this analysis
     const { data: categories, error: categoriesError } = await supabase
@@ -189,12 +207,17 @@ serve(async (req) => {
       // No fallar si hay error en comentarios, solo loggear
     }
 
+    // Mask emails for public view
+    const maskedComments = (comments || []).map(c => ({
+      ...c,
+      author_email: c.author_email ? maskEmail(c.author_email) : null
+    }));
+
     // Get ALL historical data for same building and user to build consistent evolution
     const { data: historicalData, error: historicalError } = await supabase
       .from('expense_analyses')
       .select('id, period, total_amount, created_at, period_date, expense_categories(name, current_amount)')
       .eq('building_name', analysis.building_name)
-      .eq('user_id', analysis.user_id)
       .eq('status', 'completed')
       .order('period_date', { ascending: true, nullsFirst: false })
 
@@ -245,9 +268,13 @@ serve(async (req) => {
     // Fetch building profile for filtering
     const { data: profile } = await supabase
       .from('building_profiles')
-      .select('unit_count_range, age_category, neighborhood, zone, has_amenities')
+      .select('unit_count_range, age_category, neighborhood, zone, has_amenities, owner_user_id')
       .eq('building_name', analysis.building_name)
       .maybeSingle();
+
+    // Re-check owner_user_id to ensure it matches the analysis owner
+    // This is an extra security layer for shared links
+    analysis.is_owner_view = (analysis.user_id === profile?.owner_user_id);
 
     // Fetch buildings trend via TrendService
     const filters: any = {};
@@ -259,7 +286,7 @@ serve(async (req) => {
       if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
     }
     filters.excludeBuilding = analysis.building_name;
-    filters.excludeUserId = analysis.user_id;
+    filters.excludeUserId = profile?.owner_user_id; // Use real owner ID for exclusion
 
     const { data: trendData, stats: trendStats } = await trendService.getMarketTrend(
       Object.keys(filters).length > 0 ? filters : {},
@@ -281,17 +308,22 @@ serve(async (req) => {
       all: { data: buildingsTrend, stats: buildingsTrendStats }
     };
 
-    // Limit to top 15 categories to avoid excessive queries (usually it's around 5-10)
-    const categoriesToFetch = Array.from(uniqueCategories).slice(0, 15);
+    // Limit to top 12 categories to avoid excessive queries and use Promise.all for performance
+    const categoriesToFetch = Array.from(uniqueCategories).slice(0, 12);
 
-    for (const catName of categoriesToFetch) {
+    const trendPromises = categoriesToFetch.map(async (catName) => {
       const catFilters = { ...filters, category: catName };
       const { data: catTrendData, stats: catTrendStats } = await trendService.getMarketTrend(
         catFilters,
         true // Use fallback for categories to ensure we have data
       );
-      categoryTrends[catName] = { data: catTrendData || [], stats: catTrendStats || null };
-    }
+      return { catName, data: catTrendData || [], stats: catTrendStats || null };
+    });
+
+    const results = await Promise.all(trendPromises);
+    results.forEach(res => {
+      categoryTrends[res.catName] = { data: res.data, stats: res.stats };
+    });
 
     // Fetch inflation data
     let inflationData = null;
@@ -350,7 +382,7 @@ serve(async (req) => {
       const baseBuildingsItem = buildingsTrend.find(b => b.period === firstPeriod);
       const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
 
-      const evolution: EvolutionDataPoint[] = slicedHistoricalData.map((h) => {
+      const evolution: EvolutionDataPoint[] = slicedHistoricalData.map((h: any) => {
         const userPercent = baseTotal > 0 ? ((h.total_amount - baseTotal) / baseTotal) * 100 : 0
 
         let inflationPercent: number | null = null
@@ -366,7 +398,7 @@ serve(async (req) => {
 
         let buildingsPercent: number | null = null
         if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
-          const buildingsItem = buildingsTrend.find(b => b.period === h.period)
+          const buildingsItem = buildingsTrend.find((b: any) => b.period === h.period)
           if (buildingsItem && buildingsItem.average !== undefined) {
             buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100
           }
@@ -407,7 +439,7 @@ serve(async (req) => {
       evolutionData,
       deviation,
       buildingsTrendStats,
-      comments: comments || [],
+      comments: maskedComments,
       inflationData,
       categoryTrends
     }
