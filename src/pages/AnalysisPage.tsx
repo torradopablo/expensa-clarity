@@ -1300,7 +1300,7 @@ Analizá tu expensa en ExpensaCheck`;
                               </div>
                               <div>
                                 <p className="font-black text-base text-foreground">
-                                  {comment.is_owner_comment ? 'Tú (Como Propietario)' : comment.author_name}
+                                  {comment.is_owner_comment ? 'Tú (Autor del Análisis)' : comment.author_name}
                                 </p>
                                 <p className="text-xs text-muted-foreground font-bold tracking-wider">{formatDate(comment.created_at)}</p>
                               </div>
@@ -1369,7 +1369,7 @@ Analizá tu expensa en ExpensaCheck`;
                               <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center">
                                 <Building className="w-4 h-4" />
                               </div>
-                              <p className="font-bold text-sm text-primary">Tú (Propietario)</p>
+                              <p className="font-bold text-sm text-primary">Tú (Autor)</p>
                             </div>
                             <p className="text-base leading-relaxed text-foreground font-medium">
                               {reply.comment}
