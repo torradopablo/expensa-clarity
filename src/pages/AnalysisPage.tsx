@@ -160,7 +160,7 @@ interface EvolutionDataPoint {
   period: string;
   userPercent: number;
   inflationPercent: number | null;
-  inflationEstimated?: boolean;
+  inflationEstimated: boolean;
   buildingsPercent: number | null;
 }
 
@@ -173,8 +173,10 @@ interface Deviation {
 interface BuildingsTrendStats {
   totalBuildings: number;
   totalAnalyses: number;
-  periodsCount: number;
-  filtersApplied: boolean;
+  averageIncrease: number;
+  medianIncrease: number;
+  periodsCount?: number;
+  filtersApplied?: boolean;
   usedFallback?: boolean;
 }
 
@@ -236,7 +238,7 @@ const AnalysisPage = () => {
         navigate("/auth");
         return;
       }
-      
+
       setUser(session.user);
 
       try {
@@ -505,14 +507,22 @@ const AnalysisPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Dynamic Background */}
+        <div className="absolute inset-0 -z-10 bg-background">
+          <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+        </div>
+
         <Header />
-        <main className="pt-24 pb-20">
+        <main className="pt-32 pb-20 relative z-10">
           <div className="container max-w-4xl">
-            <Skeleton className="h-48 w-full mb-8" />
-            <Skeleton className="h-32 w-full mb-4" />
-            <Skeleton className="h-32 w-full mb-4" />
-            <Skeleton className="h-32 w-full" />
+            <Skeleton className="h-[400px] w-full mb-12 rounded-[2rem]" />
+            <Skeleton className="h-48 w-full mb-8 rounded-2xl" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <Skeleton className="h-32 w-full rounded-2xl" />
+              <Skeleton className="h-32 w-full rounded-2xl" />
+            </div>
           </div>
         </main>
       </div>
@@ -652,7 +662,7 @@ Analizá tu expensa en ExpensaCheck`;
   // Function to submit owner reply
   const handleOwnerReply = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!replyingTo || !ownerReply.trim()) {
       setCommentError("Por favor escribe una respuesta");
       return;
@@ -719,7 +729,7 @@ Analizá tu expensa en ExpensaCheck`;
       // Add new reply to local state
       const newReplyData = (responseData as any).comment;
       setComments(prev => [...prev, newReplyData]);
-      
+
       // Invalidate cache for this analysis to ensure share shows updated comments
       try {
         await supabase.functions.invoke('invalidate-share-cache', {
@@ -729,13 +739,13 @@ Analizá tu expensa en ExpensaCheck`;
         console.log('Cache invalidation failed:', cacheError);
         // Don't fail the comment submission if cache invalidation fails
       }
-      
+
       // Reset form
       setOwnerReply('');
       setReplyingTo(null);
-      
+
       toast.success("Respuesta enviada correctamente");
-      
+
     } catch (err: any) {
       console.error('Error submitting owner reply:', err);
       setCommentError(err.message || 'Error al enviar la respuesta');
@@ -747,7 +757,7 @@ Analizá tu expensa en ExpensaCheck`;
   // Function to submit a new comment
   const handleCommentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!id || !newComment.comment.trim()) {
       setCommentError("Por favor escribe un comentario");
       return;
@@ -813,7 +823,7 @@ Analizá tu expensa en ExpensaCheck`;
       // Add new comment to local state
       const newCommentData = (responseData as any).comment;
       setComments(prev => [...prev, newCommentData]);
-      
+
       // Invalidate cache for this analysis to ensure share shows updated comments
       try {
         await supabase.functions.invoke('invalidate-share-cache', {
@@ -823,12 +833,12 @@ Analizá tu expensa en ExpensaCheck`;
         console.log('Cache invalidation failed:', cacheError);
         // Don't fail the comment submission if cache invalidation fails
       }
-      
+
       // Reset form
       setNewComment({ author_name: '', author_email: '', comment: '' });
-      
+
       toast.success("Comentario enviado correctamente");
-      
+
     } catch (err: any) {
       console.error('Error submitting comment:', err);
       setCommentError(err.message || 'Error al enviar el comentario');
@@ -1099,7 +1109,7 @@ Analizá tu expensa en ExpensaCheck`;
 
             {/* Evolution Comparison Chart - Percentage with inflation and other buildings */}
             {evolutionData.length >= 2 && (
-              <div className="mb-8">
+              <div className="mb-12">
                 <EvolutionComparisonChart
                   data={evolutionData}
                   buildingName={analysis.building_name || "Este edificio"}
@@ -1111,179 +1121,158 @@ Analizá tu expensa en ExpensaCheck`;
 
 
             {/* Comments Section */}
-            <Card variant="glass" className="mb-8 animate-fade-in-up">
-              <CardHeader>
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center">
-                    <MessageSquare className="w-5 h-5 text-secondary" />
+            <Card className="mb-12 bg-card/40 backdrop-blur-xl border border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+              <CardHeader className="p-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center border border-secondary/20">
+                    <MessageSquare className="w-6 h-6 text-secondary" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg">Comentarios</CardTitle>
-                    <p className="text-sm text-muted-foreground">
-                      {comments.length} comentario{comments.length !== 1 ? 's' : ''} sobre este análisis
+                    <CardTitle className="text-xl font-bold">Comunidad y Consultas</CardTitle>
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {comments.length} comentario{comments.length !== 1 ? 's' : ''} en este análisis
                     </p>
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-8 pt-0">
                 {/* Comment Form */}
-                <form onSubmit={handleCommentSubmit} className="mb-6 p-4 bg-muted/30 rounded-lg">
-                  <div className="grid gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-2">Tu comentario </label>
-                      <textarea
-                        value={newComment.comment}
-                        onChange={(e) => setNewComment(prev => ({ ...prev, comment: e.target.value }))}
-                        className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                        rows={3}
-                        placeholder="Comparte tus observaciones sobre este análisis..."
-                        maxLength={500}
-                        required
-                      />
-                      <div className="text-xs text-muted-foreground mt-1">
+                <form onSubmit={handleCommentSubmit} className="mb-10 p-8 bg-muted/20 backdrop-blur-md rounded-[1.5rem] border border-border/50 shadow-inner">
+                  <h4 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-primary" />
+                    Agregá una nota o comentario
+                  </h4>
+                  <div className="grid gap-6">
+                    <textarea
+                      value={newComment.comment}
+                      onChange={(e) => setNewComment(prev => ({ ...prev, comment: e.target.value }))}
+                      className="w-full px-5 py-4 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground min-h-[120px] resize-none"
+                      placeholder="Escribí aquí tus notas personales o comentarios compartidos..."
+                      maxLength={500}
+                      required
+                    />
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-muted-foreground font-bold uppercase tracking-widest">
                         {newComment.comment.length}/500 caracteres
                       </div>
+                      <Button
+                        type="submit"
+                        disabled={isSubmittingComment}
+                        variant="hero"
+                        className="px-8 py-6 h-auto text-lg rounded-xl shadow-xl shadow-primary/20"
+                      >
+                        {isSubmittingComment ? "Enviando..." : "Publicar nota"}
+                      </Button>
                     </div>
                     {commentError && (
-                      <div className="text-sm text-status-attention bg-status-attention-bg p-3 rounded-lg">
+                      <div className="text-sm font-bold text-status-attention bg-status-attention-bg/50 p-4 rounded-xl border border-status-attention/30">
                         {commentError}
                       </div>
                     )}
-                    <div className="flex gap-2">
-                      <Button 
-                        type="submit" 
-                        disabled={isSubmittingComment}
-                        className="w-full md:w-auto"
-                      >
-                        {isSubmittingComment ? (
-                          <>
-                            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                            Enviando...
-                          </>
-                        ) : (
-                          <>
-                            <Send className="w-4 h-4 mr-2" />
-                            Enviar comentario
-                          </>
-                        )}
-                      </Button>
-                    </div>
                   </div>
                 </form>
 
                 {/* Comments List */}
                 {comments.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">
-                    <MessageSquare className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                    <p>Sé el primero en comentar sobre este análisis</p>
+                  <div className="text-center py-12 bg-muted/10 rounded-[2rem] border border-dashed border-border/50">
+                    <p className="text-muted-foreground font-medium">No hay notas ni comentarios aún.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {comments.map((comment) => (
-                      <div key={comment.id} className="border-l-4 border-primary/20 pl-4 py-3">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                              comment.is_owner_comment 
-                                ? 'bg-primary text-white' 
-                                : 'bg-primary/10'
-                            }`}>
-                              {comment.is_owner_comment ? (
-                                <span className="text-xs font-bold">O</span>
-                              ) : (
-                                <User className="w-4 h-4 text-primary" />
-                              )}
-                            </div>
-                            <div>
-                              <p className="font-medium text-sm">
-                                {comment.is_owner_comment ? 'Owner' : comment.author_name}
-                              </p>
-                              <p className="text-xs text-muted-foreground">{formatDate(comment.created_at)}</p>
-                            </div>
-                          </div>
-                          {/* Reply button for owner */}
-                          {user && !comment.is_owner_comment && (
-                            <button
-                              onClick={() => setReplyingTo(comment.id)}
-                              className="text-xs text-primary hover:text-primary/80 transition-colors"
-                            >
-                              Responder
-                            </button>
-                          )}
-                        </div>
-                        <p className="text-sm leading-relaxed">{comment.comment}</p>
-                        
-                        {/* Owner Reply Form */}
-                        {replyingTo === comment.id && (
-                          <div className="mt-3 p-3 bg-muted/30 rounded-lg border-l-4 border-primary/30">
-                            <form onSubmit={handleOwnerReply} className="space-y-3">
+                      <div key={comment.id} className="group animate-fade-in-up">
+                        <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
+                            ? 'bg-primary/5 border-primary/20'
+                            : 'bg-card/20 border-border/50'
+                          }`}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${comment.is_owner_comment
+                                  ? 'bg-primary border-primary/20 text-white'
+                                  : 'bg-muted border-border/50'
+                                }`}>
+                                {comment.is_owner_comment ? (
+                                  <Building className="w-6 h-6" />
+                                ) : (
+                                  <User className="w-6 h-6 text-foreground/70" />
+                                )}
+                              </div>
                               <div>
-                                <label className="block text-sm font-medium mb-2">Tu respuesta como Owner:</label>
+                                <p className="font-black text-base text-foreground">
+                                  {comment.is_owner_comment ? 'Tú (Como Propietario)' : comment.author_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-bold tracking-wider">{formatDate(comment.created_at)}</p>
+                              </div>
+                            </div>
+                            {user && !comment.is_owner_comment && (
+                              <button
+                                onClick={() => setReplyingTo(comment.id)}
+                                className="text-sm font-bold text-primary hover:underline transition-all"
+                              >
+                                Responder
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-base leading-relaxed text-foreground font-medium">
+                            {comment.comment}
+                          </p>
+
+                          {/* Owner Reply Form UI */}
+                          {replyingTo === comment.id && (
+                            <div className="mt-4 p-6 bg-muted/30 backdrop-blur-md rounded-[1.5rem] border border-primary/30 shadow-inner">
+                              <form onSubmit={handleOwnerReply} className="space-y-4">
                                 <textarea
                                   value={ownerReply}
                                   onChange={(e) => setOwnerReply(e.target.value)}
-                                  className="w-full px-3 py-2 border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary resize-none"
-                                  rows={3}
-                                  placeholder="Responde al comentario..."
+                                  className="w-full px-5 py-4 bg-background/50 border border-primary/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground min-h-[100px] resize-none"
+                                  placeholder="Escribe tu respuesta..."
                                   maxLength={1000}
                                   required
                                 />
-                                <div className="text-xs text-muted-foreground mt-1">
-                                  {ownerReply.length}/1000 caracteres
+                                <div className="flex justify-between items-center">
+                                  <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+                                    {ownerReply.length}/1000 caracteres
+                                  </div>
+                                  <div className="flex gap-3">
+                                    <Button
+                                      type="submit"
+                                      disabled={isSubmittingComment}
+                                      size="sm"
+                                      className="h-10 px-6 rounded-lg"
+                                    >
+                                      Responder
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-10 px-6 rounded-lg"
+                                      onClick={() => {
+                                        setReplyingTo(null);
+                                        setOwnerReply('');
+                                      }}
+                                    >
+                                      Cancelar
+                                    </Button>
+                                  </div>
                                 </div>
-                              </div>
-                              {commentError && (
-                                <div className="text-sm text-status-attention bg-status-attention-bg p-3 rounded-lg">
-                                  {commentError}
-                                </div>
-                              )}
-                              <div className="flex gap-2">
-                                <Button 
-                                  type="submit" 
-                                  disabled={isSubmittingComment}
-                                  size="sm"
-                                >
-                                  {isSubmittingComment ? (
-                                    <>
-                                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
-                                      <span>Enviando...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <Send className="w-4 h-4 mr-2" />
-                                      <span>Enviar respuesta</span>
-                                    </>
-                                  )}
-                                </Button>
-                                <Button 
-                                  type="button" 
-                                  variant="outline" 
-                                  size="sm"
-                                  onClick={() => {
-                                    setReplyingTo(null);
-                                    setOwnerReply('');
-                                  }}
-                                >
-                                  Cancelar
-                                </Button>
-                              </div>
-                            </form>
-                          </div>
-                        )}
-                        
-                        {/* Show replies */}
-                        {comments.filter(c => c.parent_comment_id === comment.id).map((reply) => (
-                          <div key={reply.id} className="ml-8 mt-3 p-3 bg-muted/20 rounded-lg border-l-4 border-primary/20">
-                            <div className="flex items-center gap-2 mb-2">
-                              <div className="w-6 h-6 rounded-full bg-primary text-white flex items-center justify-center">
-                                <span className="text-xs font-bold">O</span>
-                              </div>
-                              <div>
-                                <p className="font-medium text-xs text-primary">Owner</p>
-                                <p className="text-xs text-muted-foreground">{formatDate(reply.created_at)}</p>
-                              </div>
+                              </form>
                             </div>
-                            <p className="text-sm leading-relaxed">{reply.comment}</p>
+                          )}
+                        </div>
+
+                        {/* Replies */}
+                        {comments.filter(c => c.parent_comment_id === comment.id).map((reply) => (
+                          <div key={reply.id} className="ml-12 mt-4 p-5 bg-primary/5 rounded-[1.25rem] border border-primary/20 shadow-sm animate-fade-in-up">
+                            <div className="flex items-center gap-3 mb-2">
+                              <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center">
+                                <Building className="w-4 h-4" />
+                              </div>
+                              <p className="font-bold text-sm text-primary">Tú (Propietario)</p>
+                            </div>
+                            <p className="text-base leading-relaxed text-foreground font-medium">
+                              {reply.comment}
+                            </p>
                           </div>
                         ))}
                       </div>
@@ -1294,15 +1283,15 @@ Analizá tu expensa en ExpensaCheck`;
             </Card>
 
             {/* Info Card */}
-            <Card variant="soft" className="mb-8 animate-fade-in-up">
-              <CardContent className="p-6">
-                <div className="flex gap-4">
-                  <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
-                    <Info className="w-5 h-5 text-secondary" />
+            <Card className="mb-12 bg-card/30 backdrop-blur-md border border-border/50 shadow-lg rounded-[2rem] overflow-hidden animate-fade-in-up">
+              <CardContent className="p-8">
+                <div className="flex gap-6">
+                  <div className="w-14 h-14 rounded-2xl bg-secondary/10 flex items-center justify-center flex-shrink-0 border border-secondary/20">
+                    <Info className="w-7 h-7 text-secondary" />
                   </div>
                   <div>
-                    <h3 className="font-semibold mb-1">¿Qué significa esto?</h3>
-                    <p className="text-sm text-muted-foreground">
+                    <h3 className="text-lg font-bold mb-2">¿Qué significa esto?</h3>
+                    <p className="text-base text-muted-foreground leading-relaxed font-medium">
                       Los gastos marcados como "a revisar" no necesariamente son incorrectos.
                       Pueden deberse a aumentos de tarifas o gastos extraordinarios justificados.
                       Te recomendamos revisar las actas del consorcio o consultar con la administración
@@ -1314,11 +1303,11 @@ Analizá tu expensa en ExpensaCheck`;
             </Card>
 
             {/* CTA */}
-            <div className="text-center pt-8">
-              <p className="text-muted-foreground mb-4">
+            <div className="text-center pt-12 pb-20">
+              <p className="text-muted-foreground text-lg mb-8 font-medium">
                 ¿Querés analizar otra expensa?
               </p>
-              <Button asChild variant="hero" size="lg">
+              <Button asChild variant="hero" size="lg" className="px-10 h-16 text-xl rounded-2xl shadow-2xl shadow-primary/20 hover:scale-105 active:scale-95 transition-all">
                 <Link to="/analizar">Subir nueva expensa</Link>
               </Button>
             </div>
