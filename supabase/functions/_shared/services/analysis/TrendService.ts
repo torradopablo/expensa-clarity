@@ -1,5 +1,6 @@
 import { createSupabaseClient, createServiceClient } from "../../config/supabase.ts";
 import { ComparisonService } from "./ComparisonService.ts";
+import { InflationCacheService } from "../cache/InflationCacheService.ts";
 
 export interface MarketTrendFilters {
     unit_count_range?: string;
@@ -20,12 +21,27 @@ export class TrendService {
     }
 
     async getInflationData() {
-        // Inflation data is public read usually, or authenticated. Can stay as is.
-        const { data, error } = await this.supabase
+        // Try cache first
+        const inflationCacheService = new InflationCacheService();
+        const cachedInflation = await inflationCacheService.getCachedInflationData();
+
+        if (cachedInflation) {
+            return { data: cachedInflation.data, error: null, cached: true };
+        }
+
+        // Fallback to database
+        const adminSupabase = createServiceClient();
+        const { data, error } = await adminSupabase
             .from("inflation_data")
             .select("period, value, is_estimated")
             .order("period", { ascending: true });
-        return { data, error };
+
+        // Cache the result for future requests
+        if (data && !error) {
+            await inflationCacheService.cacheInflationData(data);
+        }
+
+        return { data, error, cached: false };
     }
 
     async getMarketTrend(filters?: MarketTrendFilters, fallbackIfEmpty = true) {
@@ -101,7 +117,7 @@ export class TrendService {
             filtersApplied = true;
 
             // Start with base query
-            let profilesQuery = this.supabase
+            let profilesQuery = adminSupabase
                 .from("building_profiles")
                 .select("id, building_name");
 
@@ -127,7 +143,7 @@ export class TrendService {
 
             // 2. If not enough buildings, try with Zone + other filters
             if (matchingProfiles.length < 2 && filters?.zone) {
-                let zoneQuery = this.supabase
+                let zoneQuery = adminSupabase
                     .from("building_profiles")
                     .select("id, building_name")
                     .eq("zone", filters.zone);
@@ -143,7 +159,7 @@ export class TrendService {
             // 3. Fallback to all profiles if still empty and fallback permitted
             if (matchingProfiles.length < 2 && fallbackIfEmpty) {
                 usedFallback = true;
-                let globalQuery = this.supabase
+                let globalQuery = adminSupabase
                     .from("building_profiles")
                     .select("id, building_name");
 

@@ -48,14 +48,13 @@ serve(async (req) => {
     const pdfService = new PDFService();
 
     // Verify user
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabase.auth.getClaims(token);
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
 
-    if (claimsError || !claimsData?.claims) {
+    if (userError || !user) {
       throw new AuthenticationError("Token inválido");
     }
 
-    const userId = claimsData.claims.sub as string;
+    const userId = user.id;
 
     // Convert file to base64 for AI processing (safe for large files)
     const arrayBuffer = await file.arrayBuffer();

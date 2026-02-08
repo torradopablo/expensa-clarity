@@ -1,5 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+import { InflationCacheService } from "../_shared/services/cache/InflationCacheService.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -28,6 +29,23 @@ serve(async (req) => {
     const currentYear = now.getFullYear();
     const currentMonth = now.getMonth() + 1;
     const currentPeriod = `${currentYear}-${currentMonth.toString().padStart(2, "0")}`;
+
+    // Initialize cache service
+    const inflationCacheService = new InflationCacheService();
+
+    // Try to get from cache first
+    const cachedInflation = await inflationCacheService.getCachedInflationData();
+    if (cachedInflation) {
+      console.log("Returning cached inflation data");
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          data: cachedInflation.data.sort((a: any, b: any) => a.period.localeCompare(b.period)), 
+          cached: true 
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     // Check what inflation data we already have
     const { data: existingData, error: fetchError } = await supabase
@@ -191,6 +209,9 @@ serve(async (req) => {
       .order("period", { ascending: true });
 
     if (finalError) throw finalError;
+
+    // Cache the result for future requests
+    await inflationCacheService.cacheInflationData(finalData);
 
     return new Response(
       JSON.stringify({

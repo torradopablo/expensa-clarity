@@ -12,68 +12,45 @@ export function Header() {
   };
 
   return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <header className="bg-background/80 backdrop-blur-xl border-b border-border/50 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between items-center h-16">
+        <div className="flex justify-between items-center h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center">
-            <Logo className="h-8 w-auto" />
-            <span className="ml-2 text-xl font-semibold text-gray-900">
+          <Link to="/" className="flex items-center group gap-2">
+            <Logo className="h-10 w-10 group-hover:rotate-12 transition-transform duration-500" />
+            <span className="text-2xl font-bold tracking-tight text-foreground">
               ExpensaCheck
             </span>
           </Link>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex space-x-8">
-            <Link
-              to="/analizar"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive("/analizar")
-                  ? "bg-green-100 text-green-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
-            >
-              Analizar
-            </Link>
-            <Link
-              to="/evolucion"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive("/evolucion")
-                  ? "bg-green-100 text-green-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
-            >
-              Evolución
-            </Link>
-            <Link
-              to="/historial"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive("/historial")
-                  ? "bg-green-100 text-green-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
-            >
-              Historial
-            </Link>
-            <Link
-              to="/comparar"
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                isActive("/comparar")
-                  ? "bg-green-100 text-green-700"
-                  : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-              }`}
-            >
-              Comparar
-            </Link>
+          <nav className="hidden md:flex items-center space-x-2">
+            {[
+              { path: "/analizar", label: "Analizar" },
+              { path: "/evolucion", label: "Evolución" },
+              { path: "/historial", label: "Historial" },
+              { path: "/comparar", label: "Comparar" }
+            ].map((link) => (
+              <Link
+                key={link.path}
+                to={link.path}
+                className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all duration-300 ${isActive(link.path)
+                  ? "bg-primary text-primary-foreground shadow-xl shadow-primary/20 scale-105"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent/50"
+                  }`}
+              >
+                {link.label}
+              </Link>
+            ))}
           </nav>
 
           {/* Mobile menu button */}
           <div className="md:hidden">
             <Button
               variant="ghost"
-              size="sm"
+              size="icon"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="p-2"
+              className="hover:bg-accent rounded-xl w-11 h-11 transition-colors"
             >
               <svg
                 className="h-6 w-6"
@@ -85,7 +62,7 @@ export function Header() {
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeWidth={2}
-                  d="M4 6h16M4 12h16m-7 6h7a2 2 0 002-2v6a2 2 0 002 2h-7a2 2 0 00-2-2v6a2 2 0 002 2z"
+                  d={isMenuOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16m-7 6h7"}
                 />
               </svg>
             </Button>
@@ -94,53 +71,25 @@ export function Header() {
 
         {/* Mobile Navigation */}
         {isMenuOpen && (
-          <div className="md:hidden">
-            <div className="px-2 pt-2 pb-3 space-y-1">
+          <div className="md:hidden animate-in fade-in slide-in-from-top-4 duration-300 pb-6 space-y-2">
+            {[
+              { path: "/analizar", label: "Analizar" },
+              { path: "/evolucion", label: "Evolución" },
+              { path: "/historial", label: "Historial" },
+              { path: "/comparar", label: "Comparar" }
+            ].map((link) => (
               <Link
-                to="/analizar"
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                  isActive("/analizar")
-                    ? "bg-green-100 text-green-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
+                key={link.path}
+                to={link.path}
+                className={`block px-6 py-4 rounded-2xl text-lg font-bold transition-all ${isActive(link.path)
+                  ? "bg-primary text-primary-foreground shadow-lg shadow-primary/10"
+                  : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                  }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                Analizar
+                {link.label}
               </Link>
-              <Link
-                to="/evolucion"
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                  isActive("/evolucion")
-                    ? "bg-green-100 text-green-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Evolución
-              </Link>
-              <Link
-                to="/historial"
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                  isActive("/historial")
-                    ? "bg-green-100 text-green-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Historial
-              </Link>
-              <Link
-                to="/comparar"
-                className={`block px-3 py-2 rounded-md text-base font-medium transition-colors ${
-                  isActive("/comparar")
-                    ? "bg-green-100 text-green-700"
-                    : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                }`}
-                onClick={() => setIsMenuOpen(false)}
-              >
-                Comparar
-              </Link>
-            </div>
+            ))}
           </div>
         )}
       </div>

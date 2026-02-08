@@ -22,10 +22,12 @@ import {
   ArrowLeftRight,
   AlertTriangle,
   Download,
-  RefreshCw
+  RefreshCw,
+  Plus
 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Logo } from "@/components/layout/ui/logo";
@@ -48,19 +50,26 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+            ExpensaCheck
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <Button asChild>
-            <Link to="/analizar">Analizar otra expensa</Link>
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" className="hidden sm:flex rounded-full px-6 hover:bg-accent font-semibold" size="sm">
+            <Link to="/analizar">
+              <Plus className="w-4 h-4 mr-2" />
+              Nueva expensa
+            </Link>
           </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout}>
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión" className="rounded-full hover:bg-destructive/10 hover:text-destructive">
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -245,14 +254,13 @@ const CompararPage = () => {
       if (filtersCard) filtersCard.style.display = "none";
       if (pdfSummary) pdfSummary.style.display = "block";
 
-      // 2. Set fixed width for consistency
+      // 2. Set fixed width and high contrast class for consistency
       const originalWidth = element.style.width;
       const originalPadding = element.style.padding;
-      const originalBg = element.style.backgroundColor;
 
+      element.classList.add("pdf-export-container");
       element.style.width = "1100px";
       element.style.padding = "40px";
-      element.style.backgroundColor = "#ffffff";
 
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -263,9 +271,9 @@ const CompararPage = () => {
       });
 
       // 3. Restore View
+      element.classList.remove("pdf-export-container");
       element.style.width = originalWidth;
       element.style.padding = originalPadding;
-      element.style.backgroundColor = originalBg;
 
       if (filtersCard) filtersCard.style.display = "";
       if (pdfSummary) pdfSummary.style.display = "none";
@@ -362,11 +370,17 @@ const CompararPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Dynamic Background */}
+        <div className="absolute inset-0 -z-10 bg-background">
+          <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+        </div>
         <Header />
-        <main className="pt-24 pb-20">
-          <div className="container max-w-6xl">
-            <Skeleton className="h-48 w-full mb-8" />
+        <main className="pt-32 pb-32">
+          <div className="container max-w-6xl relative z-10">
+            <Skeleton className="h-48 w-full mb-8 rounded-[2.5rem]" />
+            <Skeleton className="h-96 w-full rounded-[2.5rem]" />
           </div>
         </main>
       </div>
@@ -375,16 +389,27 @@ const CompararPage = () => {
 
   if (analyses.length < 2) {
     return (
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Dynamic Background */}
+        <div className="absolute inset-0 -z-10 bg-background">
+          <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+        </div>
         <Header />
-        <main className="pt-24 pb-20">
-          <div className="container max-w-4xl text-center">
-            <h1 className="text-2xl font-bold mb-4">Comparar Análisis</h1>
-            <p className="text-muted-foreground mb-6">
-              Necesitás al menos 2 análisis completados para poder compararlos.
+        <main className="pt-32 pb-32">
+          <div className="container max-w-4xl text-center relative z-10">
+            <div className="w-20 h-20 rounded-[2rem] bg-muted flex items-center justify-center mx-auto mb-8 border border-border/50">
+              <ArrowLeftRight className="w-10 h-10 text-muted-foreground" />
+            </div>
+            <h1 className="text-4xl font-extrabold tracking-tight mb-4">Insuficientes datos</h1>
+            <p className="text-xl text-muted-foreground mb-10 max-w-lg mx-auto font-medium">
+              Necesitás al menos 2 análisis completados para poder compararlos lado a lado.
             </p>
-            <Button asChild>
-              <Link to="/analizar">Analizar una expensa</Link>
+            <Button asChild variant="hero" size="xl" className="rounded-2xl px-12 shadow-xl shadow-primary/20">
+              <Link to="/analizar">
+                <Plus className="w-5 h-5 mr-3" />
+                Analizar nueva expensa
+              </Link>
             </Button>
           </div>
         </main>
@@ -400,73 +425,85 @@ const CompararPage = () => {
     : 0;
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 -z-10 bg-background">
+        <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+      </div>
+
       <Header />
-      <main className="pt-24 pb-20">
-        <div className="container max-w-6xl">
-          <div className="flex items-center justify-between mb-8">
-            <Button variant="ghost" className="pl-0 hover:bg-transparent" onClick={() => navigate(-1)}>
-              <ArrowLeft className="w-4 h-4 mr-2" />
+      <main className="pt-32 pb-32">
+        <div className="container max-w-6xl relative z-10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-12">
+            <Button variant="ghost" className="pl-0 hover:bg-transparent text-muted-foreground hover:text-foreground transition-colors group" onClick={() => navigate(-1)}>
+              <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
               Volver al historial
             </Button>
             {leftId && rightId && !loadingDetails && (
-              <Button onClick={exportToPDF} disabled={isExporting} variant="outline" className="gap-2">
+              <Button onClick={exportToPDF} disabled={isExporting} variant="hero" className="gap-3 rounded-2xl px-8 shadow-xl shadow-primary/20">
                 {isExporting ? (
-                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <RefreshCw className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Download className="w-4 h-4" />
+                  <Download className="w-5 h-5" />
                 )}
-                {isExporting ? "Generando PDF..." : "Descargar comparativa"}
+                {isExporting ? "Generando informe..." : "Exportar Comparativa PDF"}
               </Button>
             )}
           </div>
 
           <div id="comparar-report-content">
-            <h1 className="text-3xl font-bold mb-2">Comparar Análisis</h1>
-            <p className="text-muted-foreground mb-8">
-              Seleccioná dos análisis para ver las diferencias lado a lado
-            </p>
+            <div className="mb-10">
+              <h1 className="text-5xl font-extrabold tracking-tight mb-4">Comparativa Lado a Lado</h1>
+              <p className="text-xl text-muted-foreground font-medium max-w-2xl">
+                Analizá las variaciones específicas entre dos períodos de liquidación.
+              </p>
+            </div>
 
-            {/* Selection Area - Interactive (Hidden on PDF) */}
-            <Card id="comparison-filters-card" className="mb-8">
-              <CardContent className="p-6">
-                <div className="grid md:grid-cols-[1fr,auto,1fr] gap-4 items-end">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Análisis Base</label>
+            {/* Selection Area - Premium Glass Design */}
+            <Card id="comparison-filters-card" className="mb-12 bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden animate-fade-in-up">
+              <CardContent className="p-10">
+                <div className="grid md:grid-cols-[1fr,auto,1fr] gap-8 items-end">
+                  <div className="space-y-4">
+                    <label className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1">Análisis Base (Mes A)</label>
                     <Select value={leftId || ""} onValueChange={handleSelectLeft}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar análisis..." />
+                      <SelectTrigger className="h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-lg font-bold">
+                        <SelectValue placeholder="Seleccionar período..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-2xl border-border/50">
                         {analyses.map((a) => (
-                          <SelectItem key={a.id} value={a.id} disabled={a.id === rightId}>
-                            {a.building_name || "Edificio"} - {a.period}
+                          <SelectItem key={a.id} value={a.id} disabled={a.id === rightId} className="py-3">
+                            <span className="font-bold">{a.period}</span>
+                            <span className="ml-2 text-muted-foreground font-medium">- {a.building_name || "Edificio"}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
 
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    onClick={swapSelections}
-                    disabled={!leftId || !rightId}
-                    className="mb-0.5"
-                  >
-                    <ArrowLeftRight className="w-4 h-4" />
-                  </Button>
+                  <div className="flex justify-center pb-1">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={swapSelections}
+                      disabled={!leftId || !rightId}
+                      className="w-14 h-14 rounded-2xl border-border/50 hover:bg-accent group"
+                    >
+                      <ArrowLeftRight className="w-6 h-6 group-hover:rotate-180 transition-transform duration-500" />
+                    </Button>
+                  </div>
 
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Análisis a Comparar</label>
+                  <div className="space-y-4">
+                    <label className="text-sm font-black uppercase tracking-widest text-muted-foreground px-1">Comparar con (Mes B)</label>
                     <Select value={rightId || ""} onValueChange={handleSelectRight}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Seleccionar análisis..." />
+                      <SelectTrigger className="h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-lg font-bold">
+                        <SelectValue placeholder="Seleccionar período..." />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="rounded-2xl border-border/50">
                         {analyses.map((a) => (
-                          <SelectItem key={a.id} value={a.id} disabled={a.id === leftId}>
-                            {a.building_name || "Edificio"} - {a.period}
+                          <SelectItem key={a.id} value={a.id} disabled={a.id === leftId} className="py-3">
+                            <span className="font-bold">{a.period}</span>
+                            <span className="ml-2 text-muted-foreground font-medium">- {a.building_name || "Edificio"}</span>
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -508,32 +545,40 @@ const CompararPage = () => {
             {leftAnalysis && rightAnalysis && !loadingDetails && (
               <>
                 {/* Summary Comparison */}
-                <Card className="mb-8 animate-fade-in-up">
-                  <CardContent className="p-6">
-                    <div className="grid md:grid-cols-[1fr,auto,1fr] gap-6 items-center">
-                      <div className="text-center md:text-left">
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {leftAnalysis.building_name || "Edificio"} - {leftAnalysis.period}
+                {/* Summary Comparison - Premium Dashboard Card */}
+                <Card className="mb-12 bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[3rem] overflow-hidden animate-fade-in-up">
+                  <CardContent className="p-12">
+                    <div className="grid md:grid-cols-[1fr,auto,1fr] gap-12 items-center">
+                      <div className="text-center md:text-left space-y-2">
+                        <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+                          {leftAnalysis.period}
                         </p>
-                        <p className="text-3xl font-bold">{formatCurrency(leftAnalysis.total_amount)}</p>
+                        <p className="text-4xl font-black tabular-nums">{formatCurrency(leftAnalysis.total_amount)}</p>
+                        <p className="text-sm font-medium text-muted-foreground">{leftAnalysis.building_name || "Edificio"}</p>
                       </div>
 
-                      <div className="flex flex-col items-center gap-2">
-                        <div className={`text-lg font-semibold flex items-center gap-1 ${totalDiff > 0 ? "text-status-attention" : totalDiff < 0 ? "text-status-ok" : "text-muted-foreground"
+                      <div className="flex flex-col items-center gap-4">
+                        <div className={`text-2xl font-black flex items-center gap-2 drop-shadow-sm ${totalDiff > 0 ? "text-secondary" : totalDiff < 0 ? "text-primary" : "text-muted-foreground"
                           }`}>
-                          {totalDiff > 0 ? <TrendingUp className="w-5 h-5" /> : totalDiff < 0 ? <TrendingDown className="w-5 h-5" /> : <Minus className="w-5 h-5" />}
+                          {totalDiff > 0 ? <TrendingUp className="w-8 h-8" /> : totalDiff < 0 ? <TrendingDown className="w-8 h-8" /> : <Minus className="w-8 h-8" />}
                           {totalDiff > 0 ? "+" : ""}{formatCurrency(totalDiff)}
                         </div>
-                        <Badge variant={totalDiff > 0 ? "attention" : totalDiff < 0 ? "ok" : "default"}>
-                          {totalChangePercent > 0 ? "+" : ""}{totalChangePercent.toFixed(1)}%
-                        </Badge>
+                        <div className={`px-6 py-2 rounded-full text-base font-black tracking-tight ${totalDiff > 0
+                          ? "bg-secondary/10 text-secondary border border-secondary/20"
+                          : totalDiff < 0
+                            ? "bg-primary/10 text-primary border border-primary/20"
+                            : "bg-muted text-muted-foreground"
+                          }`}>
+                          {totalChangePercent > 0 ? "+" : ""}{totalChangePercent.toFixed(1)}% mensual
+                        </div>
                       </div>
 
-                      <div className="text-center md:text-right">
-                        <p className="text-sm text-muted-foreground mb-1">
-                          {rightAnalysis.building_name || "Edificio"} - {rightAnalysis.period}
+                      <div className="text-center md:text-right space-y-2">
+                        <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">
+                          {rightAnalysis.period}
                         </p>
-                        <p className="text-3xl font-bold">{formatCurrency(rightAnalysis.total_amount)}</p>
+                        <p className="text-4xl font-black tabular-nums">{formatCurrency(rightAnalysis.total_amount)}</p>
+                        <p className="text-sm font-medium text-muted-foreground">{rightAnalysis.building_name || "Edificio"}</p>
                       </div>
                     </div>
                   </CardContent>
@@ -550,9 +595,16 @@ const CompararPage = () => {
                   </div>
                 )}
 
-                {/* Category Comparison */}
-                <h2 className="text-xl font-semibold mb-4">Detalle por Categoría</h2>
-                <div className="space-y-3">
+                {/* Category Comparison Section */}
+                <div className="mb-6 flex items-center justify-between">
+                  <h2 className="text-2xl font-extrabold tracking-tight">Desglose Comparativo</h2>
+                  <div className="flex items-center gap-2 text-sm font-bold text-muted-foreground uppercase tracking-widest">
+                    <ArrowLeftRight className="w-4 h-4" />
+                    Categorías Detectadas
+                  </div>
+                </div>
+
+                <div className="space-y-4 mb-12">
                   {categoryComparison.map((cat, index) => {
                     const Icon = iconMap[cat.icon] || Building;
                     const isIncrease = cat.diff > 0;
@@ -562,36 +614,42 @@ const CompararPage = () => {
                     return (
                       <Card
                         key={cat.name}
-                        className={`animate-fade-in-up ${isSignificant && isIncrease ? "border-status-attention/50" : ""}`}
+                        className={cn(
+                          "group animate-fade-in-up transition-all duration-300 rounded-3xl overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg",
+                          isSignificant && isIncrease && "border-secondary/30 bg-secondary/5"
+                        )}
                         style={{ animationDelay: `${index * 0.05}s` }}
                       >
-                        <CardContent className="p-4">
-                          <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-center">
+                        <CardContent className="p-6 md:p-8">
+                          <div className="grid grid-cols-[1fr,auto,1fr] gap-8 items-center">
                             <div className="text-right">
-                              <p className="text-lg font-semibold">{formatCurrency(cat.leftAmount)}</p>
+                              <p className="text-xl font-bold tabular-nums text-foreground/80">{formatCurrency(cat.leftAmount)}</p>
                             </div>
 
-                            <div className="flex flex-col items-center gap-1 min-w-[120px]">
-                              <div className="flex items-center gap-2">
-                                <Icon className="w-4 h-4 text-muted-foreground" />
-                                <span className="text-sm font-medium">{cat.name}</span>
+                            <div className="flex flex-col items-center gap-3 min-w-[180px]">
+                              <div className="flex items-center gap-3 px-4 py-2 bg-background/50 rounded-2xl border border-border/50 group-hover:bg-primary/5 transition-colors">
+                                <Icon className="w-5 h-5 text-primary" />
+                                <span className="text-base font-extrabold text-foreground">{cat.name}</span>
                               </div>
-                              <div className={`text-xs flex items-center gap-1 ${isIncrease ? "text-status-attention" : isDecrease ? "text-status-ok" : "text-muted-foreground"
+                              <div className={`text-sm font-black flex items-center gap-1.5 ${isIncrease ? "text-secondary" : isDecrease ? "text-primary" : "text-muted-foreground"
                                 }`}>
-                                {isIncrease ? <TrendingUp className="w-3 h-3" /> : isDecrease ? <TrendingDown className="w-3 h-3" /> : <Minus className="w-3 h-3" />}
+                                {isIncrease ? <TrendingUp className="w-4 h-4" /> : isDecrease ? <TrendingDown className="w-4 h-4" /> : <Minus className="w-4 h-4" />}
                                 {cat.changePercent !== null ? (
                                   <span>{cat.changePercent > 0 ? "+" : ""}{cat.changePercent.toFixed(1)}%</span>
                                 ) : (
-                                  <span>N/A</span>
+                                  <span>0.0%</span>
                                 )}
                               </div>
                               {isSignificant && isIncrease && (
-                                <AlertTriangle className="w-3 h-3 text-status-attention" />
+                                <div className="flex items-center gap-2 px-3 py-1 bg-secondary/20 rounded-full border border-secondary/20">
+                                  <AlertTriangle className="w-4 h-4 text-secondary" />
+                                  <span className="text-[10px] font-black uppercase text-secondary">Alerta de Desvío</span>
+                                </div>
                               )}
                             </div>
 
                             <div className="text-left">
-                              <p className="text-lg font-semibold">{formatCurrency(cat.rightAmount)}</p>
+                              <p className="text-xl font-bold tabular-nums text-foreground">{formatCurrency(cat.rightAmount)}</p>
                             </div>
                           </div>
                         </CardContent>
@@ -611,12 +669,20 @@ const CompararPage = () => {
             )}
 
             {!leftId && !rightId && !loadingDetails && (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <ArrowLeftRight className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                  <p className="text-muted-foreground">
-                    Seleccioná dos análisis arriba para comenzar la comparación
-                  </p>
+              <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[3rem] overflow-hidden py-24 px-10 border-dashed border-2 animate-fade-in-up">
+                <CardContent className="text-center space-y-8">
+                  <div className="relative mx-auto w-24 h-24">
+                    <div className="absolute inset-0 bg-primary/10 rounded-full animate-pulse"></div>
+                    <div className="relative w-24 h-24 rounded-full bg-background/50 flex items-center justify-center border border-border/50 backdrop-blur-md">
+                      <ArrowLeftRight className="w-10 h-10 text-muted-foreground" />
+                    </div>
+                  </div>
+                  <div className="max-w-sm mx-auto space-y-3">
+                    <h3 className="text-2xl font-extrabold tracking-tight">Listo para comparar</h3>
+                    <p className="text-lg text-muted-foreground font-medium">
+                      Seleccioná dos períodos arriba para ver un análisis detallado de sus diferencias.
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}

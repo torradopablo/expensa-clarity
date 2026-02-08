@@ -1,7 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
 import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
 import { TrendService } from "../_shared/services/analysis/TrendService.ts"
+import { SharedAnalysisCacheService } from "../_shared/services/cache/SharedAnalysisCacheService.ts"
 
 const MAX_HISTORICAL_PERIODS = 15;
 
@@ -49,6 +50,17 @@ interface Deviation {
   isSignificant: boolean;
 }
 
+interface AnalysisComment {
+  id: string;
+  author_name: string;
+  author_email: string | null;
+  comment: string;
+  created_at: string;
+  is_owner_comment: boolean;
+  user_id: string | null;
+  parent_comment_id: string | null;
+}
+
 interface BuildingsTrendStats {
   totalBuildings: number;
   totalAnalyses: number;
@@ -84,9 +96,25 @@ serve(async (req) => {
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
+    // Initialize cache service
+    const cacheService = new SharedAnalysisCacheService()
+
     console.log('Looking for shared link with token:', token)
 
-    // Find the shared link
+    // 1. Try to get from cache first
+    const cachedResult = await cacheService.getCachedAnalysis(token)
+    if (cachedResult) {
+      console.log('Returning cached analysis data')
+      return new Response(
+        JSON.stringify(cachedResult.data),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'HIT' }
+        }
+      )
+    }
+
+    // 2. Find the shared link
     const { data: linkData, error: linkError } = await supabase
       .from('shared_analysis_links')
       .select('*')
@@ -149,12 +177,25 @@ serve(async (req) => {
       )
     }
 
+    // Get comments for this analysis (incluyendo comentarios de owner)
+    const { data: comments, error: commentsError } = await supabase
+      .from('analysis_comments')
+      .select('id, author_name, author_email, comment, created_at, is_owner_comment, user_id, parent_comment_id')
+      .eq('analysis_id', linkData.analysis_id)
+      .order('created_at', { ascending: true })
+
+    if (commentsError) {
+      console.log('Comments error:', commentsError)
+      // No fallar si hay error en comentarios, solo loggear
+    }
+
     // Get ALL historical data for same building and user to build consistent evolution
     const { data: historicalData, error: historicalError } = await supabase
       .from('expense_analyses')
-      .select('id, period, total_amount, created_at, period_date')
+      .select('id, period, total_amount, created_at, period_date, expense_categories(name, current_amount)')
       .eq('building_name', analysis.building_name)
       .eq('user_id', analysis.user_id)
+      .eq('status', 'completed')
       .order('period_date', { ascending: true, nullsFirst: false })
 
     if (historicalError) {
@@ -227,6 +268,30 @@ serve(async (req) => {
 
     const buildingsTrend = trendData || [];
     let buildingsTrendStats: BuildingsTrendStats | null = trendStats || null;
+
+    // Fetch trends for all other categories found in historical data
+    const uniqueCategories = new Set<string>();
+    if (historicalData) {
+      historicalData.forEach((h: any) => {
+        h.expense_categories?.forEach((c: any) => uniqueCategories.add(c.name));
+      });
+    }
+
+    const categoryTrends: Record<string, any> = {
+      all: { data: buildingsTrend, stats: buildingsTrendStats }
+    };
+
+    // Limit to top 15 categories to avoid excessive queries (usually it's around 5-10)
+    const categoriesToFetch = Array.from(uniqueCategories).slice(0, 15);
+
+    for (const catName of categoriesToFetch) {
+      const catFilters = { ...filters, category: catName };
+      const { data: catTrendData, stats: catTrendStats } = await trendService.getMarketTrend(
+        catFilters,
+        true // Use fallback for categories to ensure we have data
+      );
+      categoryTrends[catName] = { data: catTrendData || [], stats: catTrendStats || null };
+    }
 
     // Fetch inflation data
     let inflationData = null;
@@ -341,14 +406,23 @@ serve(async (req) => {
       historicalData: slicedHistoricalData || [],
       evolutionData,
       deviation,
-      buildingsTrendStats
+      buildingsTrendStats,
+      comments: comments || [],
+      inflationData,
+      categoryTrends
     }
 
     console.log('Returning analysis data successfully')
 
+    // 3. Cache the result for future requests
+    await cacheService.cacheAnalysis(linkData.analysis_id, token, responseData)
+
     return new Response(
       JSON.stringify(responseData),
-      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json', 'X-Cache': 'MISS' }
+      }
     )
 
   } catch (error) {

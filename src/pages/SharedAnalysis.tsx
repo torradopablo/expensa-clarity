@@ -23,8 +23,20 @@ import {
   Shield,
   Lock,
   ExternalLink,
-  History
+  History,
+  MessageSquare,
+  Send,
+  User,
+  Loader2
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { periodToYearMonth } from "@/services/formatters/date";
 import { createClient } from "@supabase/supabase-js";
 import { Sparkles } from "lucide-react";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
@@ -97,13 +109,18 @@ interface Category {
 
 interface Analysis {
   id: string;
-  building_name: string | null;
+  user_id: string;
+  building_name: string;
+  building_address?: string;
   period: string;
-  unit: string | null;
+  period_date: string;
   total_amount: number;
   previous_total: number | null;
-  status: string;
+  unit: string | null;
+  categories_count: number;
   created_at: string;
+  owner_notes?: string;
+  status?: string;
 }
 
 interface HistoricalDataPoint {
@@ -112,13 +129,14 @@ interface HistoricalDataPoint {
   total_amount: number;
   created_at: string;
   period_date: string | null;
+  expense_categories?: { name: string; current_amount: number }[];
 }
 
 interface EvolutionDataPoint {
   period: string;
   userPercent: number;
   inflationPercent: number | null;
-  inflationEstimated?: boolean;
+  inflationEstimated: boolean;
   buildingsPercent: number | null;
 }
 
@@ -128,11 +146,24 @@ interface Deviation {
   isSignificant: boolean;
 }
 
+interface AnalysisComment {
+  id: string;
+  author_name: string;
+  author_email: string | null;
+  comment: string;
+  created_at: string;
+  is_owner_comment: boolean;
+  user_id: string | null;
+  parent_comment_id: string | null;
+}
+
 interface BuildingsTrendStats {
   totalBuildings: number;
   totalAnalyses: number;
-  periodsCount: number;
-  filtersApplied: boolean;
+  averageIncrease: number;
+  medianIncrease: number;
+  periodsCount?: number;
+  filtersApplied?: boolean;
   usedFallback?: boolean;
 }
 
@@ -161,30 +192,38 @@ const SharedHistoricalChart = ({
   historicalData,
   currentAnalysisId,
   currentPeriod,
-  buildingName
+  buildingName,
+  category = "all"
 }: {
   historicalData: HistoricalDataPoint[];
   currentAnalysisId: string;
   currentPeriod: string;
   buildingName: string | null;
+  category?: string;
 }) => {
   if (historicalData.length < 2) {
     return null;
   }
 
+  const getAmount = (h: HistoricalDataPoint) => {
+    if (category === "all") return h.total_amount;
+    const cat = h.expense_categories?.find(c => c.name === category);
+    return cat ? cat.current_amount : 0;
+  };
+
   const chartData = historicalData.map((item) => ({
     period: item.period,
-    total: item.total_amount,
+    total: getAmount(item),
     isCurrent: item.id === currentAnalysisId,
   }));
 
-  const totals = historicalData.map((d) => d.total_amount);
+  const totals = historicalData.map((d) => getAmount(d));
   const average = totals.reduce((a, b) => a + b, 0) / totals.length;
   const min = Math.min(...totals);
   const max = Math.max(...totals);
-  const currentTotal = historicalData.find((d) => d.id === currentAnalysisId)?.total_amount || 0;
+  const currentTotal = getAmount(historicalData.find((d) => d.id === currentAnalysisId)!);
 
-  const firstTotal = historicalData[0]?.total_amount;
+  const firstTotal = getAmount(historicalData[0]);
   const totalEvolution = firstTotal
     ? ((currentTotal - firstTotal) / firstTotal) * 100
     : null;
@@ -198,7 +237,9 @@ const SharedHistoricalChart = ({
               <History className="w-5 h-5 text-secondary" />
             </div>
             <div>
-              <CardTitle className="text-lg">Evolución histórica</CardTitle>
+              <CardTitle className="text-lg">
+                {category === "all" ? "Evolución histórica" : `Evolución: ${category}`}
+              </CardTitle>
               <p className="text-sm text-muted-foreground">
                 {historicalData.length} análisis de {buildingName}
               </p>
@@ -342,8 +383,23 @@ const SharedAnalysis = () => {
   const [evolutionData, setEvolutionData] = useState<EvolutionDataPoint[]>([]);
   const [deviation, setDeviation] = useState<Deviation | null>(null);
   const [buildingsTrendStats, setBuildingsTrendStats] = useState<BuildingsTrendStats | null>(null);
+  const [comments, setComments] = useState<AnalysisComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [availableCategories, setAvailableCategories] = useState<string[]>([]);
+  const [inflationDataRaw, setInflationDataRaw] = useState<any[]>([]);
+  const [categoryTrends, setCategoryTrends] = useState<Record<string, any>>({});
+
+  // Form state for new comment
+  const [newComment, setNewComment] = useState({ author_name: '', author_email: '', comment: '' });
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
+  const [commentError, setCommentError] = useState<string | null>(null);
+
+  // State for owner reply
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [ownerReply, setOwnerReply] = useState('');
 
   useEffect(() => {
     const fetchSharedAnalysis = async () => {
@@ -391,6 +447,18 @@ const SharedAnalysis = () => {
           setEvolutionData(analysisResult.evolutionData || []);
           setDeviation(analysisResult.deviation || null);
           setBuildingsTrendStats(analysisResult.buildingsTrendStats || null);
+          setComments(analysisResult.comments || []);
+
+          // Store raw data for local filtering
+          setInflationDataRaw(analysisResult.inflationData || []);
+          setCategoryTrends(analysisResult.categoryTrends || {});
+
+          // Extract unique categories across all historical periods
+          const allCatNames = new Set<string>();
+          (analysisResult.historicalData || []).forEach((h: any) => {
+            h.expense_categories?.forEach((c: any) => allCatNames.add(c.name));
+          });
+          setAvailableCategories(Array.from(allCatNames).sort());
         } else {
           console.log("No analysis data in response");
           setError("No se pudo cargar el análisis");
@@ -405,6 +473,240 @@ const SharedAnalysis = () => {
 
     fetchSharedAnalysis();
   }, [token]);
+
+  // Recalculate evolution locally based on selected category
+  useEffect(() => {
+    if (historicalData.length < 2) return;
+
+    const getAmount = (h: HistoricalDataPoint) => {
+      if (selectedCategory === "all") return h.total_amount;
+      const cat = h.expense_categories?.find(c => c.name === selectedCategory);
+      return cat ? cat.current_amount : 0;
+    };
+
+    const baseAmount = getAmount(historicalData[0]);
+
+    // Create inflation map
+    const inflationMap = new Map<string, { value: number; is_estimated: boolean }>();
+    if (inflationDataRaw) {
+      inflationDataRaw.forEach(inf => {
+        const periodKey = inf.period;
+        if (periodKey) {
+          inflationMap.set(periodKey, { value: inf.value, is_estimated: inf.is_estimated });
+        }
+      });
+    }
+
+    // Find base inflation value
+    const firstPeriod = historicalData[0];
+    const firstPeriodYYYYMM = periodToYearMonth(firstPeriod.period, firstPeriod.period_date);
+    const baseInflation = firstPeriodYYYYMM ? (inflationMap.get(firstPeriodYYYYMM) ?? null) : null;
+
+    // Find custom category trend data
+    const activeTrend = categoryTrends[selectedCategory] || { data: [], stats: null };
+    const buildingsTrendRaw = activeTrend.data || [];
+
+    // Find base buildings average
+    const firstPeriodLabel = historicalData[0].period;
+    const baseBuildingsItem = buildingsTrendRaw.find((b: any) => b.period === firstPeriodLabel);
+    const baseBuildingsAverage = baseBuildingsItem?.average ?? null;
+
+    const evolution: EvolutionDataPoint[] = historicalData.map((h) => {
+      const currentAmount = getAmount(h);
+      const userPercent = baseAmount > 0 ? ((currentAmount - baseAmount) / baseAmount) * 100 : 0;
+
+      let inflationPercent: number | null = null;
+      let inflationEstimated = false;
+
+      const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
+      if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+        const inflationItem = inflationMap.get(periodYYYYMM);
+        if (inflationItem) {
+          inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+          inflationEstimated = inflationItem.is_estimated;
+        }
+      }
+
+      let buildingsPercent: number | null = null;
+      if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
+        const buildingsItem = buildingsTrendRaw.find((b: any) => b.period === h.period);
+        if (buildingsItem) {
+          buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
+        }
+      }
+
+      return {
+        period: h.period,
+        userPercent,
+        inflationPercent,
+        inflationEstimated,
+        buildingsPercent
+      };
+    });
+
+    setEvolutionData(evolution);
+    setBuildingsTrendStats(activeTrend.stats || null);
+
+    // Calculate deviation for latest period
+    const latestEvolution = evolution[evolution.length - 1];
+    if (latestEvolution) {
+      const fromInflation = latestEvolution.inflationPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.inflationPercent
+        : 0;
+      const fromBuildings = latestEvolution.buildingsPercent !== null
+        ? latestEvolution.userPercent - latestEvolution.buildingsPercent
+        : 0;
+
+      setDeviation({
+        fromInflation,
+        fromBuildings,
+        isSignificant: Math.abs(fromInflation) > 10 || Math.abs(fromBuildings) > 10
+      });
+    }
+  }, [selectedCategory, historicalData, inflationDataRaw, categoryTrends]);
+
+  // Function to submit owner reply
+  const handleOwnerReply = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!replyingTo || !ownerReply.trim()) {
+      setCommentError("Por favor escribe una respuesta");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      console.log('Submitting owner reply:', {
+        token: token?.substring(0, 10) + '...',
+        user_id: 'owner-user-id', // Esto debería venir del auth real
+        parent_comment_id: replyingTo,
+        comment: ownerReply.trim()
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-owner-comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          token,
+          user_id: 'owner-user-id', // Esto debería venir del auth real
+          parent_comment_id: replyingTo,
+          comment: ownerReply.trim()
+        })
+      });
+
+      const responseData = await response.json();
+      console.log('Response from owner-reply:', { status: response.status, data: responseData });
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Add new reply to local state
+      const newReplyData = responseData.comment;
+      setComments(prev => [...prev, newReplyData]);
+
+      // Invalidate cache to ensure updated comments are shown
+      try {
+        await supabaseFunctions.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: analysis?.id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
+
+      // Reset form
+      setOwnerReply('');
+      setReplyingTo(null);
+
+    } catch (err: any) {
+      console.error('Error submitting owner reply:', err);
+      setCommentError(err.message || 'Error al enviar la respuesta');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  // Function to submit a new comment
+  const handleCommentSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!token || !newComment.author_name.trim() || !newComment.comment.trim()) {
+      setCommentError("Por favor completa tu nombre y el comentario");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    setCommentError(null);
+
+    try {
+      console.log('Submitting comment:', {
+        token: token?.substring(0, 10) + '...',
+        author_name: newComment.author_name.trim(),
+        author_email: newComment.author_email.trim() || undefined,
+        comment: newComment.comment.trim()
+      });
+
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-analysis-comment`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+        },
+        body: JSON.stringify({
+          token,
+          author_name: newComment.author_name.trim(),
+          author_email: newComment.author_email.trim() || undefined,
+          comment: newComment.comment.trim()
+        })
+      });
+
+      const responseData = await response.json();
+      console.log('Response from add-comment:', { status: response.status, data: responseData });
+
+      if (!response.ok) {
+        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      }
+
+      // Add the new comment to the local state
+      const newCommentData = responseData.comment;
+      setComments(prev => [...prev, newCommentData]);
+
+      // Invalidate cache to ensure updated comments are shown
+      try {
+        await supabaseFunctions.functions.invoke('invalidate-share-cache', {
+          body: { analysis_id: analysis?.id }
+        });
+      } catch (cacheError) {
+        console.log('Cache invalidation failed:', cacheError);
+        // Don't fail the comment submission if cache invalidation fails
+      }
+
+      // Reset form
+      setNewComment({ author_name: '', author_email: '', comment: '' });
+
+    } catch (err: any) {
+      console.error('Error submitting comment:', err);
+      setCommentError(err.message || 'Error al enviar el comentario');
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleString('es-AR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
 
   if (isLoading) {
     return (
@@ -455,69 +757,77 @@ const SharedAnalysis = () => {
 
   return (
     <TooltipProvider delayDuration={200}>
-      <div className="min-h-screen bg-gradient-soft">
+      <div className="min-h-screen relative overflow-hidden">
+        {/* Dynamic Background */}
+        <div className="absolute inset-0 -z-10 bg-background">
+          <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+          <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+        </div>
+
         <Header />
-        <main className="pt-24 pb-20">
+        <main className="pt-32 pb-20 relative z-10">
           <div className="container max-w-4xl">
             {/* Shared badge */}
-            <div className="flex items-center gap-2 mb-6 text-sm text-muted-foreground">
-              <ExternalLink className="w-4 h-4" />
+            <div className="flex items-center gap-2 mb-8 text-sm text-muted-foreground font-medium">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <ExternalLink className="w-4 h-4 text-primary" />
+              </div>
               <span>Análisis compartido</span>
             </div>
 
             {/* Summary Card */}
-            <Card variant="glass" className="mb-8 animate-fade-in-up">
-              <CardContent className="p-6 md:p-8">
-                <div className="grid md:grid-cols-3 gap-6">
-                  <div className="md:col-span-2 space-y-4">
+            <Card className="mb-8 bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+              <CardContent className="p-8 md:p-10">
+                <div className="grid md:grid-cols-3 gap-8">
+                  <div className="md:col-span-2 space-y-6">
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-base text-muted-foreground font-medium mb-1">
                           {analysis.building_name || "Edificio"}
                         </p>
-                        <h1 className="text-2xl md:text-3xl font-bold">{analysis.period}</h1>
+                        <h1 className="text-4xl md:text-5xl font-extrabold tracking-tight">{analysis.period}</h1>
                         {analysis.unit && (
-                          <p className="text-muted-foreground">{analysis.unit}</p>
+                          <p className="text-lg text-muted-foreground font-medium mt-2">{analysis.unit}</p>
                         )}
                       </div>
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Badge variant={attentionItems > 0 ? "attention" : "ok"} className="text-sm px-3 py-1 cursor-help">
+                          <Badge variant={attentionItems > 0 ? "attention" : "ok"} className="text-sm px-4 py-1.5 rounded-full cursor-help shadow-lg">
                             {attentionItems > 0 ? (
-                              <><AlertTriangle className="w-3.5 h-3.5 mr-1.5" />{attentionItems} puntos a revisar</>
+                              <><AlertTriangle className="w-4 h-4 mr-2" />{attentionItems} puntos a revisar</>
                             ) : (
-                              <><CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />Todo en orden</>
+                              <><CheckCircle2 className="w-4 h-4 mr-2" />Todo en orden</>
                             )}
                           </Badge>
                         </TooltipTrigger>
-                        <TooltipContent side="bottom" className="max-w-xs">
+                        <TooltipContent side="bottom" className="max-w-xs p-4 rounded-xl">
                           {attentionItems > 0 ? (
-                            <p>Hay {attentionItems} categorías con aumentos mayores al promedio.</p>
+                            <p className="font-medium">Hay {attentionItems} categorías con aumentos mayores al promedio.</p>
                           ) : (
-                            <p>Todas las categorías tienen variaciones dentro de lo esperado.</p>
+                            <p className="font-medium">Todas las categorías tienen variaciones dentro de lo esperado.</p>
                           )}
                         </TooltipContent>
                       </Tooltip>
                     </div>
-                    <p className="text-muted-foreground text-sm max-w-lg">
+                    <p className="text-muted-foreground text-lg font-medium max-w-lg leading-relaxed">
                       {attentionItems > 0
                         ? "Esta expensa tiene algunos aumentos que merecen atención."
                         : "Esta expensa está dentro de los rangos normales."}
                     </p>
                   </div>
                   <div className="flex flex-col justify-center items-start md:items-end">
-                    <p className="text-sm text-muted-foreground mb-1">Total del mes</p>
-                    <p className="text-3xl md:text-4xl font-bold">
+                    <p className="text-sm text-muted-foreground font-bold uppercase tracking-wider mb-2">Total del mes</p>
+                    <p className="text-4xl md:text-5xl font-black text-foreground">
                       {formatCurrency(analysis.total_amount)}
                     </p>
                     {analysis.previous_total && (
-                      <div className={`flex items-center gap-1 mt-2 text-sm ${totalChange > 0 ? "text-status-attention" : "text-status-ok"}`}>
+                      <div className={`flex items-center gap-2 mt-4 text-base font-bold px-4 py-2 rounded-xl ${totalChange > 0 ? "bg-status-attention-bg text-status-attention" : "bg-status-ok-bg text-status-ok"}`}>
                         {totalChange > 0 ? (
-                          <TrendingUp className="w-4 h-4" />
+                          <TrendingUp className="w-5 h-5" />
                         ) : (
-                          <TrendingDown className="w-4 h-4" />
+                          <TrendingDown className="w-5 h-5" />
                         )}
-                        <span className="font-medium">
+                        <span>
                           {totalChange > 0 ? "+" : ""}{totalChange.toFixed(1)}% vs mes anterior
                         </span>
                       </div>
@@ -528,14 +838,14 @@ const SharedAnalysis = () => {
             </Card>
 
             {/* AI Summary */}
-            <Card variant="soft" className="mb-8 animate-fade-in-up border-primary/20 bg-primary/5">
-              <CardContent className="p-4 flex items-start gap-3">
-                <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
-                  <Sparkles className="w-4 h-4 text-primary" />
+            <Card className="mb-12 bg-primary/5 backdrop-blur-md border-primary/20 shadow-xl rounded-[1.5rem] animate-fade-in-up">
+              <CardContent className="p-6 flex items-start gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0 border border-primary/30">
+                  <Sparkles className="w-6 h-6 text-primary" />
                 </div>
                 <div>
-                  <p className="text-sm font-medium text-primary mb-1">Resumen IA</p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-sm font-bold text-primary uppercase tracking-widest mb-2">Análisis de Inteligencia Artificial</p>
+                  <p className="text-base text-foreground/90 leading-relaxed font-medium">
                     {attentionItems > 0
                       ? `Esta expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. ${attentionItems} categoría${attentionItems > 1 ? 's merecen' : ' merece'} revisión por aumentos significativos.`
                       : `Esta expensa de ${analysis.period} totaliza ${formatCurrency(analysis.total_amount)}${analysis.previous_total ? ` (${totalChange > 0 ? '+' : ''}${totalChange.toFixed(0)}% vs anterior)` : ''}. Todos los rubros están dentro de parámetros normales.`}
@@ -546,9 +856,12 @@ const SharedAnalysis = () => {
 
             {/* Categories Breakdown */}
             {categories.length > 0 && (
-              <div className="grid gap-4 mb-8">
-                <h2 className="text-xl font-semibold">Detalle por categoría</h2>
-                <div className="grid gap-4">
+              <div className="grid gap-6 mb-12">
+                <div className="flex items-center gap-3">
+                  <div className="w-2 h-8 bg-primary rounded-full"></div>
+                  <h2 className="text-2xl font-bold tracking-tight">Detalle por categoría</h2>
+                </div>
+                <div className="grid gap-6">
                   {categories.map((category, index) => {
                     const change = calculateChange(category.current_amount, category.previous_amount);
                     const Icon = iconMap[category.icon] || Building;
@@ -556,41 +869,40 @@ const SharedAnalysis = () => {
                     return (
                       <Card
                         key={category.id}
-                        variant="default"
-                        className="animate-fade-in-up overflow-hidden"
+                        className="bg-card/30 backdrop-blur-md border border-border/50 shadow-lg rounded-[1.5rem] overflow-hidden animate-fade-in-up hover:bg-card/40 transition-colors"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <CardContent className="p-0">
                           <div className="flex flex-col md:flex-row">
-                            <div className="flex-1 p-5 md:p-6">
-                              <div className="flex items-start gap-4">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                            <div className="flex-1 p-6 md:p-8">
+                              <div className="flex items-start gap-5">
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 border ${category.status === "attention" ? "bg-status-attention-bg border-status-attention/30" : "bg-status-ok-bg border-status-ok/30"
                                   }`}>
-                                  <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                  <Icon className={`w-7 h-7 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
                                     }`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <h3 className="font-semibold">{category.name}</h3>
-                                    <Badge variant={category.status as any}>
+                                  <div className="flex items-center gap-3 mb-2">
+                                    <h3 className="text-xl font-bold">{category.name}</h3>
+                                    <Badge variant={category.status as any} className="px-3">
                                       {category.status === "ok" ? "OK" : "Revisar"}
                                     </Badge>
                                   </div>
-                                  <p className="text-sm text-muted-foreground">
-                                    {category.explanation || "Sin observaciones"}
+                                  <p className="text-base text-muted-foreground leading-relaxed font-medium">
+                                    {category.explanation || "Sin observaciones específicas para este rubro."}
                                   </p>
                                 </div>
                               </div>
                             </div>
-                            <div className="flex md:flex-col items-center justify-between md:justify-center gap-4 p-5 md:p-6 bg-muted/30 md:w-48 border-t md:border-t-0 md:border-l border-border">
+                            <div className="flex md:flex-col items-center justify-between md:justify-center gap-6 p-6 md:p-8 bg-muted/20 md:w-56 border-t md:border-t-0 md:border-l border-border/50">
                               <div className="text-center">
-                                <p className="text-xs text-muted-foreground mb-0.5">Este mes</p>
-                                <p className="text-lg font-bold">{formatCurrency(category.current_amount)}</p>
+                                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider mb-1">Este mes</p>
+                                <p className="text-2xl font-black">{formatCurrency(category.current_amount)}</p>
                               </div>
                               {category.previous_amount && (
-                                <div className={`flex items-center gap-1 text-sm font-medium ${change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                                <div className={`flex items-center gap-1.5 text-base font-bold px-3 py-1 rounded-lg ${change > 15 ? "bg-status-attention-bg text-status-attention" : change > 0 ? "bg-muted/50 text-muted-foreground" : "bg-status-ok-bg text-status-ok"
                                   }`}>
-                                  {change > 0 ? <TrendingUp className="w-3.5 h-3.5" /> : <TrendingDown className="w-3.5 h-3.5" />}
+                                  {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                                   {change > 0 ? "+" : ""}{change.toFixed(1)}%
                                 </div>
                               )}
@@ -627,6 +939,40 @@ const SharedAnalysis = () => {
               </div>
             )}
 
+            {/* Evolution Section Filter */}
+            {analysis.building_name && (
+              <div className="mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in-up">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <TrendingUp className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-bold font-heading">Evolución y Tendencias</h3>
+                    <p className="text-sm text-muted-foreground">Análisis histórico comparado con el mercado e inflación</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-1.5 min-w-[280px]">
+                  <label htmlFor="category-filter" className="text-xs font-semibold text-muted-foreground px-1 uppercase tracking-wider">
+                    Análisis específico por rubro
+                  </label>
+                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                    <SelectTrigger id="category-filter" className="bg-background/50 backdrop-blur-md border-border/50 h-11 rounded-xl focus:ring-primary/20 transition-all font-medium shadow-sm">
+                      <SelectValue placeholder="Todos los rubros" />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-[300px]">
+                      <SelectItem value="all" className="font-semibold text-primary">📊 Todos los rubros (Total)</SelectItem>
+                      {availableCategories.map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {cat}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            )}
+
             {/* Historical Evolution Chart */}
             {historicalData.length >= 2 && (
               <div className="mb-8">
@@ -635,6 +981,7 @@ const SharedAnalysis = () => {
                   currentAnalysisId={analysis.id}
                   currentPeriod={analysis.period}
                   buildingName={analysis.building_name}
+                  category={selectedCategory}
                 />
               </div>
             )}
@@ -651,18 +998,265 @@ const SharedAnalysis = () => {
               </div>
             )}
 
-            {/* CTA */}
-            <Card variant="soft" className="animate-fade-in-up">
-              <CardContent className="p-6 text-center">
-                <h3 className="font-semibold mb-2">¿Querés analizar tu propia expensa?</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Subí tu liquidación y obtené un análisis detallado en segundos.
-                </p>
-                <Button asChild variant="hero">
-                  <Link to="/analizar">Analizar mi expensa</Link>
-                </Button>
+            {/* Owner's Notes Section */}
+            {analysis?.owner_notes && (
+              <Card className="mb-12 bg-card/40 backdrop-blur-xl border border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+                <CardHeader className="p-8 pb-4">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                      <MessageSquare className="w-6 h-6 text-primary" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-xl font-bold">Notas del Administrador</CardTitle>
+                      <p className="text-sm text-muted-foreground font-medium">
+                        Información adicional para los propietarios
+                      </p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 pt-4">
+                  <div className="p-6 bg-primary/5 rounded-[1.5rem] border border-primary/10">
+                    <p className="text-base leading-relaxed text-foreground/90 font-medium italic">
+                      "{analysis.owner_notes}"
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Comments Section */}
+            <Card className="mb-12 bg-card/40 backdrop-blur-xl border border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+              <CardHeader className="p-8">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-secondary/10 flex items-center justify-center border border-secondary/20">
+                    <MessageSquare className="w-6 h-6 text-secondary" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xl font-bold">Comunidad y Consultas</CardTitle>
+                    <p className="text-sm text-muted-foreground font-medium">
+                      {comments.length} comentario{comments.length !== 1 ? 's' : ''} en este análisis
+                    </p>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 pt-0">
+                {/* Comment Form */}
+                <form onSubmit={handleCommentSubmit} className="mb-10 p-8 bg-muted/20 backdrop-blur-md rounded-[1.5rem] border border-border/50 shadow-inner">
+                  <h4 className="text-lg font-bold mb-6 flex items-center gap-2">
+                    <MessageSquare className="w-5 h-5 text-primary" />
+                    Dejá tu comentario o duda
+                  </h4>
+                  <div className="grid gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-foreground/80 ml-1">Tu nombre *</label>
+                        <input
+                          type="text"
+                          value={newComment.author_name}
+                          onChange={(e) => setNewComment(prev => ({ ...prev, author_name: e.target.value }))}
+                          className="w-full px-5 py-3 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground"
+                          placeholder="Ej: Juan Pérez"
+                          maxLength={100}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-bold text-foreground/80 ml-1">Email (opcional)</label>
+                        <input
+                          type="email"
+                          value={newComment.author_email}
+                          onChange={(e) => setNewComment(prev => ({ ...prev, author_email: e.target.value }))}
+                          className="w-full px-5 py-3 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground"
+                          placeholder="juan@ejemplo.com"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-bold text-foreground/80 ml-1">Tu comentario *</label>
+                      <textarea
+                        value={newComment.comment}
+                        onChange={(e) => setNewComment(prev => ({ ...prev, comment: e.target.value }))}
+                        className="w-full px-5 py-4 bg-background/50 border border-border/50 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground min-h-[120px] resize-none"
+                        placeholder="Escribí tu consulta o comentario sobre estas expensas..."
+                        maxLength={500}
+                        required
+                      />
+                      <div className="flex justify-between items-center px-1">
+                        <div className="text-xs text-muted-foreground font-bold uppercase tracking-widest">
+                          {newComment.comment.length}/500 caracteres
+                        </div>
+                      </div>
+                    </div>
+                    {commentError && (
+                      <div className="text-sm font-bold text-status-attention bg-status-attention-bg/50 p-4 rounded-xl border border-status-attention/30">
+                        {commentError}
+                      </div>
+                    )}
+                    <Button
+                      type="submit"
+                      disabled={isSubmittingComment}
+                      variant="hero"
+                      className="w-full md:w-auto px-8 py-6 h-auto text-lg rounded-xl shadow-xl shadow-primary/20"
+                    >
+                      {isSubmittingComment ? "Enviando..." : "Publicar comentario"}
+                    </Button>
+                  </div>
+                </form>
+
+                {/* Comments List */}
+                {comments.length === 0 ? (
+                  <div className="text-center py-16 bg-muted/10 rounded-[2rem] border border-dashed border-border/50">
+                    <div className="w-20 h-20 rounded-full bg-muted/20 flex items-center justify-center mx-auto mb-6">
+                      <MessageSquare className="w-10 h-10 text-muted-foreground opacity-50" />
+                    </div>
+                    <h5 className="text-xl font-bold mb-2 text-foreground/70">Aún no hay comentarios</h5>
+                    <p className="text-muted-foreground font-medium">Sé el primero en participar de la conversación.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {comments.map((comment) => (
+                      <div key={comment.id} className="group animate-fade-in-up">
+                        <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
+                          ? 'bg-primary/5 border-primary/20'
+                          : 'bg-card/20 border-border/50'
+                          }`}>
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border shadow-sm ${comment.is_owner_comment
+                                ? 'bg-primary border-primary/20 text-white'
+                                : 'bg-muted border-border/50'
+                                }`}>
+                                {comment.is_owner_comment ? (
+                                  <Building className="w-6 h-6" />
+                                ) : (
+                                  <User className="w-6 h-6 text-foreground/70" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-black text-base text-foreground flex items-center gap-2">
+                                  {comment.is_owner_comment ? 'Administrador' : comment.author_name}
+                                  {comment.is_owner_comment && (
+                                    <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] uppercase tracking-widest px-2 py-0">Owner</Badge>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground font-bold tracking-wider">{formatDate(comment.created_at)}</p>
+                              </div>
+                            </div>
+                            {analysis?.user_id === 'owner-user-id' && !comment.is_owner_comment && (
+                              <button
+                                onClick={() => setReplyingTo(comment.id)}
+                                className="text-sm font-bold text-primary hover:underline transition-all"
+                              >
+                                Responder
+                              </button>
+                            )}
+                          </div>
+                          <p className="text-base leading-relaxed text-foreground font-medium">
+                            {comment.comment}
+                          </p>
+
+                          {/* Owner Reply Form UI */}
+                          {replyingTo === comment.id && (
+                            <div className="mt-4 p-6 bg-muted/30 backdrop-blur-md rounded-[1.5rem] border border-primary/30 shadow-inner">
+                              <form onSubmit={handleOwnerReply} className="space-y-4">
+                                <div>
+                                  <label className="block text-sm font-bold mb-2 ml-1 text-primary">Tu respuesta como Administrador:</label>
+                                  <textarea
+                                    value={ownerReply}
+                                    onChange={(e) => setOwnerReply(e.target.value)}
+                                    className="w-full px-5 py-4 bg-background/50 border border-primary/20 rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all font-medium text-foreground min-h-[100px] resize-none"
+                                    placeholder="Responde al comentario..."
+                                    maxLength={1000}
+                                    required
+                                  />
+                                  <div className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest mt-2 px-1">
+                                    {ownerReply.length}/1000 caracteres
+                                  </div>
+                                </div>
+                                {commentError && (
+                                  <div className="text-sm font-bold text-status-attention bg-status-attention-bg/50 p-3 rounded-lg border border-status-attention/30">
+                                    {commentError}
+                                  </div>
+                                )}
+                                <div className="flex gap-3">
+                                  <Button
+                                    type="submit"
+                                    disabled={isSubmittingComment}
+                                    size="sm"
+                                    className="h-10 px-6 rounded-lg shadow-lg shadow-primary/20"
+                                  >
+                                    {isSubmittingComment ? (
+                                      <>
+                                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                                        <span>Enviando...</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Send className="w-4 h-4 mr-2" />
+                                        <span>Enviar respuesta</span>
+                                      </>
+                                    )}
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-10 px-6 rounded-lg border-border/50"
+                                    onClick={() => {
+                                      setReplyingTo(null);
+                                      setOwnerReply('');
+                                    }}
+                                  >
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </form>
+                            </div>
+                          )}
+
+                          {/* Replies list */}
+                          {comments.filter(c => c.parent_comment_id === comment.id).map((reply) => (
+                            <div key={reply.id} className="ml-8 md:ml-12 mt-4 p-5 bg-primary/5 backdrop-blur-md rounded-[1.25rem] border border-primary/20 shadow-sm animate-fade-in-up">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div className="w-8 h-8 rounded-lg bg-primary text-white flex items-center justify-center border border-primary/20 shadow-sm">
+                                  <Building className="w-4 h-4" />
+                                </div>
+                                <div>
+                                  <p className="font-bold text-sm text-primary flex items-center gap-1.5 underline underline-offset-4 decoration-primary/30">
+                                    Administrador
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{formatDate(reply.created_at)}</p>
+                                </div>
+                              </div>
+                              <p className="text-base leading-relaxed text-foreground font-medium italic">
+                                "{reply.comment}"
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
+
+            {/* CTA */}
+            <Card className="bg-primary shadow-2xl shadow-primary/20 rounded-[2rem] overflow-hidden animate-fade-in-up border-0">
+              <CardContent className="p-10 text-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 blur-3xl rounded-full -mr-32 -mt-32"></div>
+                <div className="relative z-10">
+                  <h3 className="text-2xl font-black text-white mb-3">¿Querés analizar tu propia expensa?</h3>
+                  <p className="text-white/80 text-lg font-medium mb-8 max-w-lg mx-auto leading-relaxed">
+                    Unite a cientos de vecinos que ya controlan sus gastos. Obtené transparencia total en segundos.
+                  </p>
+                  <Button asChild size="lg" className="bg-white text-primary hover:bg-white/90 px-10 h-14 text-lg font-bold rounded-2xl shadow-xl transition-all hover:scale-105 active:scale-95">
+                    <Link to="/analizar">Analizar mi expensa GRATIS</Link>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
           </div>
         </main>
       </div>
