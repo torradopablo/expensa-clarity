@@ -139,14 +139,13 @@ const Evolucion = () => {
       if (filtersCard) filtersCard.style.display = "none";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "block";
 
-      // 2. Set fixed width for consistency
+      // 2. Set fixed width and high contrast class for consistency
       const originalWidth = element.style.width;
       const originalPadding = element.style.padding;
-      const originalBg = element.style.backgroundColor;
 
+      element.classList.add("pdf-export-container");
       element.style.width = "1100px";
       element.style.padding = "40px";
-      element.style.backgroundColor = "#ffffff";
 
       const canvas = await html2canvas(element, {
         scale: 2,
@@ -157,9 +156,9 @@ const Evolucion = () => {
       });
 
       // 3. Restore View
+      element.classList.remove("pdf-export-container");
       element.style.width = originalWidth;
       element.style.padding = originalPadding;
-      element.style.backgroundColor = originalBg;
 
       if (filtersCard) filtersCard.style.display = "";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "none";

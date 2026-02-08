@@ -183,4 +183,91 @@
   .shadow-soft-xl {
     box-shadow: var(--shadow-xl);
   }
+
+  /* PDF Export Optimization - High Contrast */
+  .pdf-export-container {
+    background-color: white !important;
+    color: #0f172a !important;
+    /* slate-900 */
+  }
+
+  .pdf-export-container * {
+    text-shadow: none !important;
+    box-shadow: none !important;
+  }
+
+  .pdf-export-container h1,
+  .pdf-export-container h2,
+  .pdf-export-container h3,
+  .pdf-export-container p,
+  .pdf-export-container span,
+  .pdf-export-container div {
+    color: #0f172a !important;
+  }
+
+  .pdf-export-container .text-muted-foreground,
+  .pdf-export-container .text-muted-foreground * {
+    color: #475569 !important;
+    /* slate-600 */
+  }
+
+  .pdf-export-container .bg-card,
+  .pdf-export-container .bg-card\/40,
+  .pdf-export-container .bg-card\/30,
+  .pdf-export-container [class*="bg-card"] {
+    background-color: #ffffff !important;
+    border: 1.5px solid #e2e8f0 !important;
+    /* slate-200 */
+    backdrop-filter: none !important;
+  }
+
+  .pdf-export-container .bg-muted,
+  .pdf-export-container .bg-muted\/10,
+  .pdf-export-container .bg-muted\/20,
+  .pdf-export-container .bg-muted\/30 {
+    background-color: #f8fafc !important;
+    /* slate-50 */
+    border: 1px solid #e2e8f0 !important;
+  }
+
+  .pdf-export-container .border,
+  .pdf-export-container .border-border,
+  .pdf-export-container [class*="border-"] {
+    border-color: #e2e8f0 !important;
+  }
+
+  /* Chart Specifics for PDF */
+  .pdf-export-container .recharts-cartesian-grid line {
+    stroke: #e2e8f0 !important;
+  }
+
+  .pdf-export-container .recharts-text tspan,
+  .pdf-export-container .recharts-text {
+    fill: #1e293b !important;
+    font-weight: 600 !important;
+  }
+
+  .pdf-export-container .recharts-legend-item-text {
+    color: #0f172a !important;
+    font-weight: 600 !important;
+  }
+
+  /* High contrast for primary/secondary elements in PDF */
+  .pdf-export-container .text-primary {
+    color: #059669 !important;
+    /* green-600 */
+  }
+
+  .pdf-export-container .text-secondary {
+    color: #2563eb !important;
+    /* blue-600 */
+  }
+
+  .pdf-export-container .bg-primary\/10 {
+    background-color: #ecfdf5 !important;
+  }
+
+  .pdf-export-container .bg-secondary\/10 {
+    background-color: #eff6ff !important;
+  }
 }
