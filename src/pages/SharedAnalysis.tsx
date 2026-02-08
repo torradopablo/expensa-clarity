@@ -1007,9 +1007,9 @@ const SharedAnalysis = () => {
                       <MessageSquare className="w-6 h-6 text-primary" />
                     </div>
                     <div>
-                      <CardTitle className="text-xl font-bold">Notas del Administrador</CardTitle>
+                      <CardTitle className="text-xl font-bold">Notas del Autor</CardTitle>
                       <p className="text-sm text-muted-foreground font-medium">
-                        Información adicional para los propietarios
+                        Información adicional de este reporte
                       </p>
                     </div>
                   </div>
@@ -1134,9 +1134,9 @@ const SharedAnalysis = () => {
                               </div>
                               <div>
                                 <p className="font-black text-base text-foreground flex items-center gap-2">
-                                  {comment.is_owner_comment ? 'Administrador' : comment.author_name}
+                                  {comment.is_owner_comment ? 'Autor del Análisis' : comment.author_name}
                                   {comment.is_owner_comment && (
-                                    <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] uppercase tracking-widest px-2 py-0">Owner</Badge>
+                                    <Badge className="bg-primary/20 text-primary border-primary/30 text-[10px] uppercase tracking-widest px-2 py-0">Autor</Badge>
                                   )}
                                 </p>
                                 <p className="text-xs text-muted-foreground font-bold tracking-wider">{formatDate(comment.created_at)}</p>
@@ -1160,7 +1160,7 @@ const SharedAnalysis = () => {
                             <div className="mt-4 p-6 bg-muted/30 backdrop-blur-md rounded-[1.5rem] border border-primary/30 shadow-inner">
                               <form onSubmit={handleOwnerReply} className="space-y-4">
                                 <div>
-                                  <label className="block text-sm font-bold mb-2 ml-1 text-primary">Tu respuesta como Administrador:</label>
+                                  <label className="block text-sm font-bold mb-2 ml-1 text-primary">Tu respuesta como Autor:</label>
                                   <textarea
                                     value={ownerReply}
                                     onChange={(e) => setOwnerReply(e.target.value)}
@@ -1223,7 +1223,7 @@ const SharedAnalysis = () => {
                                 </div>
                                 <div>
                                   <p className="font-bold text-sm text-primary flex items-center gap-1.5 underline underline-offset-4 decoration-primary/30">
-                                    Administrador
+                                    Autor del Análisis
                                   </p>
                                   <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-tighter">{formatDate(reply.created_at)}</p>
                                 </div>
