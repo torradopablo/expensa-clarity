@@ -55,24 +55,28 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+            ExpensaCheck
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="outline" size="sm">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" className="hidden md:flex rounded-full px-6 hover:bg-accent font-semibold" size="sm">
             <Link to="/historial">Ver historial</Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
-            <Link to="/perfil">
-              <User className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="rounded-full hover:bg-accent">
+              <Link to="/perfil">
+                <User className="w-5 h-5" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión" className="rounded-full hover:bg-destructive/10 hover:text-destructive">
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -93,7 +97,7 @@ const Evolucion = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
 
-  const { analyses, loading: loadingAnalyses } = useAnalysis();
+  const { analyses, loading: loadingAnalyses, error: errorAnalyses } = useAnalysis();
 
   const [selectedBuilding, setSelectedBuilding] = useState<string>(
     searchParams.get("edificio") || "all"
@@ -109,8 +113,18 @@ const Evolucion = () => {
     buildingsTrend,
     buildingsTrendStats,
     loading: loadingEvolution,
+    error: errorEvolution,
     calculateEvolution
   } = useEvolution(selectedCategory, selectedBuilding);
+
+  useEffect(() => {
+    if (errorEvolution) {
+      toast.error(`Error al cargar datos de evolución: ${errorEvolution}`);
+    }
+    if (errorAnalyses) {
+      toast.error(`Error al cargar análisis: ${errorAnalyses}`);
+    }
+  }, [errorEvolution, errorAnalyses]);
 
   const exportToPDF = async () => {
     setIsExporting(true);
@@ -418,32 +432,38 @@ const Evolucion = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 -z-10 bg-background">
+        <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+      </div>
+
       <Header />
-      <main className="pt-24 pb-20">
-        <div className="container max-w-5xl">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-8">
+      <main className="pt-32 pb-32">
+        <div className="container max-w-5xl relative z-10">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-12">
             <div>
-              <Button variant="ghost" className="pl-0 mb-2 hover:bg-transparent" onClick={() => navigate(-1)}>
-                <ArrowLeft className="w-4 h-4 mr-2" />
+              <Button variant="ghost" className="pl-0 mb-4 hover:bg-transparent text-muted-foreground hover:text-foreground transition-colors group" onClick={() => navigate(-1)}>
+                <ArrowLeft className="w-4 h-4 mr-2 group-hover:-translate-x-1 transition-transform" />
                 Volver al historial
               </Button>
             </div>
-            <Button onClick={exportToPDF} disabled={isExporting || loadingAnalyses} variant="outline" className="gap-2">
+            <Button onClick={exportToPDF} disabled={isExporting || loadingAnalyses} variant="hero" className="gap-3 rounded-2xl px-8 shadow-xl shadow-primary/20">
               {isExporting ? (
-                <RefreshCw className="w-4 h-4 animate-spin" />
+                <RefreshCw className="w-5 h-5 animate-spin" />
               ) : (
-                <Download className="w-4 h-4" />
+                <Download className="w-5 h-5" />
               )}
-              {isExporting ? "Generando PDF..." : "Descargar informe"}
+              {isExporting ? "Generando informe..." : "Exportar PDF"}
             </Button>
           </div>
 
           <div id="evolucion-report-content">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold">Evolución de Expensas</h1>
-              <p className="text-muted-foreground mt-1">
-                Analizá cómo variaron tus gastos en comparación con la inflación y el mercado.
+            <div className="mb-12">
+              <h1 className="text-5xl font-extrabold tracking-tight mb-4">Evolución de Expensas</h1>
+              <p className="text-xl text-muted-foreground font-medium max-w-2xl">
+                Visualizá el comportamiento de tus gastos y comparalos con indicadores clave del mercado.
               </p>
             </div>
 
@@ -465,19 +485,22 @@ const Evolucion = () => {
             ) : (
               <>
                 {/* Selectors - Interactive (Hidden on PDF) */}
-                <Card id="filters-card" variant="soft" className="mb-6 animate-fade-in-up">
-                  <CardContent className="p-4">
-                    <div className="flex flex-col md:flex-row items-stretch md:items-center gap-4">
-                      <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Building className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Edificio:</span>
+                {/* Selectors - Premium Glassmatic Design */}
+                <Card id="filters-card" className="mb-8 bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+                  <CardContent className="p-8">
+                    <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-8">
+                      <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                            <Building className="w-5 h-5 text-primary" />
+                          </div>
+                          <span className="text-base font-bold text-foreground">Edificio:</span>
                         </div>
                         <Select value={selectedBuilding} onValueChange={handleBuildingChange}>
-                          <SelectTrigger className="w-full sm:w-[220px]">
+                          <SelectTrigger className="w-full sm:w-[260px] h-12 rounded-xl bg-background/50 border-border/50 focus:ring-primary/20">
                             <SelectValue placeholder="Seleccionar edificio" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="rounded-xl border-border/50">
                             <SelectItem value="all">Todos los edificios</SelectItem>
                             {buildings.map((building) => (
                               <SelectItem key={building} value={building}>
@@ -488,16 +511,18 @@ const Evolucion = () => {
                         </Select>
                       </div>
 
-                      <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                        <div className="flex items-center gap-2 shrink-0">
-                          <Sparkles className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium">Categoría:</span>
+                      <div className="flex-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="w-10 h-10 rounded-xl bg-secondary/10 flex items-center justify-center border border-secondary/20">
+                            <Sparkles className="w-5 h-5 text-secondary" />
+                          </div>
+                          <span className="text-base font-bold text-foreground">Categoría:</span>
                         </div>
                         <Select value={selectedCategory} onValueChange={handleCategoryChange}>
-                          <SelectTrigger className="w-full sm:w-[220px]">
+                          <SelectTrigger className="w-full sm:w-[260px] h-12 rounded-xl bg-background/50 border-border/50 focus:ring-primary/20">
                             <SelectValue placeholder="Ver todas" />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="rounded-xl border-border/50">
                             <SelectItem value="all">Monto total (todas)</SelectItem>
                             {categories.map((cat) => (
                               <SelectItem key={cat} value={cat}>
@@ -509,53 +534,59 @@ const Evolucion = () => {
                       </div>
 
                       {loadingEvolution && (
-                        <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground shrink-0 self-center" />
+                        <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary/5">
+                          <RefreshCw className="w-6 h-6 animate-spin text-primary shrink-0" />
+                        </div>
                       )}
                     </div>
                   </CardContent>
                 </Card>
 
-                {/* Static Filter Summary for PDF (Hidden on Screen) */}
-                <div id="pdf-filter-summary" className="hidden mb-6 p-4 border rounded-xl bg-gray-50 border-gray-200">
-                  <div className="flex flex-row justify-between items-center text-sm text-gray-700">
-                    <div className="flex items-center gap-2">
-                      <Building className="w-4 h-4 text-gray-500" />
-                      <span className="font-semibold">Edificio: </span>
-                      <span>{selectedBuilding === "all" ? "Todos los edificios" : selectedBuilding}</span>
+                {/* Static Filter Summary for PDF */}
+                <div id="pdf-filter-summary" className="hidden mb-10 p-8 border-2 border-dashed rounded-3xl bg-muted/30 border-border/50">
+                  <div className="flex flex-row justify-between items-center text-lg">
+                    <div className="flex items-center gap-4">
+                      <Building className="w-6 h-6 text-primary" />
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Edificio Seleccionado</p>
+                        <p className="font-extrabold text-foreground">{selectedBuilding === "all" ? "Todos los edificios" : selectedBuilding}</p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="w-4 h-4 text-gray-500" />
-                      <span className="font-semibold">Categoría: </span>
-                      <span>{selectedCategory === "all" ? "Monto total (todas)" : selectedCategory}</span>
+                    <div className="flex items-center gap-4">
+                      <Sparkles className="w-6 h-6 text-secondary" />
+                      <div>
+                        <p className="text-sm font-bold uppercase tracking-wider text-muted-foreground">Categoría de Análisis</p>
+                        <p className="font-extrabold text-foreground">{selectedCategory === "all" ? "Monto total (todas)" : selectedCategory}</p>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Stats Cards */}
                 {stats && (
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                    <Card variant="soft" className="animate-fade-in-up">
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Períodos analizados</p>
-                        <p className="text-2xl font-bold">{stats.count}</p>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+                    <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-lg rounded-3xl animate-fade-in-up">
+                      <CardContent className="p-6 text-center">
+                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">Períodos</p>
+                        <p className="text-4xl font-extrabold text-foreground">{stats.count}</p>
                       </CardContent>
                     </Card>
-                    <Card variant="soft" className="animate-fade-in-up" style={{ animationDelay: "0.05s" }}>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Promedio mensual</p>
-                        <p className="text-lg font-bold">{formatCurrency(stats.avg)}</p>
+                    <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-lg rounded-3xl animate-fade-in-up" style={{ animationDelay: "0.05s" }}>
+                      <CardContent className="p-6 text-center">
+                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">Promedio</p>
+                        <p className="text-2xl font-extrabold text-foreground">{formatCurrency(stats.avg)}</p>
                       </CardContent>
                     </Card>
-                    <Card variant="soft" className="animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Mínimo</p>
-                        <p className="text-lg font-bold text-status-ok">{formatCurrency(stats.min)}</p>
+                    <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-lg rounded-3xl animate-fade-in-up" style={{ animationDelay: "0.1s" }}>
+                      <CardContent className="p-6 text-center">
+                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">Mínimo</p>
+                        <p className="text-2xl font-extrabold text-primary">{formatCurrency(stats.min)}</p>
                       </CardContent>
                     </Card>
-                    <Card variant="soft" className="animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
-                      <CardContent className="p-4 text-center">
-                        <p className="text-xs text-muted-foreground mb-1">Máximo</p>
-                        <p className="text-lg font-bold text-status-attention">{formatCurrency(stats.max)}</p>
+                    <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-lg rounded-3xl animate-fade-in-up" style={{ animationDelay: "0.15s" }}>
+                      <CardContent className="p-6 text-center">
+                        <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground mb-2">Máximo</p>
+                        <p className="text-2xl font-extrabold text-secondary">{formatCurrency(stats.max)}</p>
                       </CardContent>
                     </Card>
                   </div>
@@ -563,82 +594,88 @@ const Evolucion = () => {
 
                 {/* Evolution Chart (Absolute values) */}
                 {chartData.length > 0 && (
-                  <Card variant="elevated" className="animate-fade-in-up mb-6">
-                    <CardHeader>
-                      <div className="flex items-center justify-between flex-wrap gap-2">
+                  <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden animate-fade-in-up mb-8">
+                    <CardHeader className="p-8 pb-4">
+                      <div className="flex items-center justify-between flex-wrap gap-6">
                         <div>
-                          <CardTitle className="text-lg">
-                            {selectedCategory === "all" ? "Evolución del gasto total" : `Evolución de ${selectedCategory}`}
+                          <CardTitle className="text-2xl font-extrabold tracking-tight">
+                            {selectedCategory === "all" ? "Evolución Histórica Monomodal" : `Gasto en ${selectedCategory}`}
                           </CardTitle>
-                          <CardDescription>
+                          <CardDescription className="text-base font-medium text-muted-foreground mt-1">
                             {selectedBuilding === "all"
-                              ? "Todos los edificios"
-                              : selectedBuilding}
+                              ? "Consolidado de todos tus activos"
+                              : `Edificio: ${selectedBuilding}`}
                           </CardDescription>
                         </div>
                         {stats && stats.count >= 2 && (
-                          <div className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium ${stats.changePercent > 0
-                            ? "bg-status-attention-bg text-status-attention"
+                          <div className={`flex items-center gap-3 px-6 py-3 rounded-2xl text-base font-black tracking-tight shadow-lg ${stats.changePercent > 0
+                            ? "bg-secondary/10 text-secondary shadow-secondary/10"
                             : stats.changePercent < 0
-                              ? "bg-status-ok-bg text-status-ok"
+                              ? "bg-primary/10 text-primary shadow-primary/10"
                               : "bg-muted text-muted-foreground"
                             }`}>
                             {stats.changePercent > 0 ? (
-                              <TrendingUp className="w-4 h-4" />
+                              <TrendingUp className="w-6 h-6" />
                             ) : stats.changePercent < 0 ? (
-                              <TrendingDown className="w-4 h-4" />
+                              <TrendingDown className="w-6 h-6" />
                             ) : (
-                              <Minus className="w-4 h-4" />
+                              <Minus className="w-6 h-6" />
                             )}
                             <span>
                               {stats.changePercent > 0 ? "+" : ""}
-                              {stats.changePercent.toFixed(1)}% último período
+                              {stats.changePercent.toFixed(1)}% mensual
                             </span>
                           </div>
                         )}
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="h-[300px] w-full">
+                    <CardContent className="px-8 pb-8">
+                      <div className="h-[400px] w-full mt-6">
                         <ResponsiveContainer width="100%" height="100%">
-                          <AreaChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                          <AreaChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
                             <defs>
                               <linearGradient id="colorTotal" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.4} />
                                 <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
                               </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border)/0.3)" />
                             <XAxis
                               dataKey="period"
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                              dy={10}
+                              tick={{ fontSize: 13, fontWeight: 600, fill: "hsl(var(--muted-foreground))" }}
+                              dy={15}
                             />
                             <YAxis
                               axisLine={false}
                               tickLine={false}
-                              tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
-                              tickFormatter={(value) => `$${value / 1000}k`}
+                              tick={{ fontSize: 13, fontWeight: 600, fill: "hsl(var(--muted-foreground))" }}
+                              tickFormatter={(value) => `$${(value / 1000).toLocaleString()}${value >= 1000 ? 'k' : ''}`}
                             />
                             <Tooltip
+                              cursor={{ stroke: 'hsl(var(--primary)/0.2)', strokeWidth: 2 }}
                               contentStyle={{
-                                backgroundColor: "hsl(var(--popover))",
-                                borderColor: "hsl(var(--border))",
-                                borderRadius: "12px",
-                                boxShadow: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
-                                fontSize: "12px"
+                                backgroundColor: "hsl(var(--card)/0.9)",
+                                backdropFilter: "blur(8px)",
+                                borderColor: "hsl(var(--border)/0.5)",
+                                borderRadius: "20px",
+                                boxShadow: "0 25px 50px -12px rgb(0 0 0 / 0.5)",
+                                border: "1px solid hsl(var(--border)/0.5)",
+                                padding: "16px"
                               }}
-                              formatter={(value: number) => [formatCurrency(value), "Monto"]}
+                              itemStyle={{ color: "hsl(var(--foreground))", fontWeight: 700 }}
+                              labelStyle={{ color: "hsl(var(--muted-foreground))", fontWeight: 600, marginBottom: "8px" }}
+                              formatter={(value: number) => [formatCurrency(value), "Monto Final"]}
                             />
                             <Area
                               type="monotone"
                               dataKey="total"
                               stroke="hsl(var(--primary))"
-                              strokeWidth={3}
+                              strokeWidth={4}
                               fillOpacity={1}
                               fill="url(#colorTotal)"
+                              animationDuration={2000}
                             />
                           </AreaChart>
                         </ResponsiveContainer>
@@ -661,27 +698,32 @@ const Evolucion = () => {
 
                 {/* AI Analysis / Evolution Insights */}
                 {aiAnalysis && (
-                  <Card variant="elevated" className="mt-6 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-primary-soft flex items-center justify-center">
-                          <Sparkles className="w-4 h-4 text-primary" />
+                  <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[3rem] overflow-hidden mt-12 animate-fade-in-up" style={{ animationDelay: "0.2s" }}>
+                    <CardHeader className="p-10 pb-6 border-b border-border/30">
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+                          <Sparkles className="w-8 h-8 text-primary animate-pulse" />
                         </div>
-                        <CardTitle className="text-lg">Análisis de evolución inteligente</CardTitle>
+                        <div>
+                          <CardTitle className="text-2xl font-extrabold tracking-tight">Análisis Predictivo & Tendencias</CardTitle>
+                          <p className="text-muted-foreground font-medium">Información generada por nuestro motor de IA</p>
+                        </div>
                       </div>
                     </CardHeader>
-                    <CardContent>
-                      <div className="prose prose-sm max-w-none text-muted-foreground whitespace-pre-line">
+                    <CardContent className="p-10 pt-8">
+                      <div className="prose prose-lg dark:prose-invert max-w-none text-foreground font-medium leading-relaxed whitespace-pre-line opacity-90">
                         {aiAnalysis}
                       </div>
 
                       {deviation && deviation.isSignificant && (
-                        <div className="mt-6 p-4 bg-status-attention-bg border border-status-attention/20 rounded-xl flex gap-3">
-                          <TrendingUp className="w-5 h-5 text-status-attention shrink-0" />
+                        <div className="mt-10 p-8 bg-secondary/10 border border-secondary/20 rounded-[2rem] flex items-center gap-6 shadow-lg shadow-secondary/5">
+                          <div className="w-16 h-16 rounded-full bg-secondary/20 flex items-center justify-center border border-secondary/20 shrink-0">
+                            <TrendingUp className="w-8 h-8 text-secondary" />
+                          </div>
                           <div>
-                            <p className="text-sm font-semibold text-status-attention">Desviación detectada</p>
-                            <p className="text-xs text-muted-foreground">
-                              Tus expensas están {deviation.fromInflation > 0 ? "por encima" : "por debajo"} de la inflación acumulada en un {Math.abs(deviation.fromInflation).toFixed(1)}%.
+                            <p className="text-xl font-extrabold text-secondary mb-1">Desviación Atípica Detectada</p>
+                            <p className="text-lg text-muted-foreground font-medium lg:max-w-xl">
+                              Tus expensas están <span className="text-foreground">{deviation.fromInflation > 0 ? "por encima" : "por debajo"}</span> de la inflación acumulada en un <span className="text-foreground font-bold">{Math.abs(deviation.fromInflation).toFixed(1)}%</span>.
                             </p>
                           </div>
                         </div>

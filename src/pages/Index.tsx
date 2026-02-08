@@ -41,77 +41,83 @@ const Header = () => {
   }, []);
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+            ExpensaCheck
+          </span>
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-8">
-          <a href="#como-funciona" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+        <nav className="hidden md:flex items-center gap-10">
+          <a href="#como-funciona" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             Cómo funciona
           </a>
-          <a href="#beneficios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <a href="#beneficios" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             Beneficios
           </a>
-          <a href="#precios" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+          <a href="#precios" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
             Precios
           </a>
           {session && (
-            <Link to="/historial" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+            <Link to="/historial" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
               Mi historial
             </Link>
           )}
         </nav>
 
-        <div className="flex items-center gap-2">
-          {session && (
-            <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="hidden sm:inline-flex">
+        <div className="flex items-center gap-4">
+          {session ? (
+            <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="rounded-full hover:bg-accent">
               <Link to="/perfil">
                 <User className="w-5 h-5" />
               </Link>
             </Button>
+          ) : (
+            <Link to="/auth" className="hidden sm:inline-flex text-sm font-medium hover:text-primary transition-colors">
+              Iniciar sesión
+            </Link>
           )}
 
           {/* Mobile Menu Button */}
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="md:hidden rounded-full"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
           </Button>
 
-          <Button asChild size="default" className="hidden sm:inline-flex">
-            <Link to="/analizar">Analizar expensas</Link>
+          <Button asChild size="lg" className="hidden sm:inline-flex rounded-full shadow-lg shadow-primary/25 font-semibold">
+            <Link to="/analizar">Analizar ahora</Link>
           </Button>
         </div>
       </div>
 
       {/* Mobile Navigation Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden bg-background border-b border-border animate-fade-in">
-          <nav className="container py-4 flex flex-col gap-3">
+        <div className="md:hidden bg-background/95 backdrop-blur-xl border-b border-border animate-fade-in">
+          <nav className="container py-8 flex flex-col gap-6">
             <a
               href="#como-funciona"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Cómo funciona
             </a>
             <a
               href="#beneficios"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Beneficios
             </a>
             <a
               href="#precios"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+              className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
               onClick={() => setMobileMenuOpen(false)}
             >
               Precios
@@ -120,17 +126,17 @@ const Header = () => {
               <>
                 <Link
                   to="/historial"
-                  className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                  className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Mi historial
                 </Link>
                 <Link
                   to="/perfil"
-                  className="text-sm font-medium text-primary py-2 flex items-center gap-2"
+                  className="text-lg font-medium text-primary flex items-center gap-3"
                   onClick={() => setMobileMenuOpen(false)}
                 >
-                  <User className="w-4 h-4" />
+                  <User className="w-5 h-5" />
                   Mi Perfil
                 </Link>
               </>
@@ -138,13 +144,13 @@ const Header = () => {
             {!session && (
               <Link
                 to="/auth"
-                className="text-sm text-muted-foreground hover:text-foreground transition-colors py-2"
+                className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
                 onClick={() => setMobileMenuOpen(false)}
               >
                 Iniciar sesión
               </Link>
             )}
-            <Button asChild size="default" className="mt-2 w-full">
+            <Button asChild size="xl" className="mt-4 w-full rounded-2xl">
               <Link to="/analizar" onClick={() => setMobileMenuOpen(false)}>
                 Analizar expensas
               </Link>
@@ -157,85 +163,85 @@ const Header = () => {
 };
 
 const HeroSection = () => (
-  <section className="pt-32 pb-20 bg-gradient-soft">
+  <section className="relative pt-40 pb-24 overflow-hidden">
+    {/* Decorative background elements */}
+    <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full -z-10 overflow-hidden">
+      <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/10 blur-[120px] rounded-full animate-pulse-slow"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-secondary/10 blur-[120px] rounded-full animate-pulse-slow" style={{ animationDelay: "1s" }}></div>
+    </div>
+
     <div className="container">
-      <div className="grid lg:grid-cols-2 gap-12 items-center">
-        <div className="space-y-8 animate-fade-in-up">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-soft text-primary text-sm font-medium">
+      <div className="grid lg:grid-cols-2 gap-16 items-center">
+        <div className="space-y-10 animate-fade-in-up">
+          <div className="inline-flex items-center gap-3 px-5 py-2 rounded-full bg-accent border border-primary/20 text-primary text-sm font-semibold tracking-wide shadow-sm">
             <Shield className="w-4 h-4" />
-            Para propietarios y administradores
+            <span className="uppercase">Inteligencia Artificial para tu Consorcio</span>
           </div>
-          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold leading-tight">
+          <h1 className="text-5xl md:text-6xl lg:text-7xl font-extrabold leading-[1.1] tracking-tight text-foreground">
             Expensas claras,{" "}
-            <span className="text-gradient">decisiones informadas</span>
+            <span className="text-gradient">decisiones inteligentes</span>
           </h1>
-          <p className="text-lg text-muted-foreground max-w-xl">
-            Ya seas propietario o administrador, analizá expensas comparándolas con una <strong>comunidad de edificios</strong> y el <strong>contexto inflacionario</strong>.
-            Ideal para entender tus gastos o presentar informes claros en reuniones de consorcio.
+          <p className="text-xl text-muted-foreground max-w-xl leading-relaxed">
+            Analizá tus expensas comparándolas con una <strong className="text-foreground">red de edificios</strong> y el impacto de la <strong className="text-foreground">inflación</strong>. Claridad total para propietarios y administradores.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <Button asChild variant="hero" size="xl">
+          <div className="flex flex-col sm:flex-row gap-5">
+            <Button asChild variant="hero" size="xl" className="rounded-2xl px-10 shadow-xl shadow-primary/20">
               <Link to="/analizar">
-                Analizar mis expensas
-                <ArrowRight className="w-5 h-5" />
+                Analizar expensas
+                <ArrowRight className="w-5 h-5 ml-2" />
               </Link>
             </Button>
-            <Button asChild variant="outline" size="xl">
-              <Link to="/ejemplo">Ver ejemplo de análisis</Link>
+            <Button asChild variant="outline" size="xl" className="rounded-2xl px-10 border-border hover:bg-accent hover:text-foreground transition-all">
+              <Link to="/ejemplo">Ver demostración</Link>
             </Button>
           </div>
-          {/* Value proposition badges */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4">
-            <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
-              <div className="w-8 h-8 rounded-full bg-secondary-soft flex items-center justify-center flex-shrink-0">
-                <FileText className="w-4 h-4 text-secondary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Propietarios</p>
-                <p className="text-xs text-muted-foreground">Entendé si pagás lo justo</p>
-              </div>
+
+          <div className="flex items-center gap-8 pt-4">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              Pago por uso
             </div>
-            <div className="flex items-center gap-3 bg-card/50 rounded-lg p-3 border border-border/50">
-              <div className="w-8 h-8 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
-                <BarChart3 className="w-4 h-4 text-primary" />
-              </div>
-              <div>
-                <p className="text-sm font-medium">Administradores</p>
-                <p className="text-xs text-muted-foreground">Informes listos para presentar</p>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-6 pt-2">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="w-4 h-4 text-primary" />
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
               Sin suscripción
             </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="w-4 h-4 text-primary" />
-              Pago único por análisis
-            </div>
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <CheckCircle2 className="w-4 h-4 text-primary" />
-              Resultado inmediato
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <CheckCircle2 className="w-5 h-5 text-primary" />
+              Reporte PDF
             </div>
           </div>
         </div>
-        <div className="relative animate-fade-in" style={{ animationDelay: "0.2s" }}>
-          <div className="relative">
+
+        <div className="relative animate-fade-in" style={{ animationDelay: "0.3s" }}>
+          <div className="relative z-10 p-2 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-[2.5rem] backdrop-blur-sm border border-white/10 shadow-2xl">
             <img
               src={heroIllustration}
-              alt="Ilustración de análisis de documentos"
-              className="w-full rounded-2xl shadow-soft-xl"
+              alt="Análisis inteligente"
+              className="w-full rounded-[2rem] shadow-2xl"
             />
-            <div className="absolute -bottom-6 -left-6 bg-card rounded-xl p-4 shadow-soft-lg animate-float">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-status-ok-bg flex items-center justify-center">
-                  <TrendingUp className="w-5 h-5 text-status-ok" />
-                </div>
-                <div>
-                  <p className="text-sm font-medium">Análisis con contexto</p>
-                  <p className="text-xs text-muted-foreground">Comunidad + Inflación</p>
-                </div>
+          </div>
+
+          {/* Floating cards for premium feel */}
+          <div className="absolute -bottom-10 -left-10 bg-card/90 backdrop-blur-xl rounded-2xl p-5 border border-border shadow-2xl animate-float z-20 hidden md:block">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
+                <TrendingUp className="w-6 h-6 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">Detección de Desvíos</p>
+                <p className="text-xs text-muted-foreground">Comparativa con mercado</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="absolute -top-6 -right-6 bg-card/90 backdrop-blur-xl rounded-2xl p-5 border border-border shadow-2xl animate-float z-20 hidden md:block" style={{ animationDelay: "1.5s" }}>
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-secondary/20 flex items-center justify-center">
+                <BarChart3 className="w-6 h-6 text-secondary" />
+              </div>
+              <div>
+                <p className="text-sm font-bold">Contexto Real</p>
+                <p className="text-xs text-muted-foreground">Inflación vs Histórico</p>
               </div>
             </div>
           </div>
@@ -250,45 +256,45 @@ const HowItWorksSection = () => {
     {
       icon: Upload,
       title: "Subí la expensa",
-      description: "Cargá el PDF de la liquidación. Funciona para tu edificio o los que administrás."
+      description: "Cargá el PDF de la liquidación. Nuestro sistema procesa todos los rubros automáticamente."
     },
     {
       icon: BarChart3,
-      title: "Análisis automático",
-      description: "Comparamos los gastos con edificios similares y la inflación del país para darte contexto real."
+      title: "IA en acción",
+      description: "Comparamos tus gastos con miles de edificios similares para identificar anomalías."
     },
     {
       icon: Download,
-      title: "Informe listo",
-      description: "Recibí un reporte claro, ideal para revisar vos mismo o presentar en reuniones de consorcio."
+      title: "Reporte Ejecutivo",
+      description: "Obtené claridad absoluta con sugerencias concretas y gráficas profesionales."
     }
   ];
 
   return (
-    <section id="como-funciona" className="py-20">
+    <section id="como-funciona" className="py-32 relative">
       <div className="container">
-        <div className="text-center space-y-4 mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold">¿Cómo funciona?</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Tres pasos simples para propietarios que quieren entender o administradores que necesitan presentar.
+        <div className="text-center space-y-6 mb-20">
+          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Proceso simple, resultados potentes</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg">
+            Diseñado para ser intuitivo y darte la información que importa en segundos.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-3 gap-12">
           {steps.map((step, index) => (
             <div
               key={index}
               className="relative group animate-fade-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="absolute -top-4 -left-4 w-8 h-8 rounded-full bg-gradient-hero text-primary-foreground flex items-center justify-center text-sm font-bold">
+              <div className="absolute -top-6 -left-6 w-12 h-12 rounded-2xl bg-primary/20 text-primary flex items-center justify-center text-xl font-bold border border-primary/30 z-10 backdrop-blur-md">
                 {index + 1}
               </div>
-              <div className="bg-card rounded-2xl p-8 shadow-soft-sm hover:shadow-soft-md transition-all h-full">
-                <div className="w-14 h-14 rounded-xl bg-primary-soft flex items-center justify-center mb-6 group-hover:scale-110 transition-transform">
-                  <step.icon className="w-7 h-7 text-primary" />
+              <div className="bg-card/50 backdrop-blur-sm rounded-[2rem] p-10 border border-border/50 hover:border-primary/50 transition-all duration-500 h-full group-hover:-translate-y-2 shadow-sm hover:shadow-2xl hover:shadow-primary/5">
+                <div className="w-16 h-16 rounded-2xl bg-accent flex items-center justify-center mb-8 group-hover:scale-110 transition-transform duration-500 border border-border">
+                  <step.icon className="w-8 h-8 text-primary" />
                 </div>
-                <h3 className="text-xl font-semibold mb-3">{step.title}</h3>
-                <p className="text-muted-foreground">{step.description}</p>
+                <h3 className="text-2xl font-bold mb-4">{step.title}</h3>
+                <p className="text-muted-foreground leading-relaxed text-lg">{step.description}</p>
               </div>
             </div>
           ))}
@@ -302,49 +308,49 @@ const BenefitsSection = () => {
   const pillars = [
     {
       icon: Users,
-      title: "Referencia de mercado",
-      description: "Comparación con edificios similares",
-      detail: "Contrastamos con una comunidad real de edificios para saber si los valores están en línea con el mercado.",
+      title: "Comunidad Inteligente",
+      description: "Referencia de mercado real",
+      detail: "Contrastamos tus gastos con una red de edificios similares para saber si tus costos están optimizados.",
       color: "secondary"
     },
     {
       icon: LineChart,
-      title: "Contexto económico",
-      description: "Inflación y aumentos justificados",
-      detail: "Verificamos si los incrementos tienen sentido según la inflación del país o si requieren atención.",
+      title: "Economía de Escala",
+      description: "Detección de sobreprecios",
+      detail: "Analizamos rubro por rubro para identificar áreas donde podrías estar pagando más de lo necesario.",
       color: "primary"
     },
     {
       icon: TrendingUp,
-      title: "Historial del edificio",
-      description: "Evolución mes a mes",
-      detail: "Seguimiento de cómo evolucionan los gastos, ideal para detectar tendencias y explicarlas en reuniones.",
+      title: "Visión a Largo Plazo",
+      description: "Seguimiento de tendencias",
+      detail: "Evolución histórica detallada que te permite anticipar gastos y planificar el futuro de tu consorcio.",
       color: "accent"
     }
   ];
 
   return (
-    <section id="beneficios" className="py-20 bg-gradient-soft">
+    <section id="beneficios" className="py-32 bg-muted/30">
       <div className="container">
-        <div className="text-center space-y-4 mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">Información respaldada por datos</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Análisis que sirve para entender tus gastos o para presentar informes claros en el consorcio.
+        <div className="text-center space-y-6 mb-20">
+          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Información que genera valor</h2>
+          <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
+            Herramientas profesionales para una gestión transparente y eficiente de tus gastos compartidos.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-10">
           {pillars.map((pillar, index) => (
             <div
               key={index}
-              className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-md hover:shadow-soft-lg transition-all animate-fade-in-up border border-border/50"
+              className="bg-card/40 backdrop-blur-sm rounded-[2rem] p-8 md:p-12 border border-border/50 hover:bg-card/60 transition-all duration-300 animate-fade-in-up"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className={`w-14 h-14 rounded-xl ${pillar.color === 'primary' ? 'bg-primary-soft' : pillar.color === 'secondary' ? 'bg-secondary-soft' : 'bg-accent/10'} flex items-center justify-center mb-5`}>
-                <pillar.icon className={`w-7 h-7 ${pillar.color === 'primary' ? 'text-primary' : pillar.color === 'secondary' ? 'text-secondary' : 'text-accent-foreground'}`} />
+              <div className={`w-20 h-20 rounded-3xl ${pillar.color === 'primary' ? 'bg-primary/10 border-primary/20' : pillar.color === 'secondary' ? 'bg-secondary/10 border-secondary/20' : 'bg-accent'} border flex items-center justify-center mb-8`}>
+                <pillar.icon className={`w-10 h-10 ${pillar.color === 'primary' ? 'text-primary' : pillar.color === 'secondary' ? 'text-secondary' : 'text-foreground'}`} />
               </div>
-              <h3 className="text-xl font-semibold mb-2">{pillar.title}</h3>
-              <p className="text-sm font-medium text-muted-foreground mb-3">{pillar.description}</p>
-              <p className="text-sm text-muted-foreground/80">{pillar.detail}</p>
+              <h3 className="text-2xl font-bold mb-3">{pillar.title}</h3>
+              <p className="text-primary text-sm font-semibold mb-5 uppercase tracking-wider">{pillar.description}</p>
+              <p className="text-muted-foreground leading-relaxed text-lg">{pillar.detail}</p>
             </div>
           ))}
         </div>
@@ -357,80 +363,78 @@ const UseCasesSection = () => {
   const useCases = [
     {
       icon: Home,
-      role: "Propietario",
-      title: "Entendé si pagás lo justo",
+      role: "Propietarios",
+      title: "Justicia en tus Gastos",
       scenarios: [
-        "Recibiste un aumento y querés saber si es razonable",
-        "Querés comparar con otros edificios de la zona",
-        "Necesitás datos para cuestionar un gasto en asamblea",
-        "Querés llevar un control histórico de tus expensas"
+        "¿Recibiste un aumento injustificado?",
+        "Compará con edificios de tu zona",
+        "Argumentos sólidos para asambleas",
+        "Control total de tu patrimonio"
       ]
     },
     {
       icon: Briefcase,
-      role: "Administrador",
-      title: "Informes claros para el consorcio",
+      role: "Administradores",
+      title: "Gestión Profesional",
       scenarios: [
-        "Presentar informes profesionales en reuniones",
-        "Justificar aumentos con datos de mercado e inflación",
-        "Mostrar la evolución histórica de los gastos",
-        "Anticipar preguntas de propietarios con información respaldada"
+        "Reportes visuales para reuniones",
+        "Justificá gastos con IA y datos",
+        "Transparencia que genera confianza",
+        "Anticipate a las dudas de los vecinos"
       ]
     },
     {
       icon: Building2,
-      role: "Consorcista activo",
-      title: "Participá con información",
+      role: "Inversores",
+      title: "Rentabilidad Clara",
       scenarios: [
-        "Llevar datos concretos a las asambleas",
-        "Comparar gestiones de diferentes administradores",
-        "Detectar gastos inusuales antes que otros",
-        "Proponer mejoras basadas en evidencia"
+        "Evaluá costos antes de comprar",
+        "Optimizá el ROI de tus unidades",
+        "Detectá ineficiencias operativas",
+        "Data-driven real estate management"
       ]
     }
   ];
 
   return (
-    <section id="casos-de-uso" className="py-20">
+    <section id="casos-de-uso" className="py-32">
       <div className="container">
-        <div className="text-center space-y-4 mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold">¿Para quién es ExpensaCheck?</h2>
-          <p className="text-muted-foreground max-w-2xl mx-auto">
-            Distintos perfiles, un mismo objetivo: claridad sobre los gastos del edificio.
+        <div className="max-w-3xl mx-auto text-center space-y-6 mb-20">
+          <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight text-foreground">Diseñado para cada perfil</h2>
+          <p className="text-muted-foreground text-lg leading-relaxed">
+            Diferentes necesidades, una misma herramienta poderosa para dar claridad financiera.
           </p>
         </div>
-        <div className="grid md:grid-cols-3 gap-6">
+        <div className="grid md:grid-cols-3 gap-8">
           {useCases.map((useCase, index) => (
             <div
               key={index}
-              className="bg-card rounded-2xl p-6 md:p-8 shadow-soft-sm hover:shadow-soft-md transition-all animate-fade-in-up border border-border/50"
+              className="group bg-card/30 backdrop-blur-sm rounded-[2.5rem] p-10 border border-border/50 hover:bg-card/50 hover:border-primary/30 transition-all duration-500 animate-fade-in-up shadow-sm"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
-              <div className="flex items-center gap-3 mb-5">
-                <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
-                  <useCase.icon className="w-6 h-6 text-primary" />
+              <div className="flex flex-col items-center text-center mb-8">
+                <div className="w-20 h-20 rounded-full bg-primary/10 flex items-center justify-center mb-6 group-hover:scale-110 transition-transform duration-500 shadow-inner">
+                  <useCase.icon className="w-10 h-10 text-primary" />
                 </div>
-                <div>
-                  <span className="text-xs font-medium text-primary uppercase tracking-wide">{useCase.role}</span>
-                  <h3 className="text-lg font-semibold">{useCase.title}</h3>
-                </div>
+                <span className="text-xs font-bold text-primary uppercase tracking-[0.2em] mb-3">{useCase.role}</span>
+                <h3 className="text-2xl font-bold">{useCase.title}</h3>
               </div>
-              <ul className="space-y-3">
+              <ul className="space-y-4">
                 {useCase.scenarios.map((scenario, idx) => (
-                  <li key={idx} className="flex items-start gap-2">
-                    <CheckCircle2 className="w-4 h-4 text-primary mt-0.5 flex-shrink-0" />
-                    <span className="text-sm text-muted-foreground">{scenario}</span>
+                  <li key={idx} className="flex items-center gap-4">
+                    <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    <span className="text-muted-foreground font-medium">{scenario}</span>
                   </li>
                 ))}
               </ul>
             </div>
           ))}
         </div>
-        <div className="text-center mt-10">
-          <Button asChild variant="outline" size="lg">
-            <Link to="/analizar">
-              Probá con tu expensa
-              <ArrowRight className="w-4 h-4 ml-2" />
+        <div className="text-center mt-20">
+          <Button asChild variant="outline" size="xl" className="rounded-2xl px-12 border-border hover:bg-primary hover:text-primary-foreground hover:border-primary transition-all duration-300">
+            <Link to="/analizar" className="flex items-center gap-3">
+              Empezar ahora
+              <ArrowRight className="w-5 h-5" />
             </Link>
           </Button>
         </div>
@@ -440,51 +444,62 @@ const UseCasesSection = () => {
 };
 
 const PricingSection = () => (
-  <section id="precios" className="py-20">
+  <section id="precios" className="py-32 relative overflow-hidden">
+    {/* Background Glow */}
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 blur-[120px] rounded-full -z-10"></div>
+
     <div className="container">
-      <div className="max-w-lg mx-auto text-center">
-        <div className="bg-card rounded-3xl p-8 md:p-12 shadow-soft-lg animate-scale-in">
-          {/* Promo banner */}
-          <div className="bg-gradient-hero text-primary-foreground rounded-xl p-4 mb-6 animate-pulse-soft">
-            <p className="text-sm font-semibold">🎉 ¡Tu primer análisis es GRATIS!</p>
-            <p className="text-xs opacity-90">Registrate y probá ExpensaCheck sin costo</p>
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-card/40 backdrop-blur-xl rounded-[3rem] p-10 md:p-16 border border-primary/20 shadow-2xl animate-scale-in relative overflow-hidden">
+          {/* Decorative Corner */}
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -z-10"></div>
+
+          <div className="text-center">
+            <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-bold mb-10 shadow-sm uppercase tracking-widest">
+              Pricing transparente
+            </div>
+
+            <div className="bg-gradient-hero text-primary-foreground rounded-3xl p-6 mb-12 shadow-xl shadow-primary/20">
+              <p className="text-lg font-bold mb-1">🎁 Primer análisis BONIFICADO</p>
+              <p className="text-sm opacity-90 font-medium">Probá la potencia de ExpensaCheck sin costo</p>
+            </div>
+
+            <div className="mb-12">
+              <span className="text-7xl font-black text-foreground">$1.500</span>
+              <span className="text-muted-foreground text-xl ml-3">ARS / análisis</span>
+            </div>
+
+            <ul className="space-y-6 text-left mb-12 border-y border-border/50 py-10">
+              {[
+                "Comparativa con Red de Edificios",
+                "Monitoreo de Impacto Inflacionario",
+                "IA con Detección de Desvíos",
+                "Reporte Profesional Exportable",
+                "Dashboard Histórico de Evolución"
+              ].map((feature, index) => (
+                <li key={index} className="flex items-center gap-4">
+                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/20">
+                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                  </div>
+                  <span className="text-muted-foreground font-medium text-lg">{feature}</span>
+                </li>
+              ))}
+            </ul>
+
+            <Button asChild variant="hero" size="xl" className="w-full rounded-[1.5rem] py-8 text-xl font-bold shadow-2xl shadow-primary/25 hover:scale-[1.02] transition-transform">
+              <Link to="/analizar">
+                Empezar Análisis
+                <ArrowRight className="w-6 h-6 ml-3" />
+              </Link>
+            </Button>
+
+            <div className="flex items-center justify-center gap-3 mt-8">
+              <Shield className="w-4 h-4 text-muted-foreground" />
+              <p className="text-sm text-muted-foreground font-medium">
+                Procesado por Mercado Pago
+              </p>
+            </div>
           </div>
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary-soft text-primary text-sm font-medium mb-6">
-            Sin suscripción
-          </div>
-          <h2 className="text-3xl font-bold mb-2">Pago por análisis</h2>
-          <p className="text-muted-foreground mb-8">
-            Ideal para propietarios o administradores. Pagás solo cuando lo necesitás.
-          </p>
-          <div className="mb-8">
-            <span className="text-5xl font-bold">$1.500</span>
-            <span className="text-muted-foreground ml-2">ARS / expensa</span>
-          </div>
-          <ul className="space-y-4 text-left mb-8">
-            {[
-              "Comparación con edificios similares",
-              "Contexto inflacionario del país",
-              "Detección de desvíos y anomalías",
-              "Reporte listo para presentar",
-              "Lenguaje claro y profesional"
-            ].map((feature, index) => (
-              <li key={index} className="flex items-center gap-3">
-                <div className="w-5 h-5 rounded-full bg-primary-soft flex items-center justify-center flex-shrink-0">
-                  <CheckCircle2 className="w-3 h-3 text-primary" />
-                </div>
-                <span className="text-sm">{feature}</span>
-              </li>
-            ))}
-          </ul>
-          <Button asChild variant="hero" size="xl" className="w-full">
-            <Link to="/analizar">
-              Analizar mi expensa
-              <ArrowRight className="w-5 h-5" />
-            </Link>
-          </Button>
-          <p className="text-xs text-muted-foreground mt-4">
-            Pago seguro con Mercado Pago
-          </p>
         </div>
       </div>
     </div>
@@ -492,26 +507,41 @@ const PricingSection = () => (
 );
 
 const Footer = () => (
-  <footer className="py-12 border-t border-border">
+  <footer className="py-20 border-t border-border bg-background relative overflow-hidden">
     <div className="container">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-lg font-semibold">ExpensaCheck</span>
+      <div className="grid md:grid-cols-4 gap-12 mb-16">
+        <div className="col-span-2 space-y-6">
+          <Link to="/" className="flex items-center gap-3 group">
+            <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform" />
+            <span className="text-2xl font-bold tracking-tight">ExpensaCheck</span>
+          </Link>
+          <p className="text-muted-foreground text-lg max-w-sm">
+            Nuestra misión es brindar transparencia y claridad financiera a cada consorcio de Argentina utilizando inteligencia artificial y datos de mercado.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground text-center">
-          © 2024 ExpensaCheck. Claridad y tranquilidad para tus expensas.
+        <div>
+          <h4 className="font-bold text-lg mb-6">Producto</h4>
+          <ul className="space-y-4">
+            <li><a href="#como-funciona" className="text-muted-foreground hover:text-primary transition-colors font-medium">Cómo funciona</a></li>
+            <li><a href="#beneficios" className="text-muted-foreground hover:text-primary transition-colors font-medium">Beneficios</a></li>
+            <li><a href="#precios" className="text-muted-foreground hover:text-primary transition-colors font-medium">Precios</a></li>
+          </ul>
+        </div>
+        <div>
+          <h4 className="font-bold text-lg mb-6">Legal</h4>
+          <ul className="space-y-4">
+            <li><Link to="/terminos" className="text-muted-foreground hover:text-primary transition-colors font-medium">Términos</Link></li>
+            <li><Link to="/privacidad" className="text-muted-foreground hover:text-primary transition-colors font-medium">Privacidad</Link></li>
+            <li><Link to="/contacto" className="text-muted-foreground hover:text-primary transition-colors font-medium">Contacto</Link></li>
+          </ul>
+        </div>
+      </div>
+      <div className="pt-12 border-t border-border flex flex-col md:flex-row items-center justify-between gap-6">
+        <p className="text-muted-foreground font-medium">
+          © 2024 ExpensaCheck. Todos los derechos reservados.
         </p>
-        <div className="flex items-center gap-6">
-          <Link to="/terminos" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Términos
-          </Link>
-          <Link to="/privacidad" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Privacidad
-          </Link>
-          <Link to="/contacto" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-            Contacto
-          </Link>
+        <div className="flex gap-8">
+          {/* Social icons could go here */}
         </div>
       </div>
     </div>

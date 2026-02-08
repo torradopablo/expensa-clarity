@@ -13,7 +13,8 @@ import {
   CreditCard,
   LogOut,
   AlertCircle,
-  User
+  User,
+  Shield
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -42,25 +43,29 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+            ExpensaCheck
+          </span>
         </Link>
         {user && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block mr-2">
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-muted-foreground hidden md:block">
               {user.email}
             </span>
-            <Button asChild variant="ghost" size="icon" title="Mi Perfil">
-              <Link to="/perfil">
-                <User className="w-4 h-4" />
-              </Link>
-            </Button>
-            <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
-              <LogOut className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="rounded-full hover:bg-accent">
+                <Link to="/perfil">
+                  <User className="w-5 h-5" />
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión" className="rounded-full hover:bg-destructive/10 hover:text-destructive">
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
         )}
       </div>
@@ -75,34 +80,36 @@ const steps = [
 ];
 
 const Stepper = ({ currentStep }: { currentStep: number }) => (
-  <div className="flex items-center justify-center gap-4 mb-12">
+  <div className="flex items-center justify-center gap-6 mb-16 lg:mb-24">
     {steps.map((step, index) => (
       <div key={step.number} className="flex items-center">
-        <div className="flex flex-col items-center">
+        <div className="flex flex-col items-center group">
           <div
-            className={`w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${currentStep >= step.number
-              ? "bg-gradient-hero text-primary-foreground"
-              : "bg-muted text-muted-foreground"
+            className={`w-14 h-14 rounded-2xl flex items-center justify-center text-lg font-bold transition-all duration-500 border-2 ${currentStep >= step.number
+              ? "bg-primary border-primary text-primary-foreground shadow-2xl shadow-primary/20 scale-110"
+              : "bg-muted/50 border-border text-muted-foreground"
               }`}
           >
             {currentStep > step.number ? (
-              <CheckCircle2 className="w-5 h-5" />
+              <CheckCircle2 className="w-7 h-7" />
             ) : (
               step.number
             )}
           </div>
-          <div className="mt-2 text-center">
-            <p className={`text-sm font-medium ${currentStep >= step.number ? "text-foreground" : "text-muted-foreground"}`}>
+          <div className="mt-4 text-center">
+            <p className={`text-sm font-bold tracking-tight uppercase ${currentStep >= step.number ? "text-foreground" : "text-muted-foreground"}`}>
               {step.title}
             </p>
-            <p className="text-xs text-muted-foreground hidden sm:block">{step.description}</p>
+            <p className="text-xs text-muted-foreground hidden md:block mt-1 font-medium">{step.description}</p>
           </div>
         </div>
         {index < steps.length - 1 && (
-          <div
-            className={`w-16 sm:w-24 h-0.5 mx-4 transition-all ${currentStep > step.number ? "bg-primary" : "bg-muted"
-              }`}
-          />
+          <div className="px-4">
+            <div
+              className={`w-12 sm:w-20 lg:w-32 h-1 rounded-full transition-all duration-1000 ${currentStep > step.number ? "bg-primary shadow-sm shadow-primary/50" : "bg-muted"
+                }`}
+            />
+          </div>
         )}
       </div>
     ))}
@@ -170,20 +177,20 @@ const UploadStep = ({
   }, [onFileSelect]);
 
   return (
-    <div className="max-w-2xl mx-auto animate-fade-in-up">
-      <Card variant="elevated">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Subí tu liquidación de expensas</CardTitle>
-          <CardDescription>
-            Aceptamos archivos PDF de hasta 15MB
+    <div className="max-w-3xl mx-auto animate-fade-in-up">
+      <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="text-center pt-12">
+          <CardTitle className="text-3xl font-extrabold tracking-tight">Preparar Análisis</CardTitle>
+          <CardDescription className="text-lg">
+            Subí tu liquidación de expensas para que nuestra IA la procese.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="px-8 pb-12 space-y-8">
           {!file ? (
             <label
-              className={`relative flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${isDragging
-                ? "border-primary bg-primary-soft"
-                : "border-border hover:border-primary hover:bg-muted/50"
+              className={`relative flex flex-col items-center justify-center w-full h-80 border-2 border-dashed rounded-[2rem] cursor-pointer transition-all duration-300 ${isDragging
+                ? "border-primary bg-primary/5 scale-[0.99]"
+                : "border-border/50 hover:border-primary/50 bg-background/50 hover:bg-background/80"
                 }`}
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -195,44 +202,50 @@ const UploadStep = ({
                 accept=".pdf"
                 onChange={handleFileInput}
               />
-              <div className="flex flex-col items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-primary-soft flex items-center justify-center">
-                  <Upload className="w-8 h-8 text-primary" />
+              <div className="flex flex-col items-center gap-6">
+                <div className="w-24 h-24 rounded-3xl bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+                  <Upload className="w-12 h-12 text-primary animate-bounce-slow" />
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-medium">
-                    Arrastrá tu PDF aquí
+                  <p className="text-2xl font-bold text-foreground">
+                    Arrastrá tu archivo aquí
                   </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    máximo 15MB
+                  <p className="text-muted-foreground font-medium mt-2">
+                    o hacé clic para buscar en tu equipo (PDF, máx. 15MB)
                   </p>
                 </div>
               </div>
             </label>
           ) : (
-            <div className="flex items-center gap-4 p-4 bg-primary-soft rounded-xl">
-              <div className="w-12 h-12 rounded-xl bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <FileText className="w-6 h-6 text-primary" />
+            <div className="flex items-center gap-6 p-6 bg-primary/10 border border-primary/20 rounded-3xl group transition-all duration-300">
+              <div className="w-20 h-20 rounded-2xl bg-primary/20 flex items-center justify-center flex-shrink-0 border border-primary/20">
+                <FileText className="w-10 h-10 text-primary" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-medium truncate">{file.name}</p>
-                <p className="text-sm text-muted-foreground">
-                  {(file.size / 1024 / 1024).toFixed(2)} MB
-                </p>
+                <p className="text-xl font-bold truncate text-foreground leading-none mb-2">{file.name}</p>
+                <div className="flex items-center gap-3">
+                  <span className="px-2 py-0.5 rounded-md bg-primary/20 text-primary text-[10px] font-black uppercase">
+                    PDF Ready
+                  </span>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {(file.size / 1024 / 1024).toFixed(2)} MB
+                  </p>
+                </div>
               </div>
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onFileRemove}
-                className="flex-shrink-0"
+                className="flex-shrink-0 w-12 h-12 rounded-full hover:bg-destructive/10 hover:text-destructive transition-colors"
+                title="Quitar archivo"
               >
-                <X className="w-5 h-5" />
+                <X className="w-6 h-6" />
               </Button>
             </div>
           )}
 
-          <div className="flex justify-between items-center pt-4">
-            <Button variant="ghost" asChild>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6">
+            <Button variant="ghost" asChild className="rounded-xl px-8 hover:bg-accent order-2 sm:order-1 w-full sm:w-auto">
               <Link to="/">
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Volver
@@ -240,25 +253,33 @@ const UploadStep = ({
             </Button>
             <Button
               variant="hero"
-              size="lg"
+              size="xl"
               disabled={!file || isUploading}
               onClick={onNext}
+              className="rounded-2xl px-12 shadow-xl shadow-primary/20 order-1 sm:order-2 w-full sm:w-auto font-bold"
             >
               {isUploading ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  Preparando...
+                  <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                  Procesando...
                 </>
               ) : (
                 <>
                   Continuar al pago
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-5 h-5 ml-3" />
                 </>
               )}
             </Button>
           </div>
         </CardContent>
       </Card>
+
+      <div className="mt-12 text-center text-muted-foreground animate-fade-in" style={{ animationDelay: "0.5s" }}>
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/30 rounded-full border border-border/50 text-xs font-semibold uppercase tracking-widest leading-none">
+          <Shield className="w-3.5 h-3.5 text-primary" />
+          Procesamiento seguro y confidencial
+        </div>
+      </div>
     </div>
   );
 };
@@ -277,54 +298,56 @@ const PaymentStep = ({
   isFirstAnalysis?: boolean;
 }) => {
   return (
-    <div className="max-w-lg mx-auto animate-fade-in-up">
-      <Card variant="elevated">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">
+    <div className="max-w-2xl mx-auto animate-fade-in-up">
+      <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden">
+        <CardHeader className="text-center pt-12">
+          <CardTitle className="text-3xl font-extrabold tracking-tight">
             {isFreeAnalysis
-              ? (isFirstAnalysis ? "¡Tu primer análisis es gratis!" : "Análisis gratuito")
-              : "Confirmar pago"
+              ? (isFirstAnalysis ? "¡Promoción Exclusiva!" : "Acceso Bonificado")
+              : "Confirmar Pago"
             }
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-lg">
             {isFreeAnalysis
               ? (isFirstAnalysis
-                ? "Probá ExpensaCheck sin costo. A partir del segundo análisis, el precio es de $1.500 ARS."
-                : "Tu análisis es gratis"
+                ? "Disfrutá de tu primer análisis sin costo alguno."
+                : "Tenés habilitado un análisis sin cargo."
               )
-              : "Pago único y seguro con Mercado Pago"
+              : "Pago único y seguro para procesar tu documento."
             }
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="px-8 pb-12 space-y-8">
           {isFreeAnalysis && (
-            <div className="bg-status-ok-bg border border-status-ok/30 rounded-xl p-4 flex items-start gap-3">
-              <CheckCircle2 className="w-5 h-5 text-status-ok mt-0.5 flex-shrink-0" />
+            <div className="bg-primary/10 border border-primary/20 rounded-[1.5rem] p-6 flex items-start gap-4">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center flex-shrink-0 border border-primary/20">
+                <CheckCircle2 className="w-6 h-6 text-primary" />
+              </div>
               <div>
-                <p className="text-sm font-medium text-status-ok">
-                  {isFirstAnalysis ? "🎉 Promoción: primer análisis gratis" : "Análisis gratuito"}
+                <p className="text-xl font-bold text-primary mb-1">
+                  {isFirstAnalysis ? "🎉 Primer Análisis GRATIS" : "Análisis Bonificado"}
                 </p>
-                <p className="text-xs text-muted-foreground">
+                <p className="text-muted-foreground font-medium">
                   {isFirstAnalysis
-                    ? "Aprovechá esta oportunidad para conocer nuestro servicio."
-                    : "Tenés acceso a análisis sin costo."
+                    ? "Conocé cómo la IA puede darte claridad absoluta hoy mismo."
+                    : "Tu beneficio ha sido aplicado correctamente."
                   }
                 </p>
               </div>
             </div>
           )}
 
-          <div className="bg-muted/50 rounded-xl p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-muted-foreground">Análisis de expensa</span>
-              <span className={`font-medium ${isFreeAnalysis ? "line-through text-muted-foreground" : ""}`}>
+          <div className="bg-muted/30 backdrop-blur-sm rounded-[2rem] p-8 border border-border/50 space-y-6">
+            <div className="flex justify-between items-center text-lg font-medium">
+              <span className="text-muted-foreground tracking-tight">Servicio de Análisis IA</span>
+              <span className={`${isFreeAnalysis ? "line-through text-muted-foreground opacity-50" : "text-foreground font-bold"}`}>
                 $1.500 ARS
               </span>
             </div>
-            <div className="border-t border-border pt-4">
+            <div className="border-t border-border/50 pt-6">
               <div className="flex justify-between items-center">
-                <span className="font-semibold">Total</span>
-                <span className={`text-2xl font-bold ${isFreeAnalysis ? "text-status-ok" : "text-primary"}`}>
+                <span className="text-xl font-bold">Total a abonar</span>
+                <span className={`text-4xl font-black ${isFreeAnalysis ? "text-primary" : "text-foreground"}`}>
                   {isFreeAnalysis ? "GRATIS" : "$1.500 ARS"}
                 </span>
               </div>
@@ -332,51 +355,56 @@ const PaymentStep = ({
           </div>
 
           {!isFreeAnalysis && (
-            <div className="bg-secondary-soft rounded-xl p-4 flex items-start gap-3">
-              <CreditCard className="w-5 h-5 text-secondary mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium">Pago seguro con Mercado Pago</p>
-                <p className="text-xs text-muted-foreground">
-                  Serás redirigido a Mercado Pago para completar el pago. Aceptamos tarjetas de crédito, débito y dinero en cuenta.
+            <div className="bg-secondary/10 border border-secondary/20 rounded-2xl p-5 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0 border border-secondary/20">
+                <CreditCard className="w-6 h-6 text-secondary" />
+              </div>
+              <div className="flex-1">
+                <p className="text-sm font-bold text-foreground">Checkout seguro con Mercado Pago</p>
+                <p className="text-xs text-muted-foreground font-medium mt-1">
+                  Tarjetas de crédito, débito y dinero disponible. Procesamiento instantáneo.
                 </p>
               </div>
             </div>
           )}
 
-          <ul className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {[
-              "Extracción automática de datos con IA",
-              "Detección de aumentos inusuales",
-              "Explicaciones claras en español",
-              "Reporte descargable en PDF"
+              "Extracción IA de alta precisión",
+              "Detección de anomalías en rubros",
+              "Referencia de mercado actualizada",
+              "Resumen ejecutivo profesional"
             ].map((item, index) => (
-              <li key={index} className="flex items-center gap-2 text-sm">
-                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" />
-                <span>{item}</span>
-              </li>
+              <div key={index} className="flex items-center gap-3">
+                <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
+                  <CheckCircle2 className="w-3 h-3 text-primary" />
+                </div>
+                <span className="text-sm font-medium text-muted-foreground">{item}</span>
+              </div>
             ))}
-          </ul>
+          </div>
 
-          <div className="flex justify-between items-center pt-4">
-            <Button variant="ghost" onClick={onBack} disabled={isProcessing}>
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4">
+            <Button variant="ghost" onClick={onBack} disabled={isProcessing} className="rounded-xl px-8 order-2 sm:order-1 w-full sm:w-auto font-medium">
               <ArrowLeft className="w-4 h-4 mr-2" />
               Volver
             </Button>
             <Button
               variant="hero"
-              size="lg"
+              size="xl"
               onClick={onNext}
               disabled={isProcessing}
+              className="rounded-2xl px-12 shadow-xl shadow-primary/20 order-1 sm:order-2 w-full sm:w-auto font-bold"
             >
               {isProcessing ? (
                 <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-5 h-5 mr-3 animate-spin" />
                   Procesando...
                 </>
               ) : (
                 <>
-                  {isFreeAnalysis ? "Analizar gratis" : "Pagar con Mercado Pago"}
-                  <ArrowRight className="w-4 h-4" />
+                  {isFreeAnalysis ? "Comenzar Análisis" : "Confirmar y Pagar"}
+                  <ArrowRight className="w-5 h-5 ml-3" />
                 </>
               )}
             </Button>
@@ -388,31 +416,37 @@ const PaymentStep = ({
 };
 
 const ProcessingStep = () => (
-  <div className="max-w-lg mx-auto text-center animate-fade-in-up">
-    <Card variant="elevated">
-      <CardContent className="py-16 space-y-6">
-        <div className="w-20 h-20 rounded-full bg-primary-soft mx-auto flex items-center justify-center">
-          <Loader2 className="w-10 h-10 text-primary animate-spin" />
+  <div className="max-w-2xl mx-auto text-center animate-fade-in-up">
+    <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[3rem] overflow-hidden py-16 px-10">
+      <CardContent className="space-y-10">
+        <div className="relative mx-auto w-32 h-32">
+          <div className="absolute inset-0 bg-primary/20 rounded-full animate-ping opacity-30"></div>
+          <div className="relative w-32 h-32 rounded-full bg-primary/10 flex items-center justify-center border-2 border-primary/30 backdrop-blur-md">
+            <Loader2 className="w-16 h-16 text-primary animate-spin" />
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-bold mb-2">Analizando tu expensa</h2>
-          <p className="text-muted-foreground">
-            Esto tomará solo unos segundos...
+
+        <div className="space-y-4">
+          <h2 className="text-4xl font-extrabold tracking-tight">Procesando tu Expensa</h2>
+          <p className="text-xl text-muted-foreground font-medium max-w-sm mx-auto">
+            Nuestra IA está extrayendo y comparando miles de puntos de datos.
           </p>
         </div>
-        <div className="space-y-2 max-w-xs mx-auto">
+
+        <div className="bg-muted/30 rounded-[2rem] p-8 space-y-4 max-w-sm mx-auto border border-border/50">
           {[
-            "Extrayendo datos del documento",
-            "Identificando categorías de gastos",
-            "Generando reporte visual"
+            "Extrayendo rubros del PDF",
+            "Cruzando con red de edificios",
+            "Identificando desvíos significativos",
+            "Generando resumen operativo"
           ].map((step, index) => (
             <div
               key={index}
-              className="flex items-center gap-3 text-sm text-muted-foreground animate-fade-in"
-              style={{ animationDelay: `${index * 0.5}s` }}
+              className="flex items-center gap-4 text-left group transition-all"
+              style={{ animationDelay: `${index * 0.8}s` }}
             >
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse-slow" />
-              <span>{step}</span>
+              <div className="w-2.5 h-2.5 rounded-full bg-primary animate-pulse shadow-sm shadow-primary/50" />
+              <span className="text-base font-medium text-muted-foreground group-hover:text-foreground transition-colors">{step}</span>
             </div>
           ))}
         </div>
@@ -718,15 +752,17 @@ const Analizar = () => {
     navigate(`/analisis/${id}`);
   };
 
-  if (!user) {
-    return null;
-  }
-
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 -z-10 bg-background">
+        <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+      </div>
+
       <Header />
-      <main className="pt-32 pb-20">
-        <div className="container">
+      <main className="pt-32 pb-32">
+        <div className="container relative z-10">
           <Stepper currentStep={currentStep} />
 
           {currentStep === 1 && !showPaymentSuccess && (

@@ -38,7 +38,8 @@ import {
   Trash2,
   LineChart,
   Search,
-  User
+  User,
+  Building
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -57,27 +58,31 @@ const Header = () => {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+    <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+            ExpensaCheck
+          </span>
         </Link>
-        <div className="flex items-center gap-2">
-          <Button asChild variant="ghost" size="sm" className="hidden sm:flex">
+        <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" className="hidden sm:flex rounded-full px-6 hover:bg-accent font-semibold" size="sm">
             <Link to="/analizar">
               <Plus className="w-4 h-4 mr-2" />
               Nueva expensa
             </Link>
           </Button>
-          <Button asChild variant="ghost" size="icon" title="Mi Perfil">
-            <Link to="/perfil">
-              <User className="w-4 h-4" />
-            </Link>
-          </Button>
-          <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión">
-            <LogOut className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button asChild variant="ghost" size="icon" title="Mi Perfil" className="rounded-full hover:bg-accent">
+              <Link to="/perfil">
+                <User className="w-5 h-5" />
+              </Link>
+            </Button>
+            <Button variant="ghost" size="icon" onClick={handleLogout} title="Cerrar sesión" className="rounded-full hover:bg-destructive/10 hover:text-destructive">
+              <LogOut className="w-5 h-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </header>
@@ -266,48 +271,55 @@ const Historial = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-soft">
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 -z-10 bg-background">
+        <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+      </div>
+
       <Header />
-      <main className="pt-24 pb-20">
-        <div className="container max-w-4xl">
-          <div className="flex items-center justify-between gap-3 mb-8">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-primary-soft flex items-center justify-center">
-                <History className="w-6 h-6 text-primary" />
+      <main className="pt-32 pb-32">
+        <div className="container max-w-4xl relative z-10">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 mb-12">
+            <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-[1.25rem] bg-primary/10 flex items-center justify-center border border-primary/20 shadow-inner">
+                <History className="w-8 h-8 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl font-bold">Historial de expensas</h1>
-                <p className="text-muted-foreground text-sm">
-                  {filteredAnalyses.length} {filteredAnalyses.length === 1 ? "análisis realizado" : "análisis realizados"}
+                <h1 className="text-4xl font-extrabold tracking-tight">Mis Expensas</h1>
+                <p className="text-muted-foreground font-medium mt-1">
+                  {filteredAnalyses.length} {filteredAnalyses.length === 1 ? "análisis guardado" : "análisis guardados"}
                 </p>
               </div>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <Button variant="outline" size="sm" asChild>
+            <div className="flex items-center gap-3 flex-wrap">
+              <Button variant="ghost" asChild className="rounded-full px-6 hover:bg-accent font-semibold">
                 <Link to="/evolucion">
-                  <LineChart className="w-4 h-4 mr-2" />
-                  Ver evolución
+                  <LineChart className="w-5 h-5 mr-2 text-primary" />
+                  Evolución
                 </Link>
               </Button>
               {filteredAnalyses.length >= 2 && (
                 <>
                   {selectionMode ? (
-                    <>
-                      <Button variant="ghost" size="sm" onClick={cancelSelection}>
+                    <div className="flex items-center gap-2 bg-background/50 backdrop-blur-md p-1 rounded-full border border-primary/20 shadow-lg">
+                      <Button variant="ghost" size="sm" onClick={cancelSelection} className="rounded-full px-4 h-9">
                         Cancelar
                       </Button>
                       <Button
                         size="sm"
                         onClick={handleCompare}
                         disabled={selectedIds.size !== 2}
+                        className="rounded-full px-6 h-9 bg-primary text-primary-foreground font-bold shadow-lg shadow-primary/20"
                       >
                         <ArrowLeftRight className="w-4 h-4 mr-2" />
                         Comparar ({selectedIds.size}/2)
                       </Button>
-                    </>
+                    </div>
                   ) : (
-                    <Button variant="outline" size="sm" onClick={() => setSelectionMode(true)}>
-                      <ArrowLeftRight className="w-4 h-4 mr-2" />
+                    <Button variant="outline" className="rounded-full px-6 border-border/50 hover:bg-accent font-semibold" onClick={() => setSelectionMode(true)}>
+                      <ArrowLeftRight className="w-4 h-4 mr-2 text-secondary" />
                       Comparar
                     </Button>
                   )}
@@ -316,62 +328,61 @@ const Historial = () => {
             </div>
           </div>
 
-          {/* Search and Filters Section */}
+          {/* Search and Filters Section - Premium Design */}
           {analyses.some(a => a.status === "completed") && (
-            <Card variant="soft" className="mb-6 animate-fade-in-up">
-              <CardContent className="p-4">
-                {/* Search bar */}
-                <div className="relative mb-4">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                  <Input
-                    type="text"
-                    placeholder="Buscar por edificio, período o unidad..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 h-10"
-                  />
-                  {searchQuery && (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="absolute right-1 top-1/2 -translate-y-1/2 h-8 w-8"
-                      onClick={() => setSearchQuery("")}
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  )}
+            <Card className="mb-10 bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2rem] overflow-hidden animate-fade-in-up">
+              <CardContent className="p-8">
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-6">
+                  <div className="flex-1 relative group">
+                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      type="text"
+                      placeholder="Buscar por edificio, período o unidad..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-12 h-12 bg-background/50 border-border/50 rounded-xl focus:ring-primary/20 text-base"
+                    />
+                    {searchQuery && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full hover:bg-muted"
+                        onClick={() => setSearchQuery("")}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="w-full lg:w-[240px]">
+                    <Select value={buildingFilter} onValueChange={setBuildingFilter}>
+                      <SelectTrigger className="h-12 bg-background/50 border-border/50 rounded-xl focus:ring-primary/20">
+                        <div className="flex items-center gap-2">
+                          <Building className="w-4 h-4 text-muted-foreground" />
+                          <SelectValue placeholder="Edificio" />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border/50">
+                        <SelectItem value="all">Todos los edificios</SelectItem>
+                        {buildings.map((building) => (
+                          <SelectItem key={building} value={building as string}>
+                            {building}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2 mb-3">
-                  <Filter className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Filtros</span>
-                  {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="h-6 px-2 ml-auto">
-                      <X className="w-3 h-3 mr-1" />
-                      Limpiar todo
-                    </Button>
-                  )}
-                </div>
-                <div className="grid gap-3">
-                  {/* Building filter */}
-                  <Select value={buildingFilter} onValueChange={setBuildingFilter}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Edificio" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todos los edificios</SelectItem>
-                      {buildings.map((building) => (
-                        <SelectItem key={building} value={building as string}>
-                          {building}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
                 {hasActiveFilters && (
-                  <p className="text-xs text-muted-foreground mt-3">
-                    Mostrando {filteredAnalyses.length} de {analyses.filter(a => a.status === "completed").length} análisis
-                  </p>
+                  <div className="flex items-center justify-between mt-4 px-1">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      Resultados: <span className="text-foreground font-bold">{filteredAnalyses.length}</span>
+                    </p>
+                    <Button variant="link" onClick={clearFilters} className="h-auto p-0 text-xs font-bold uppercase tracking-widest text-primary hover:no-underline">
+                      Limpiar Filtros
+                    </Button>
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -411,75 +422,82 @@ const Historial = () => {
               </CardContent>
             </Card>
           ) : (
-            <div className="grid gap-4">
+            <div className="space-y-4">
               {filteredAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
                 const isSelected = selectedIds.has(analysis.id);
 
                 const cardContent = (
                   <Card
-                    variant="interactive"
                     className={cn(
-                      "animate-fade-in-up transition-all",
-                      isSelected && "ring-2 ring-primary"
+                      "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg hover:shadow-2xl hover:shadow-primary/5",
+                      isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10"
                     )}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
                     <CardContent className="p-0">
-                      <div className="flex flex-col sm:flex-row">
-                        <div className="flex-1 p-5 sm:p-6">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex items-start gap-3">
+                      <div className="flex flex-col sm:flex-row items-stretch">
+                        <div className="flex-1 p-6 md:p-8">
+                          <div className="flex items-start justify-between gap-6">
+                            <div className="flex items-start gap-5">
                               {selectionMode && (
-                                <Checkbox
-                                  checked={isSelected}
-                                  disabled={!isSelected && selectedIds.size >= 2}
-                                  className="mt-1"
-                                  onClick={(e) => toggleSelection(analysis.id, e)}
-                                />
+                                <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                                  <Checkbox
+                                    checked={isSelected}
+                                    disabled={!isSelected && selectedIds.size >= 2}
+                                    onCheckedChange={() => toggleSelection(analysis.id, { preventDefault: () => { }, stopPropagation: () => { } } as any)}
+                                    className="w-6 h-6 rounded-lg border-2"
+                                  />
+                                </div>
                               )}
                               <div className="min-w-0">
-                                <p className="text-sm text-muted-foreground truncate">
-                                  {analysis.building_name || "Edificio"}
-                                  {analysis.unit && ` · ${analysis.unit}`}
-                                </p>
-                                <h3 className="text-lg font-semibold">{analysis.period}</h3>
-                                <p className="text-xs text-muted-foreground mt-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <p className="text-base font-bold text-foreground truncate">
+                                    {analysis.building_name || "Edificio"}
+                                    {analysis.unit && (
+                                      <span className="ml-2 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-black uppercase">
+                                        UF {analysis.unit}
+                                      </span>
+                                    )}
+                                  </p>
+                                </div>
+                                <h3 className="text-2xl font-black tracking-tight text-foreground line-height-none">{analysis.period}</h3>
+                                <div className="flex items-center gap-2 mt-3 text-sm font-medium text-muted-foreground">
+                                  <CheckCircle2 className="w-4 h-4 text-primary" />
                                   Analizado el {formatDate(analysis.created_at)}
-                                </p>
+                                </div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-2 flex-shrink-0">
-                              {!selectionMode && (
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={(e) => handleDeleteClick(analysis, e)}
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </Button>
-                              )}
-                              <Badge variant="ok">
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Completo
-                              </Badge>
-                            </div>
+                            {!selectionMode && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-10 w-10 shrink-0 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                                onClick={(e) => handleDeleteClick(analysis, e)}
+                              >
+                                <Trash2 className="w-5 h-5" />
+                              </Button>
+                            )}
                           </div>
                         </div>
-                        <div className="flex items-center justify-between sm:justify-center gap-4 p-5 sm:p-6 bg-muted/30 sm:w-48 border-t sm:border-t-0 sm:border-l border-border">
-                          <div className="text-left sm:text-center">
-                            <p className="text-xs text-muted-foreground mb-0.5">Total</p>
-                            <p className="text-lg font-bold">{formatCurrency(analysis.total_amount)}</p>
+                        <div className="flex items-center justify-between sm:justify-center gap-8 p-6 md:p-8 bg-muted/20 sm:w-60 border-t sm:border-t-0 sm:border-l border-border/50 group-hover:bg-primary/5 transition-colors">
+                          <div className="text-left sm:text-right">
+                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Total abonado</p>
+                            <p className="text-2xl font-black text-foreground tabular-nums">{formatCurrency(analysis.total_amount)}</p>
                             {change !== null && (
-                              <div className={`flex items-center justify-center gap-1 text-xs font-medium mt-1 ${change > 10 ? "text-status-attention" : change > 0 ? "text-muted-foreground" : "text-status-ok"
+                              <div className={`flex items-center sm:justify-end gap-1.5 text-sm font-extrabold mt-1.5 ${change > 10 ? "text-secondary" : change > 0 ? "text-muted-foreground" : "text-primary"
                                 }`}>
-                                {change > 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
                                 {change > 0 ? "+" : ""}{change.toFixed(1)}%
                               </div>
                             )}
                           </div>
-                          <ArrowRight className="w-5 h-5 text-muted-foreground sm:hidden" />
+                          <ArrowRight className="w-6 h-6 text-primary sm:hidden group-hover:translate-x-1 transition-transform" />
+                          <div className="hidden sm:block">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                              <ArrowRight className="w-5 h-5" />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </CardContent>

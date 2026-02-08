@@ -73,31 +73,37 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-soft flex items-center justify-center p-4">
+    <div className="min-h-screen relative overflow-hidden flex items-center justify-center p-4">
+      {/* Dynamic Background */}
+      <div className="absolute inset-0 -z-10 bg-background">
+        <div className="absolute top-[10%] left-[20%] w-[30%] h-[30%] bg-primary/5 blur-[120px] rounded-full"></div>
+        <div className="absolute bottom-[20%] right-[10%] w-[40%] h-[40%] bg-secondary/5 blur-[120px] rounded-full"></div>
+      </div>
+
       <div className="w-full max-w-md animate-fade-in-up">
-        <div className="text-center mb-8">
-          <Link to="/" className="inline-flex items-center gap-2 mb-6">
-            <Logo className="w-10 h-10" />
-            <span className="text-2xl font-bold">ExpensaCheck</span>
+        <div className="text-center mb-10">
+          <Link to="/" className="inline-flex items-center gap-3 mb-8 group">
+            <Logo className="w-12 h-12 group-hover:rotate-12 transition-transform duration-500" />
+            <span className="text-3xl font-black tracking-tighter text-foreground">ExpensaCheck</span>
           </Link>
-          <h1 className="text-2xl font-bold">
-            {isLogin ? "Iniciá sesión" : "Creá tu cuenta"}
+          <h1 className="text-4xl font-black tracking-tight mb-3">
+            {isLogin ? "Bienvenido" : "Unite a nosotros"}
           </h1>
-          <p className="text-muted-foreground mt-2">
+          <p className="text-lg text-muted-foreground font-medium">
             {isLogin
-              ? "Accedé a tus análisis de expensas"
-              : "Empezá a analizar tus expensas hoy"}
+              ? "Accedé a tus análisis inteligentes"
+              : "Empezá a optimizar tus gastos hoy mismo"}
           </p>
         </div>
 
-        <Card variant="elevated">
-          <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+        <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden">
+          <CardContent className="p-8 md:p-10">
+            <form onSubmit={handleSubmit} className="space-y-6">
               {!isLogin && (
                 <div className="space-y-2">
-                  <Label htmlFor="fullName">Nombre completo</Label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Label htmlFor="fullName" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre completo</Label>
+                  <div className="relative group">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
                       id="fullName"
                       name="fullName"
@@ -105,7 +111,7 @@ const Auth = () => {
                       placeholder="Tu nombre"
                       value={formData.fullName}
                       onChange={handleInputChange}
-                      className="pl-10"
+                      className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
                       required={!isLogin}
                     />
                   </div>
@@ -113,9 +119,9 @@ const Auth = () => {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Email corporativo o personal</Label>
+                <div className="relative group">
+                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="email"
                     name="email"
@@ -123,16 +129,23 @@ const Auth = () => {
                     placeholder="tu@email.com"
                     value={formData.email}
                     onChange={handleInputChange}
-                    className="pl-10"
+                    className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <div className="flex items-center justify-between px-1">
+                  <Label htmlFor="password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Contraseña</Label>
+                  {isLogin && (
+                    <button type="button" className="text-xs font-bold text-primary hover:underline">
+                      ¿Olvidaste tu contraseña?
+                    </button>
+                  )}
+                </div>
+                <div className="relative group">
+                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                   <Input
                     id="password"
                     name="password"
@@ -140,7 +153,7 @@ const Auth = () => {
                     placeholder="••••••••"
                     value={formData.password}
                     onChange={handleInputChange}
-                    className="pl-10"
+                    className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
                     required
                     minLength={6}
                   />
@@ -150,46 +163,46 @@ const Auth = () => {
               <Button
                 type="submit"
                 variant="hero"
-                size="lg"
-                className="w-full"
+                size="xl"
+                className="w-full rounded-2xl shadow-xl shadow-primary/20 h-14 text-lg font-black"
                 disabled={isLoading}
               >
                 {isLoading ? (
                   <>
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                    {isLogin ? "Iniciando sesión..." : "Creando cuenta..."}
+                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                    Procesando...
                   </>
                 ) : (
                   <>
                     {isLogin ? "Iniciar sesión" : "Crear cuenta"}
-                    <ArrowRight className="w-4 h-4" />
+                    <ArrowRight className="w-5 h-5 ml-2" />
                   </>
                 )}
               </Button>
             </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                {isLogin ? "¿No tenés cuenta?" : "¿Ya tenés cuenta?"}{" "}
+            <div className="mt-8 pt-8 border-t border-border/50 text-center">
+              <p className="text-base text-muted-foreground font-medium">
+                {isLogin ? "¿No tenés cuenta todavía?" : "¿Ya tenés una cuenta?"}{" "}
                 <button
                   type="button"
                   onClick={() => setIsLogin(!isLogin)}
-                  className="text-primary font-medium hover:underline"
+                  className="text-primary font-black hover:underline ml-1"
                 >
-                  {isLogin ? "Registrate" : "Iniciá sesión"}
+                  {isLogin ? "Registrate gratis" : "Iniciá sesión"}
                 </button>
               </p>
             </div>
           </CardContent>
         </Card>
 
-        <p className="text-center text-xs text-muted-foreground mt-6 px-4">
+        <p className="text-center text-xs text-muted-foreground mt-8 px-6 font-medium leading-relaxed">
           Al continuar, aceptás nuestros{" "}
-          <Link to="/terminos" className="underline hover:text-foreground">
+          <Link to="/terminos" className="text-foreground font-bold hover:underline">
             Términos de Servicio
           </Link>{" "}
           y{" "}
-          <Link to="/privacidad" className="underline hover:text-foreground">
+          <Link to="/privacidad" className="text-foreground font-bold hover:underline">
             Política de Privacidad
           </Link>
         </p>
