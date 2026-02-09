@@ -18,7 +18,8 @@ import {
   Home,
   Briefcase,
   Building2,
-  User
+  User,
+  LayoutList
 } from "lucide-react";
 import heroIllustration from "@/assets/hero-illustration.png";
 
@@ -267,18 +268,18 @@ const HowItWorksSection = () => {
   const steps = [
     {
       icon: Upload,
-      title: "Subí la expensa",
-      description: "Cargá el PDF de la liquidación. Nuestro sistema procesa todos los rubros automáticamente."
+      title: "1. Carga Inteligente",
+      description: "Subí el PDF de tu liquidación. Nuestro sistema procesa todos los rubros y extrae la información clave al instante."
     },
     {
-      icon: BarChart3,
-      title: "IA en acción",
-      description: "Comparamos tus gastos con miles de edificios similares para identificar anomalías."
+      icon: TrendingUp,
+      title: "2. Evolución y Mercado",
+      description: "Comparamos tus gastos contra tu historial, la inflación acumulada y una red de edificios similares."
     },
     {
-      icon: Download,
-      title: "Reporte Ejecutivo",
-      description: "Obtené claridad absoluta con sugerencias concretas y gráficas profesionales."
+      icon: LayoutList,
+      title: "3. IA y Temario de Asamblea",
+      description: "Detectamos anomalías automáticamente y generamos un orden del día con argumentos sólidos para tu próxima reunión."
     }
   ];
 
