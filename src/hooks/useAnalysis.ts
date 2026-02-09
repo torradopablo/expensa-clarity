@@ -1,18 +1,20 @@
 import { useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import type { Analysis, Category, BuildingProfile } from "../types/analysis";
 
 export interface UseAnalysisState {
   analyses: Analysis[];
-  categories: Category[];
-  buildingProfiles: BuildingProfile[];
+  buildings: string[];
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
   loading: boolean;
   error: string | null;
 }
 
 export interface UseAnalysisActions {
   fetchAnalyses: () => Promise<void>;
+  fetchNextPage: () => void;
   fetchCategories: (analysisId: string) => Promise<void>;
   createAnalysis: (data: Partial<Analysis>) => Promise<Analysis | null>;
   updateAnalysis: (id: string, data: Partial<Analysis>) => Promise<void>;
@@ -23,26 +25,59 @@ export interface UseAnalysisActions {
   reset: () => void;
 }
 
-export function useAnalysis() {
+export function useAnalysis(filters?: { buildingName?: string }) {
   const queryClient = useQueryClient();
 
   // Queries
+  const PAGE_SIZE = 10;
+
+  // Infinite Query for analyses
   const {
-    data: analyses = [],
+    data: infiniteAnalyses,
     isLoading: loadingAnalyses,
     error: errorAnalyses,
-    refetch: fetchAnalyses
-  } = useQuery({
-    queryKey: ["analyses"],
-    queryFn: async () => {
-      const { data, error } = await supabase
+    refetch: fetchAnalyses,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ["analyses", filters],
+    queryFn: async ({ pageParam = 0 }) => {
+      let query = supabase
         .from("expense_analyses")
         .select("*, expense_categories(*)")
         .order("created_at", { ascending: false });
 
+      if (filters?.buildingName && filters.buildingName !== "all") {
+        query = query.eq("building_name", filters.buildingName);
+      }
+
+      const { data, error } = await query.range(pageParam, pageParam + PAGE_SIZE - 1);
+
       if (error) throw error;
       return data as Analysis[];
     },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage.length === PAGE_SIZE ? allPages.length * PAGE_SIZE : undefined;
+    },
+    initialPageParam: 0,
+  });
+
+  const analyses = infiniteAnalyses?.pages.flat() || [];
+
+  // Query for unique buildings
+  const { data: buildings = [] } = useQuery({
+    queryKey: ["user-buildings"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("expense_analyses")
+        .select("building_name")
+        .not("building_name", "is", null);
+
+      if (error) throw error;
+      const unique = [...new Set(data.map(d => d.building_name))];
+      return unique.sort() as string[];
+    }
   });
 
   // Categories query (needs a specific ID, so we might keep it dynamic or use a placeholder)
@@ -188,9 +223,13 @@ export function useAnalysis() {
 
   return {
     analyses,
+    buildings,
+    hasNextPage,
+    isFetchingNextPage,
     loading: loadingAnalyses || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
     error: errorAnalyses ? (errorAnalyses as Error).message : null,
     fetchAnalyses: async () => { await fetchAnalyses(); },
+    fetchNextPage: () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); },
     createAnalysis: createMutation.mutateAsync,
     updateAnalysis: (id: string, data: Partial<Analysis>) => updateMutation.mutateAsync({ id, data }),
     deleteAnalysis: deleteMutation.mutateAsync,

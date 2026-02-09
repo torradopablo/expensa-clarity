@@ -78,32 +78,25 @@ interface MeetingSummary {
 
 const PrepararReunion = () => {
     const navigate = useNavigate();
-    const { analyses, loading } = useAnalysis();
-
     const [selectedBuilding, setSelectedBuilding] = useState<string>("");
+    const {
+        analyses,
+        buildings,
+        loading,
+        hasNextPage,
+        fetchNextPage,
+        isFetchingNextPage
+    } = useAnalysis({ buildingName: selectedBuilding });
     const [selectedAnalyses, setSelectedAnalyses] = useState<string[]>([]);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isExporting, setIsExporting] = useState(false);
     const [summary, setSummary] = useState<MeetingSummary | null>(null);
     const [activeItems, setActiveItems] = useState<Set<string>>(new Set());
 
-    // Get unique buildings
-    const buildings = useMemo(() => {
-        const completedAnalyses = analyses.filter(a => a.status === "completed");
-        const unique = [...new Set(completedAnalyses.map(a => a.building_name).filter(Boolean))];
-        return unique.sort();
-    }, [analyses]);
-
-    // Get analyses for selected building
+    // Filter analyses for the selected building (done mostly by server now, but we keep it safe)
     const buildingAnalyses = useMemo(() => {
         if (!selectedBuilding) return [];
-        return analyses
-            .filter(a => a.building_name === selectedBuilding && a.status === "completed")
-            .sort((a, b) => {
-                const dateA = a.period_date ? new Date(a.period_date).getTime() : new Date(a.created_at).getTime();
-                const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
-                return dateB - dateA;
-            });
+        return analyses.filter(a => a.building_name === selectedBuilding && a.status === "completed");
     }, [selectedBuilding, analyses]);
 
     const toggleAnalysis = (id: string) => {
@@ -341,6 +334,34 @@ const PrepararReunion = () => {
                                                 </div>
                                             ))}
                                         </div>
+
+                                        {/* Load More Periods */}
+                                        {hasNextPage && (
+                                            <div className="mt-8 text-center">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    onClick={fetchNextPage}
+                                                    disabled={isFetchingNextPage}
+                                                    className="rounded-full px-8 text-muted-foreground hover:text-primary hover:bg-primary/5 font-bold"
+                                                >
+                                                    {isFetchingNextPage ? (
+                                                        <>
+                                                            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                                            Cargando más períodos...
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <Plus className="w-4 h-4 mr-2" />
+                                                            Cargar más períodos
+                                                        </>
+                                                    )}
+                                                </Button>
+                                                <p className="text-[10px] text-muted-foreground mt-2 italic">
+                                                    Si no encontrás el período que buscás, podés cargar análisis anteriores.
+                                                </p>
+                                            </div>
+                                        )}
 
                                         <Button
                                             onClick={handleGenerate}

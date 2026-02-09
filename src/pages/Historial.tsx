@@ -40,7 +40,8 @@ import {
   Search,
   User,
   Building,
-  Users
+  Users,
+  Loader2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,7 +121,6 @@ const calculateChange = (current: number, previous: number | null) => {
 
 const Historial = () => {
   const navigate = useNavigate();
-  const { analyses, loading, deleteAnalysis } = useAnalysis();
 
   // Selection states for comparison
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -134,6 +134,16 @@ const Historial = () => {
   // Filter states
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [buildingFilter, setBuildingFilter] = useState<string>("all");
+
+  const {
+    analyses,
+    buildings,
+    loading,
+    deleteAnalysis,
+    hasNextPage,
+    fetchNextPage,
+    isFetchingNextPage
+  } = useAnalysis({ buildingName: buildingFilter });
 
   const handleDeleteClick = (analysis: Analysis, e: React.MouseEvent) => {
     e.preventDefault();
@@ -213,12 +223,6 @@ const Historial = () => {
     setSelectedIds(new Set());
   };
 
-  // Get unique buildings and periods for filter options
-  const buildings = useMemo(() => {
-    const completedAnalyses = analyses.filter(a => a.status === "completed");
-    const unique = [...new Set(completedAnalyses.map(a => a.building_name).filter(Boolean))];
-    return unique.sort();
-  }, [analyses]);
 
 
   // Filter and sort analyses by period (newest first)
@@ -236,7 +240,7 @@ const Historial = () => {
         }
       }
 
-      // Building filter
+      // Building filter (now mostly done by server, but we keep the logic consistent)
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
@@ -533,6 +537,31 @@ const Historial = () => {
                   </Link>
                 );
               })}
+            </div>
+          )}
+
+          {/* Load More Button */}
+          {hasNextPage && (
+            <div className="mt-12 text-center animate-fade-in">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={fetchNextPage}
+                disabled={isFetchingNextPage}
+                className="rounded-full px-12 border-primary/20 hover:bg-primary/5 font-bold h-14 min-w-[200px]"
+              >
+                {isFetchingNextPage ? (
+                  <>
+                    <Loader2 className="w-5 h-5 mr-3 animate-spin" />
+                    Cargando...
+                  </>
+                ) : (
+                  <>
+                    Ver más análisis
+                    <Plus className="w-5 h-5 ml-3" />
+                  </>
+                )}
+              </Button>
             </div>
           )}
 
