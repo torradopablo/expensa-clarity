@@ -271,6 +271,7 @@
     background-color: #eff6ff !important;
   }
 }
+
 @media print {
   .print\:hidden {
     display: none !important;
@@ -287,8 +288,8 @@
     margin: 0 !important;
   }
 
-  .bg-card, 
-  .bg-card\/40, 
+  .bg-card,
+  .bg-card\/40,
   .bg-muted\/10,
   .backdrop-blur-xl {
     background-color: white !important;
@@ -302,7 +303,12 @@
     color: #334155 !important;
   }
 
-  h1, h2, h3, h4, p, span {
+  h1,
+  h2,
+  h3,
+  h4,
+  p,
+  span {
     color: black !important;
     text-shadow: none !important;
   }
@@ -313,42 +319,54 @@
 }
 
 /* REFUERZO DE CONTRASTE PARA PDF - PREPARAR REUNION */
+.pdf-export-container {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+}
+
 .pdf-export-container .pdf-item-active {
   background-color: #ffffff !important;
-  border: 2px solid #e2e8f0 !important;
-  color: #0f172a !important;
+  border: 1.5px solid #000000 !important;
+  color: #000000 !important;
   opacity: 1 !important;
   transform: none !important;
   box-shadow: none !important;
+  margin-bottom: 20px !important;
+  border-radius: 12px !important;
 }
 
-.pdf-export-container .pdf-item-hidden {
+.pdf-export-container .pdf-item-hidden,
+.pdf-export-container .item-inactive {
   display: none !important;
 }
 
-.pdf-export-container .badge,
-.pdf-export-container [class*="Badge"] {
-  background-color: #f1f5f9 !important;
-  color: #0f172a !important;
-  border: 1px solid #cbd5e1 !important;
-  text-transform: uppercase !important;
-  font-weight: 800 !important;
+.pdf-export-container [class*="bg-primary"],
+.pdf-export-container [class*="bg-secondary"],
+.pdf-export-container .backdrop-blur-xl {
+  background-color: #ffffff !important;
+  backdrop-filter: none !important;
+  background-image: none !important;
 }
 
-.pdf-export-container h2, 
-.pdf-export-container h3, 
-.pdf-export-container p {
+.pdf-export-container h2,
+.pdf-export-container h3,
+.pdf-export-container p,
+.pdf-export-container span {
   color: #000000 !important;
-  font-weight: 600 !important;
+  opacity: 1 !important;
+  text-shadow: none !important;
 }
 
 .pdf-export-container .text-muted-foreground {
-  color: #475569 !important; /* Gris oscuro para legibilidad */
+  color: #1a1a1a !important;
+  /* Casi negro para legibilidad máxima */
 }
 
 /* Ocultar botones y elementos de UI en el PDF */
 .pdf-export-container .print\:hidden,
 .pdf-export-container button,
-.pdf-export-container .flex.items-center.gap-3.print\:hidden {
+.pdf-export-container .flex.items-center.gap-3.print\:hidden,
+.pdf-export-container input[type="checkbox"],
+.pdf-export-container .w-12.sm\:w-16.flex.items-center {
   display: none !important;
 }
