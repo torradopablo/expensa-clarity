@@ -39,7 +39,8 @@ import {
   LineChart,
   Search,
   User,
-  Building
+  Building,
+  Users
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,6 +68,12 @@ const Header = () => {
           </span>
         </Link>
         <div className="flex items-center gap-4">
+          <Button asChild variant="ghost" className="hidden lg:flex rounded-full px-6 hover:bg-accent font-semibold" size="sm">
+            <Link to="/preparar-reunion">
+              <Users className="w-4 h-4 mr-2" />
+              Reuniones
+            </Link>
+          </Button>
           <Button asChild variant="ghost" className="hidden sm:flex rounded-full px-6 hover:bg-accent font-semibold" size="sm">
             <Link to="/analizar">
               <Plus className="w-4 h-4 mr-2" />

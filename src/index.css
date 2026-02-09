@@ -271,3 +271,84 @@
     background-color: #eff6ff !important;
   }
 }
+@media print {
+  .print\:hidden {
+    display: none !important;
+  }
+
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  #meeting-temario-content {
+    background-color: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .bg-card, 
+  .bg-card\/40, 
+  .bg-muted\/10,
+  .backdrop-blur-xl {
+    background-color: white !important;
+    backdrop-filter: none !important;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    opacity: 1 !important;
+  }
+
+  .text-muted-foreground {
+    color: #334155 !important;
+  }
+
+  h1, h2, h3, h4, p, span {
+    color: black !important;
+    text-shadow: none !important;
+  }
+
+  .item-inactive {
+    display: none !important;
+  }
+}
+
+/* REFUERZO DE CONTRASTE PARA PDF - PREPARAR REUNION */
+.pdf-export-container .pdf-item-active {
+  background-color: #ffffff !important;
+  border: 2px solid #e2e8f0 !important;
+  color: #0f172a !important;
+  opacity: 1 !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.pdf-export-container .pdf-item-hidden {
+  display: none !important;
+}
+
+.pdf-export-container .badge,
+.pdf-export-container [class*="Badge"] {
+  background-color: #f1f5f9 !important;
+  color: #0f172a !important;
+  border: 1px solid #cbd5e1 !important;
+  text-transform: uppercase !important;
+  font-weight: 800 !important;
+}
+
+.pdf-export-container h2, 
+.pdf-export-container h3, 
+.pdf-export-container p {
+  color: #000000 !important;
+  font-weight: 600 !important;
+}
+
+.pdf-export-container .text-muted-foreground {
+  color: #475569 !important; /* Gris oscuro para legibilidad */
+}
+
+/* Ocultar botones y elementos de UI en el PDF */
+.pdf-export-container .print\:hidden,
+.pdf-export-container button,
+.pdf-export-container .flex.items-center.gap-3.print\:hidden {
+  display: none !important;
+}

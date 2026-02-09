@@ -12,6 +12,7 @@ import { Logo } from "@/components/layout/ui/logo";
 const Auth = () => {
   const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
+  const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
@@ -65,6 +66,31 @@ const Auth = () => {
     }
   };
 
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.email) {
+      toast.error("Por favor, ingresá tu email");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(formData.email, {
+        redirectTo: `${window.location.origin}/update-password`,
+      });
+
+      if (error) throw error;
+
+      toast.success("Se envió un link de recuperación a tu email");
+      setIsForgotPassword(false);
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      toast.error(error.message || "Error al enviar el link de recuperación");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData((prev) => ({
       ...prev,
@@ -87,99 +113,156 @@ const Auth = () => {
             <span className="text-3xl font-black tracking-tighter text-foreground">ExpensaCheck</span>
           </Link>
           <h1 className="text-4xl font-black tracking-tight mb-3">
-            {isLogin ? "Bienvenido" : "Unite a nosotros"}
+            {isForgotPassword ? "Recuperar cuenta" : isLogin ? "Bienvenido" : "Unite a nosotros"}
           </h1>
           <p className="text-lg text-muted-foreground font-medium">
-            {isLogin
-              ? "Accedé a tus análisis inteligentes"
-              : "Empezá a optimizar tus gastos hoy mismo"}
+            {isForgotPassword
+              ? "Ingresá tu email para restablecer tu contraseña"
+              : isLogin
+                ? "Accedé a tus análisis inteligentes"
+                : "Empezá a optimizar tus gastos hoy mismo"}
           </p>
         </div>
 
         <Card className="bg-card/40 backdrop-blur-xl border-border/50 shadow-2xl rounded-[2.5rem] overflow-hidden">
           <CardContent className="p-8 md:p-10">
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {!isLogin && (
+            {isForgotPassword ? (
+              <form onSubmit={handleResetPassword} className="space-y-6">
                 <div className="space-y-2">
-                  <Label htmlFor="fullName" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre completo</Label>
+                  <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Tu email de registro</Label>
                   <div className="relative group">
-                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
                     <Input
-                      id="fullName"
-                      name="fullName"
-                      type="text"
-                      placeholder="Tu nombre"
-                      value={formData.fullName}
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={formData.email}
                       onChange={handleInputChange}
                       className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
-                      required={!isLogin}
+                      required
                     />
                   </div>
                 </div>
-              )}
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Email corporativo o personal</Label>
-                <div className="relative group">
-                  <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="tu@email.com"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
-                    required
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between px-1">
-                  <Label htmlFor="password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Contraseña</Label>
-                  {isLogin && (
-                    <button type="button" className="text-xs font-bold text-primary hover:underline">
-                      ¿Olvidaste tu contraseña?
-                    </button>
+                <Button
+                  type="submit"
+                  variant="hero"
+                  size="xl"
+                  className="w-full rounded-2xl shadow-xl shadow-primary/20 h-14 text-lg font-black"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      Enviar link de recuperación
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
                   )}
-                </div>
-                <div className="relative group">
-                  <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
-                    required
-                    minLength={6}
-                  />
-                </div>
-              </div>
+                </Button>
 
-              <Button
-                type="submit"
-                variant="hero"
-                size="xl"
-                className="w-full rounded-2xl shadow-xl shadow-primary/20 h-14 text-lg font-black"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                    Procesando...
-                  </>
-                ) : (
-                  <>
-                    {isLogin ? "Iniciar sesión" : "Crear cuenta"}
-                    <ArrowRight className="w-5 h-5 ml-2" />
-                  </>
+                <div className="text-center">
+                  <button
+                    type="button"
+                    onClick={() => setIsForgotPassword(false)}
+                    className="text-sm font-bold text-muted-foreground hover:text-primary transition-colors"
+                  >
+                    Volver al inicio de sesión
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {!isLogin && (
+                  <div className="space-y-2">
+                    <Label htmlFor="fullName" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Nombre completo</Label>
+                    <div className="relative group">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input
+                        id="fullName"
+                        name="fullName"
+                        type="text"
+                        placeholder="Tu nombre"
+                        value={formData.fullName}
+                        onChange={handleInputChange}
+                        className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
+                        required={!isLogin}
+                      />
+                    </div>
+                  </div>
                 )}
-              </Button>
-            </form>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Email corporativo o personal</Label>
+                  <div className="relative group">
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="email"
+                      name="email"
+                      type="email"
+                      placeholder="tu@email.com"
+                      value={formData.email}
+                      onChange={handleInputChange}
+                      className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1">
+                    <Label htmlFor="password" className="text-xs font-black uppercase tracking-widest text-muted-foreground">Contraseña</Label>
+                    {isLogin && (
+                      <button
+                        type="button"
+                        onClick={() => setIsForgotPassword(true)}
+                        className="text-xs font-bold text-primary hover:underline"
+                      >
+                        ¿Olvidaste tu contraseña?
+                      </button>
+                    )}
+                  </div>
+                  <div className="relative group">
+                    <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                    <Input
+                      id="password"
+                      name="password"
+                      type="password"
+                      placeholder="••••••••"
+                      value={formData.password}
+                      onChange={handleInputChange}
+                      className="pl-12 h-14 bg-background/50 border-border/50 rounded-2xl focus:ring-primary/20 text-base"
+                      required
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+
+                <Button
+                  type="submit"
+                  variant="hero"
+                  size="xl"
+                  className="w-full rounded-2xl shadow-xl shadow-primary/20 h-14 text-lg font-black"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      {isLogin ? "Iniciar sesión" : "Crear cuenta"}
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </form>
+            )}
 
             <div className="mt-8 pt-8 border-t border-border/50 text-center">
               <p className="text-base text-muted-foreground font-medium">

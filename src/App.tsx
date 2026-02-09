@@ -17,6 +17,8 @@ import Privacidad from "./pages/Privacidad";
 import Contacto from "./pages/Contacto";
 import SharedAnalysis from "./pages/SharedAnalysis";
 import Perfil from "./pages/Perfil";
+import UpdatePassword from "./pages/UpdatePassword";
+import PrepararReunion from "./pages/PrepararReunion";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +50,8 @@ const App = () => (
           <Route path="/contacto" element={<Contacto />} />
           <Route path="/compartido/:token" element={<SharedAnalysis />} />
           <Route path="/perfil" element={<Perfil />} />
+          <Route path="/update-password" element={<UpdatePassword />} />
+          <Route path="/preparar-reunion" element={<PrepararReunion />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

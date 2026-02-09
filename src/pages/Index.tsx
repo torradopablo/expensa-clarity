@@ -62,9 +62,14 @@ const Header = () => {
             Precios
           </a>
           {session && (
-            <Link to="/historial" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-              Mi historial
-            </Link>
+            <>
+              <Link to="/historial" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+                Mi historial
+              </Link>
+              <Link to="/preparar-reunion" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+                Preparar Reunión
+              </Link>
+            </>
           )}
         </nav>
 
@@ -130,6 +135,13 @@ const Header = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Mi historial
+                </Link>
+                <Link
+                  to="/preparar-reunion"
+                  className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Preparar Reunión
                 </Link>
                 <Link
                   to="/perfil"
@@ -446,30 +458,39 @@ const UseCasesSection = () => {
 const PricingSection = () => (
   <section id="precios" className="py-32 relative overflow-hidden">
     {/* Background Glow */}
-    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-primary/5 blur-[120px] rounded-full -z-10"></div>
+    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-primary/5 blur-[120px] rounded-full -z-10"></div>
 
     <div className="container">
-      <div className="max-w-2xl mx-auto">
-        <div className="bg-card/40 backdrop-blur-xl rounded-[3rem] p-10 md:p-16 border border-primary/20 shadow-2xl animate-scale-in relative overflow-hidden">
-          {/* Decorative Corner */}
+      <div className="text-center space-y-6 mb-20 animate-fade-in">
+        <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Planes a tu medida</h2>
+        <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
+          Elegí la opción que mejor se adapte a tus necesidades. Transparencia total desde el primer momento.
+        </p>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
+        {/* Individual Card */}
+        <div className="bg-card/40 backdrop-blur-xl rounded-[3rem] p-10 border border-primary/20 shadow-2xl animate-fade-in-up relative overflow-hidden flex flex-col h-full">
           <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -z-10"></div>
 
-          <div className="text-center">
-            <div className="inline-flex items-center gap-2 px-6 py-2 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-bold mb-10 shadow-sm uppercase tracking-widest">
-              Pricing transparente
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-xs font-bold mb-8 shadow-sm uppercase tracking-widest">
+              Uso Individual
             </div>
 
-            <div className="bg-gradient-hero text-primary-foreground rounded-3xl p-6 mb-12 shadow-xl shadow-primary/20">
-              <p className="text-lg font-bold mb-1">🎁 Primer análisis BONIFICADO</p>
-              <p className="text-sm opacity-90 font-medium">Probá la potencia de ExpensaCheck sin costo</p>
+            <div className="mb-8">
+              <span className="text-6xl font-black text-foreground">$1.500</span>
+              <span className="text-muted-foreground text-lg ml-2">/ análisis</span>
             </div>
 
-            <div className="mb-12">
-              <span className="text-7xl font-black text-foreground">$1.500</span>
-              <span className="text-muted-foreground text-xl ml-3">ARS / análisis</span>
+            <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 mb-10">
+              <p className="text-sm font-bold text-primary flex items-center gap-2">
+                <span className="text-lg">🎁</span>
+                ¡Primer análisis BONIFICADO!
+              </p>
             </div>
 
-            <ul className="space-y-6 text-left mb-12 border-y border-border/50 py-10">
+            <ul className="space-y-4 mb-10">
               {[
                 "Comparativa con Red de Edificios",
                 "Monitoreo de Impacto Inflacionario",
@@ -477,29 +498,80 @@ const PricingSection = () => (
                 "Reporte Profesional Exportable",
                 "Dashboard Histórico de Evolución"
               ].map((feature, index) => (
-                <li key={index} className="flex items-center gap-4">
-                  <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 border border-primary/20">
-                    <CheckCircle2 className="w-4 h-4 text-primary" />
+                <li key={index} className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-primary" />
                   </div>
-                  <span className="text-muted-foreground font-medium text-lg">{feature}</span>
+                  <span className="text-muted-foreground font-medium">{feature}</span>
                 </li>
               ))}
             </ul>
+          </div>
 
-            <Button asChild variant="hero" size="xl" className="w-full rounded-[1.5rem] py-8 text-xl font-bold shadow-2xl shadow-primary/25 hover:scale-[1.02] transition-transform">
-              <Link to="/analizar">
-                Empezar Análisis
-                <ArrowRight className="w-6 h-6 ml-3" />
-              </Link>
-            </Button>
+          <Button asChild variant="hero" size="xl" className="w-full rounded-2xl py-7 text-lg font-bold shadow-xl shadow-primary/25 hover:scale-[1.02] transition-transform mt-auto">
+            <Link to="/analizar">
+              Empezar Análisis
+              <ArrowRight className="w-5 h-5 ml-2" />
+            </Link>
+          </Button>
 
-            <div className="flex items-center justify-center gap-3 mt-8">
-              <Shield className="w-4 h-4 text-muted-foreground" />
-              <p className="text-sm text-muted-foreground font-medium">
-                Procesado por Mercado Pago
+          <div className="flex items-center justify-center gap-2 mt-6">
+            <Shield className="w-3.5 h-3.5 text-muted-foreground" />
+            <p className="text-xs text-muted-foreground font-medium">
+              Pago seguro vía Mercado Pago
+            </p>
+          </div>
+        </div>
+
+        {/* Administrators Card */}
+        <div className="bg-card/40 backdrop-blur-xl rounded-[3rem] p-10 border border-border/50 shadow-2xl animate-fade-in-up relative overflow-hidden flex flex-col h-full border-dashed" style={{ animationDelay: "0.2s" }}>
+          <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/5 blur-3xl -z-10"></div>
+
+          <div className="flex-1">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-secondary/10 border border-secondary/20 text-secondary text-xs font-bold mb-8 shadow-sm uppercase tracking-widest">
+              Administradores
+            </div>
+
+            <div className="mb-8">
+              <span className="text-5xl font-black text-foreground">Custom</span>
+              <p className="text-muted-foreground mt-2 font-medium">Planes por volumen de edificios</p>
+            </div>
+
+            <div className="bg-secondary/5 border border-secondary/10 rounded-2xl p-4 mb-10">
+              <p className="text-sm font-bold text-secondary flex items-center gap-2">
+                <Building2 className="w-5 h-5" />
+                Soporte para múltiples consorcios
               </p>
             </div>
+
+            <ul className="space-y-4 mb-10">
+              {[
+                "Membresías Mensuales Flexibles",
+                "Panel Multi-Consorcio Centralizado",
+                "Facturación A/B Automatizada",
+                "Reportes de Analisis de Gestión",
+                "Soporte Prioritario Dedicado"
+              ].map((feature, index) => (
+                <li key={index} className="flex items-center gap-3">
+                  <div className="w-5 h-5 rounded-full bg-secondary/10 flex items-center justify-center flex-shrink-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-secondary" />
+                  </div>
+                  <span className="text-muted-foreground font-medium">{feature}</span>
+                </li>
+              ))}
+            </ul>
           </div>
+
+          <Button asChild variant="outline" size="xl" className="w-full rounded-2xl py-7 text-lg font-bold border-secondary/50 text-secondary hover:bg-secondary/10 transition-all mt-auto">
+            <Link to="/contacto">
+              Contactar al equipo
+              <Briefcase className="w-5 h-5 ml-2" />
+            </Link>
+          </Button>
+
+          <p className="text-center text-xs text-muted-foreground mt-6 font-medium">
+            Atención personalizada para grandes volúmenes
+          </p>
         </div>
       </div>
     </div>
