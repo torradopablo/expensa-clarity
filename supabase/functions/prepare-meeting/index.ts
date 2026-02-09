@@ -1,0 +1,151 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { corsHeaders } from "../_shared/config/cors.ts";
+import { createSupabaseClient, createServiceClient } from "../_shared/config/supabase.ts";
+import { AnalysisRepository } from "../_shared/services/database/AnalysisRepository.ts";
+import { MeetingPrepService } from "../_shared/services/analysis/MeetingPrepService.ts";
+import { AuthenticationError, ValidationError, AppError } from "../_shared/utils/error.utils.ts";
+
+// Version: 1.0.3
+serve(async (req) => {
+    // Handle CORS preflight
+    if (req.method === "OPTIONS") {
+        return new Response("ok", { headers: corsHeaders });
+    }
+
+    try {
+
+        console.log(`[prepare-meeting] Request received. Method: ${req.method}`);
+        const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
+
+        if (!authHeader) {
+            console.error("[prepare-meeting] CRITICAL: Missing Authorization header");
+            throw new AuthenticationError("No se proporcionó token de sesión (Header missing)");
+        }
+
+        const body = await req.json().catch((e: Error) => {
+            console.error("[prepare-meeting] Error parsing body:", e);
+            return {};
+        });
+        const { analysis_ids, building_name } = body;
+
+        if (!analysis_ids || !Array.isArray(analysis_ids) || analysis_ids.length === 0) {
+            throw new ValidationError("Se requiere una lista de IDs de análisis");
+        }
+
+        console.log(`[prepare-meeting] Verifying token for ${analysis_ids.length} analyses...`);
+
+        // Use SERVICE ROLE for verification (more reliable in Edge Functions)
+        const supabaseService = createServiceClient();
+        const token = authHeader.replace(/^[Bb]earer\s+/i, "");
+
+        const { data: { user }, error: userError } = await supabaseService.auth.getUser(token);
+
+        if (userError) {
+            console.error("[prepare-meeting] Auth verification failed:", userError.message);
+            throw new AuthenticationError(`Token inválido o expirado: ${userError.message}`);
+        }
+        if (!user) {
+            console.error("[prepare-meeting] No user found for this token");
+            throw new AuthenticationError("Usuario no encontrado");
+        }
+
+        console.log(`[prepare-meeting] User authenticated: ${user.id}. Fetching data...`);
+
+        // Use the USER's own token for database operations to respect RLS
+        const analysisRepo = new AnalysisRepository(authHeader);
+        const supabase = createSupabaseClient(authHeader);
+        const meetingService = new MeetingPrepService();
+
+        // 1. Fetch Analyses and Categories
+        console.log(`[prepare-meeting] Fetching data for ${analysis_ids.length} analyses...`);
+        const analysesData = await Promise.all(
+            analysis_ids.map(async (id) => {
+                const [analysisRes, categoriesRes] = await Promise.all([
+                    analysisRepo.getAnalysis(id),
+                    analysisRepo.getCategories(id)
+                ]);
+
+                if (analysisRes.error || !analysisRes.data) {
+                    console.error(`Error fetching analysis ${id}:`, analysisRes.error || 'No data found (RLS?)');
+                    return null;
+                }
+
+                return {
+                    ...analysisRes.data,
+                    categories: categoriesRes.data || [],
+                    owner_notes: analysisRes.data.owner_notes || ""
+                };
+            })
+        );
+
+        const validAnalyses = analysesData.filter(Boolean);
+        if (validAnalyses.length === 0) {
+            throw new ValidationError("No se encontraron análisis válidos en la base de datos");
+        }
+
+        // 2. Fetch Comments for these analyses
+        const { data: allComments, error: commentsError } = await supabase
+            .from("analysis_comments")
+            .select("*")
+            .in("analysis_id", analysis_ids)
+            .order("created_at", { ascending: false });
+
+        if (commentsError) {
+            console.error("[prepare-meeting] Error fetching comments:", commentsError);
+        }
+
+        const commentsByType = {
+            owner: allComments?.filter(c => c.is_owner_comment) || [],
+            shared: allComments?.filter(c => !c.is_owner_comment) || []
+        };
+
+        // 3. Map periods to shared comments for context
+        const analysisMap = new Map(validAnalyses.map(a => [a.id, a.period]));
+        commentsByType.shared = commentsByType.shared.map(c => ({
+            ...c,
+            period: analysisMap.get(c.analysis_id) || "General"
+        }));
+
+        // 4. Generate Summary using AI
+        const finalBuildingName = building_name || (validAnalyses[0] && validAnalyses[0].building_name) || "Consorcio";
+
+        console.log(`[prepare-meeting] Requesting AI summary for ${finalBuildingName} using OpenAI`);
+
+        const summary = await meetingService.generateMeetingChecklist({
+            buildingName: finalBuildingName,
+            analyses: validAnalyses,
+            commentsByType
+        });
+
+        return new Response(
+            JSON.stringify(summary),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+
+    } catch (error: any) {
+        console.error("Prepare meeting error:", error);
+
+        let status = 500;
+        let message = "Error interno del servidor";
+        let code = "SERVER_ERROR";
+
+        if (error instanceof AppError) {
+            status = error.statusCode;
+            message = error.message;
+            code = error instanceof AuthenticationError ? "UNAUTHORIZED" : "BAD_REQUEST";
+        } else if (error.message?.includes("token") || error.message?.includes("session") || error.message?.includes("unauthorized")) {
+            status = 401;
+            message = error.message;
+            code = "UNAUTHORIZED";
+        }
+
+        return new Response(
+            JSON.stringify({
+                error: message,
+                code: code,
+                details: error instanceof Error ? error.message : String(error)
+            }),
+            { status, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+    }
+});

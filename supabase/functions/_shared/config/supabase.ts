@@ -5,7 +5,7 @@ export function createSupabaseClient(authHeader?: string) {
   const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
-  if (authHeader?.startsWith("Bearer ")) {
+  if (authHeader?.trim().toLowerCase().startsWith("bearer ")) {
     return createClient(
       supabaseUrl,
       supabaseAnonKey,
@@ -19,6 +19,6 @@ export function createSupabaseClient(authHeader?: string) {
 export function createServiceClient() {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  
+
   return createClient(supabaseUrl, supabaseServiceKey);
 }

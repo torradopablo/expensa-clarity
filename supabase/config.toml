@@ -1,4 +1,4 @@
-project_id = "hbqjmbqhupuenqqctsbr"
+project_id = "behkapaytnvegjebaaac"
 
 [functions.process-expense]
 verify_jwt = false
@@ -31,4 +31,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.cache-maintenance]
+verify_jwt = false
+
+[functions.prepare-meeting]
 verify_jwt = false
