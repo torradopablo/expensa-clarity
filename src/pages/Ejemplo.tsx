@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -24,7 +24,13 @@ import {
   ArrowRight,
   History,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Send,
+  FileSearch,
+  LayoutList,
+  ArrowRightCircle,
+  Clock,
+  Globe
 } from "lucide-react";
 import {
   AreaChart,
@@ -139,12 +145,12 @@ const mockHistoricalData = [
 ];
 
 const mockEvolutionData = [
-  { period: "Julio", userPercent: 0, inflationPercent: 0, buildingsPercent: 0 },
-  { period: "Agosto", userPercent: 8.5, inflationPercent: 4.2, buildingsPercent: 5.1 },
-  { period: "Septiembre", userPercent: 12.1, inflationPercent: 7.8, buildingsPercent: 9.4 },
-  { period: "Octubre", userPercent: 19.4, inflationPercent: 11.5, buildingsPercent: 14.2 },
-  { period: "Noviembre", userPercent: 25.8, inflationPercent: 16.2, buildingsPercent: 18.7 },
-  { period: "Diciembre", userPercent: 42.6, inflationPercent: 21.4, buildingsPercent: 24.8 },
+  { period: "Julio", userPercent: 0, inflationPercent: 0, buildingsPercent: 0, inflationEstimated: false },
+  { period: "Agosto", userPercent: 8.5, inflationPercent: 4.2, buildingsPercent: 5.1, inflationEstimated: false },
+  { period: "Septiembre", userPercent: 12.1, inflationPercent: 7.8, buildingsPercent: 9.4, inflationEstimated: false },
+  { period: "Octubre", userPercent: 19.4, inflationPercent: 11.5, buildingsPercent: 14.2, inflationEstimated: false },
+  { period: "Noviembre", userPercent: 25.8, inflationPercent: 16.2, buildingsPercent: 18.7, inflationEstimated: false },
+  { period: "Diciembre", userPercent: 42.6, inflationPercent: 21.4, buildingsPercent: 24.8, inflationEstimated: false },
 ];
 
 const mockDeviation = {
@@ -160,6 +166,50 @@ const mockComparisonData = expenseData.categories.map(c => ({
   diff: c.current - c.previous,
   changePercent: ((c.current - c.previous) / c.previous) * 100
 })).sort((a, b) => b.rightAmount - a.rightAmount);
+
+const mockMeetingAgenda = [
+  {
+    id: "1",
+    importance: "high",
+    category: "Administración",
+    title: "Revisión de honorarios vs Mercado",
+    description: "Se detectó que el aumento del 57.5% sitúa los honorarios significativamente por encima del promedio regional para edificios de similar categoría.",
+    source: "Comparativa de Mercado"
+  },
+  {
+    id: "2",
+    importance: "medium",
+    category: "Servicios",
+    title: "Plan de eficiencia energética",
+    description: "Debido al incremento del 56% en la tarifa eléctrica, se propone evaluar el cambio a luminarias LED en áreas comunes y sensores de movimiento.",
+    source: "Análisis de Evolución"
+  },
+  {
+    id: "3",
+    importance: "low",
+    category: "Mantenimiento",
+    title: "Seguimiento reparación portón",
+    description: "Verificar garantía de la reparación realizada este mes para evitar cargos duplicados en períodos futuros.",
+    source: "Detalle de Gastos"
+  }
+];
+
+const mockComments = [
+  {
+    author: "Ricardo G.",
+    role: "Vecino 5° A",
+    comment: "¿Alguien más notó que el cargo de mantenimiento del portón ya figuraba en octubre? Deberíamos consultarlo en la asamblea.",
+    date: "Ayer, 18:45",
+    isOwner: false
+  },
+  {
+    author: "Admin Torres",
+    role: "Administrador",
+    comment: "Buenas tardes Ricardo, estamos revisando el detalle técnico. Si hubo un error en la carga se bonificará en el próximo período. Saludos.",
+    date: "Hoy, 10:20",
+    isOwner: true
+  }
+];
 
 const formatCurrency = (amount: number) => {
   return new Intl.NumberFormat('es-AR', {
@@ -199,11 +249,29 @@ const Ejemplo = () => {
               </Button>
             </div>
 
-            {/* Example badge */}
-            <div className="flex justify-center mb-6">
-              <Badge variant="outline" className="text-sm px-4 py-1.5 bg-muted/50">
-                📋 Este es un ejemplo de análisis
-              </Badge>
+            {/* Pipeline Indicator */}
+            <div className="grid grid-cols-4 gap-2 mb-12">
+              {[
+                { label: "Análisis", icon: FileSearch, active: true },
+                { label: "Evolución", icon: Clock, active: true },
+                { label: "Comparativa", icon: Globe, active: true },
+                { label: "Reunión", icon: LayoutList, active: true },
+              ].map((step, i) => (
+                <div key={i} className="flex flex-col items-center gap-2">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center ${step.active ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "bg-muted text-muted-foreground"}`}>
+                    <step.icon className="w-5 h-5" />
+                  </div>
+                  <span className={`text-[10px] font-bold uppercase tracking-wider ${step.active ? "text-primary" : "text-muted-foreground"}`}>{step.label}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* Step 1 Heading */}
+            <div className="flex items-center gap-3 mb-6 animate-fade-in text-primary">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                <span className="font-bold">1</span>
+              </div>
+              <h2 className="text-xl font-bold uppercase tracking-tight">Análisis Inteligente e Individual</h2>
             </div>
 
             {/* Summary Card */}
@@ -341,14 +409,20 @@ const Ejemplo = () => {
               </div>
             </div>
 
-            {/* Visual Comparison Chart */}
-            <div className="mb-8">
-              <ComparisonChart
-                data={mockComparisonData}
-                leftLabel="Noviembre"
-                rightLabel="Diciembre"
-              />
+            {/* Step 2 Heading */}
+            <div className="flex items-center gap-3 mt-16 mb-8 animate-fade-in text-secondary">
+              <div className="w-8 h-8 rounded-lg bg-secondary/10 flex items-center justify-center">
+                <span className="font-bold">2</span>
+              </div>
+              <h2 className="text-xl font-bold uppercase tracking-tight">Evolución Histórica</h2>
             </div>
+
+            <div className="grid gap-6 mb-8">
+              <p className="text-muted-foreground text-sm leading-relaxed bg-secondary/5 p-4 rounded-2xl border border-secondary/10">
+                <strong className="text-foreground">Mirada a largo plazo:</strong> Entender cómo varían tus expensas en el tiempo es clave. No solo mostramos tu histórico, sino que lo comparamos con el <strong className="text-foreground">índice de inflación</strong> acumulada para saber si tus aumentos están justificados por el contexto macro.
+              </p>
+            </div>
+
 
             {/* Historical Evolution Chart - Custom mock since we can't use the component directly */}
             <div className="mb-8">
@@ -384,6 +458,28 @@ const Ejemplo = () => {
               </Card>
             </div>
 
+            {/* Step 3 Heading */}
+            <div className="flex items-center gap-3 mt-16 mb-8 animate-fade-in text-primary">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center">
+                <span className="font-bold">3</span>
+              </div>
+              <h2 className="text-xl font-bold uppercase tracking-tight">Comparativa de Mercado</h2>
+            </div>
+
+            <div className="grid gap-6 mb-8">
+              <p className="text-muted-foreground text-sm leading-relaxed bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                <strong className="text-foreground">¿Estás pagando de más?</strong> Comparamos tus costos contra una <strong className="text-foreground">red de edificios similares</strong> en tu zona. Gracias a nuestra base de datos, podemos decirte con precisión si un rubro (como administración o limpieza) está fuera de mercado.
+              </p>
+            </div>
+            {/* Visual Comparison Chart */}
+            <div className="mb-8">
+              <ComparisonChart
+                data={mockComparisonData}
+                leftLabel="Noviembre"
+                rightLabel="Diciembre"
+              />
+            </div>
+
             {/* Evolution Comparison Chart */}
             <div className="mb-8">
               <EvolutionComparisonChart
@@ -394,20 +490,109 @@ const Ejemplo = () => {
               />
             </div>
 
-            {/* Personal Notes */}
+            {/* Step 4 Heading */}
+            <div className="flex items-center gap-3 mt-16 mb-8 animate-fade-in text-secondary">
+              <div className="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/20 flex items-center justify-center">
+                <span className="font-bold">4</span>
+              </div>
+              <h2 className="text-xl font-bold uppercase tracking-tight">Preparación de Reunión (Agenda IA)</h2>
+            </div>
+
+            <div className="grid gap-6 mb-8">
+              <p className="text-muted-foreground text-sm leading-relaxed bg-primary/5 p-4 rounded-2xl border border-primary/10">
+                <strong className="text-foreground">El paso final:</strong> Una vez detectadas las anomalías, nuestra IA genera automáticamente un <strong className="text-foreground">temario para tu próxima asamblea</strong>. Te damos los argumentos basados en datos para que puedas plantear tus dudas con fundamentos sólidos.
+              </p>
+
+              <Card className="rounded-[2rem] border-primary/20 bg-card/40 backdrop-blur-xl shadow-xl overflow-hidden">
+                <CardHeader className="p-6 border-b border-border/50 bg-primary/5">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <LayoutList className="w-5 h-5 text-primary" />
+                      Temario Sugerido para Reunión
+                    </CardTitle>
+                    <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                      Generado por IA
+                    </Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border/50">
+                    {mockMeetingAgenda.map((item) => (
+                      <div key={item.id} className="p-6 hover:bg-muted/30 transition-colors">
+                        <div className="flex items-center gap-3 mb-2">
+                          <Badge className={
+                            item.importance === 'high' ? "bg-status-attention text-white" :
+                              item.importance === 'medium' ? "bg-primary/20 text-primary border-primary/30" :
+                                "bg-muted text-muted-foreground"
+                          }>
+                            {item.importance === 'high' ? 'Crítico' : item.importance === 'medium' ? 'Importante' : 'Sugerencia'}
+                          </Badge>
+                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{item.category}</span>
+                        </div>
+                        <h4 className="font-bold mb-1">{item.title}</h4>
+                        <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
+                        <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-primary/70 uppercase">
+                          <ArrowRightCircle className="w-3 h-3" />
+                          Fuente: {item.source}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Comments Section */}
             <div className="mb-8">
-              <Card variant="soft" className="animate-fade-in-up">
-                <CardContent className="p-5">
-                  <div className="flex items-start gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center flex-shrink-0">
+              <Card variant="glass" className="animate-fade-in-up overflow-hidden rounded-[2rem] border-secondary/20 shadow-xl">
+                <CardHeader className="bg-secondary/5 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-secondary-soft flex items-center justify-center">
                       <MessageSquare className="w-5 h-5 text-secondary" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold mb-3">Notas personales</h3>
-                      <p className="text-sm text-muted-foreground italic">
-                        "Llamar a la administración por el cargo de mantenimiento del portón. Me parece que ya se había pagado en Octubre."
-                      </p>
+                    <div>
+                      <h3 className="text-lg font-bold">Comentarios y Feedback</h3>
+                      <p className="text-sm text-muted-foreground">Conversación entre vecinos y administración</p>
                     </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-border/50">
+                    {mockComments.map((comment, i) => (
+                      <div key={i} className={`p-6 ${comment.isOwner ? 'bg-secondary/5' : ''}`}>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs ${comment.isOwner ? 'bg-secondary text-white' : 'bg-muted text-muted-foreground'}`}>
+                              {comment.author[0]}
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold">{comment.author}</p>
+                              <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{comment.role}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-muted-foreground">{comment.date}</span>
+                        </div>
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {comment.comment}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="p-6 bg-muted/30 border-t border-border/50">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                        <Send className="w-4 h-4 text-muted-foreground" />
+                      </div>
+                      <input
+                        type="text"
+                        disabled
+                        placeholder="Escribí un comentario público..."
+                        className="w-full bg-background border border-border rounded-full py-2.5 pl-10 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 opacity-70 cursor-not-allowed"
+                      />
+                    </div>
+                    <p className="text-[10px] text-muted-foreground mt-3 text-center italic">
+                      Esta es una demostración. En la versión real podés interactuar con otros propietarios.
+                    </p>
                   </div>
                 </CardContent>
               </Card>
