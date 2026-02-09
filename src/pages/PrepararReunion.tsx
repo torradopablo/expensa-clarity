@@ -131,15 +131,24 @@ const PrepararReunion = () => {
                 }
             });
 
-            if (error) throw error;
+            if (error) {
+                if (error.status === 429) {
+                    toast.error("Límite diario alcanzado: podés generar hasta 3 temarios por día.");
+                    return;
+                }
+                throw error;
+            }
 
             setSummary(data);
             // Initialize all items as active
             setActiveItems(new Set(data.items.map((item: MeetingItem) => item.id)));
-            toast.success("Temario generado con éxito");
+            toast.success("Temario estratégico generado con éxito");
         } catch (error: any) {
             console.error("Error generating meeting prep:", error);
-            toast.error("No se pudo generar el temario. Reintentá en unos minutos.");
+            const errorMessage = error.message === "RATE_LIMIT_EXCEEDED"
+                ? "Límite diario alcanzado (3 reuniones por día)."
+                : "No se pudo generar el temario. Reintentá en unos minutos.";
+            toast.error(errorMessage);
         } finally {
             setIsGenerating(false);
         }
@@ -174,11 +183,15 @@ const PrepararReunion = () => {
             if (!element) return;
             // 1. Prepare View for Capture (High Contrast & Hide UI)
             element.classList.add("pdf-export-container");
+            element.classList.add("bg-white"); // Force white background
+
             const originalWidth = element.style.width;
             const originalPadding = element.style.padding;
+            const originalMaxWidth = element.style.maxWidth;
 
-            element.style.width = "1000px"; // Fixed width for consistent capture
-            element.style.padding = "40px";
+            element.style.width = "1000px";
+            element.style.maxWidth = "1000px";
+            element.style.padding = "60px";
 
             // Simple PDF generation
             const canvas = await html2canvas(element, {
@@ -190,7 +203,9 @@ const PrepararReunion = () => {
 
             // Restore View
             element.classList.remove("pdf-export-container");
+            element.classList.remove("bg-white");
             element.style.width = originalWidth;
+            element.style.maxWidth = originalMaxWidth;
             element.style.padding = originalPadding;
 
             const imgData = canvas.toDataURL("image/png");
@@ -382,6 +397,11 @@ const PrepararReunion = () => {
                                                 </>
                                             )}
                                         </Button>
+
+                                        <p className="text-center text-xs text-muted-foreground mt-4 font-medium flex items-center justify-center gap-1.5 opacity-70">
+                                            <AlertCircle className="w-3.5 h-3.5" />
+                                            Límite: 3 temarios estratégicos por día.
+                                        </p>
                                     </CardContent>
                                 </Card>
                             )}
@@ -498,8 +518,8 @@ const PrepararReunion = () => {
                         </div>
                     )}
                 </div>
-            </main>
-        </div>
+            </main >
+        </div >
     );
 };
 

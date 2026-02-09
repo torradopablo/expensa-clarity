@@ -49,12 +49,35 @@ serve(async (req) => {
             throw new AuthenticationError("Usuario no encontrado");
         }
 
-        console.log(`[prepare-meeting] User authenticated: ${user.id}. Fetching data...`);
+        console.log(`[prepare-meeting] User authenticated: ${user.id}. Checking daily limit...`);
 
         // Use the USER's own token for database operations to respect RLS
         const analysisRepo = new AnalysisRepository(authHeader);
         const supabase = createSupabaseClient(authHeader);
         const meetingService = new MeetingPrepService();
+
+        // 0. Check Daily Limit (3 per day)
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const { count, error: countError } = await supabase
+            .from("meeting_preparation_logs")
+            .select("*", { count: "exact", head: true })
+            .eq("user_id", user.id)
+            .gte("created_at", today.toISOString());
+
+        if (countError) {
+            console.error("[prepare-meeting] Error checking daily limit:", countError);
+        } else if (count !== null && count >= 3) {
+            return new Response(
+                JSON.stringify({
+                    error: "Límite diario alcanzado",
+                    code: "RATE_LIMIT_EXCEEDED",
+                    details: "Has alcanzado el límite de 3 temarios generados por día. Por favor, intentá mañana."
+                }),
+                { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+            );
+        }
 
         // 1. Fetch Analyses and Categories
         console.log(`[prepare-meeting] Fetching data for ${analysis_ids.length} analyses...`);
@@ -116,6 +139,18 @@ serve(async (req) => {
             analyses: validAnalyses,
             commentsByType
         });
+
+        // 5. Log the usage
+        try {
+            await supabase
+                .from("meeting_preparation_logs")
+                .insert({
+                    user_id: user.id,
+                    building_name: finalBuildingName
+                });
+        } catch (logError) {
+            console.error("[prepare-meeting] Failed to log usage:", logError);
+        }
 
         return new Response(
             JSON.stringify(summary),

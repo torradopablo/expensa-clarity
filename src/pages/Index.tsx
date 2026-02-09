@@ -611,7 +611,7 @@ const Footer = () => (
       </div>
       <div className="pt-12 border-t border-border flex flex-col md:flex-row items-center justify-between gap-6">
         <p className="text-muted-foreground font-medium">
-          © 2024 ExpensaCheck. Todos los derechos reservados.
+          © 2026 ExpensaCheck. Todos los derechos reservados.
         </p>
         <div className="flex gap-8">
           {/* Social icons could go here */}

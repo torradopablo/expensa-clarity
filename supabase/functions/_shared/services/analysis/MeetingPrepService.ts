@@ -28,41 +28,45 @@ export class MeetingPrepService {
         console.log(`[MeetingPrepService] Processing ${data.buildingName} with ${data.analyses.length} periods.`);
 
         const systemPrompt = `Eres un asistente experto en consorcios y administración de edificios en Argentina. 
-Tu tarea es generar un temario (checklist) de puntos críticos para una reunión de consorcio basado en los datos proporcionados.
-REGLA CRÍTICA: Debes responder EXCLUSIVAMENTE con un objeto JSON válido. No incluyas texto antes o después. 
+Tu tarea es generar un temario (checklist) estratégico y profesional para una reunión de consorcio.
+REGLA CRÍTICA: Debes responder EXCLUSIVAMENTE con un objeto JSON válido. No incluyas texto explicativo antes o después. 
 El JSON debe seguir la estructura solicitada estrictamente.`;
 
-        const prompt = `Generá un temario estructurado para la reunión del consorcio "${data.buildingName}".
-    
-DATOS DE GASTOS Y ALERTAS:
+        const prompt = `Generá un temario estratégico y detallado para la reunión del consorcio "${data.buildingName}". 
+El objetivo es que los propietarios tengan argumentos sólidos y claros para discutir con la administración o entre ellos.
+
+DATOS DE GASTOS Y ALERTAS (Basado en el análisis de expensas):
 ${data.analyses.map(a => `- Período ${a.period}: Total ${a.total_amount}. 
-  Alertas detectadas: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
+  Alertas detectadas que requieren atención: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
 
-COMENTARIOS Y RECLAMOS DE PROPIETARIOS (Links Compartidos):
+RECLAMOS Y COMENTARIOS DE PROPIETARIOS:
 ${data.commentsByType.shared.length > 0
-                ? data.commentsByType.shared.map(c => `- ${c.author_name} (Sobre expensa de ${c.period || 'General'}): "${c.comment}"`).join('\n')
-                : "No hay comentarios externos."}
+                ? data.commentsByType.shared.map(c => `- ${c.author_name} dijo: "${c.comment}"`).join('\n')
+                : "No hay comentarios externos registrados."}
 
-NOTAS DEL ADMINISTRADOR:
+NOTAS ADICIONALES DEL ADMINISTRADOR/USUARIO:
 ${data.analyses.map(a => `- ${a.period}: ${a.owner_notes || 'Sin notas adicionales'}`).join('\n')}
 
-INSTRUCCIONES DE SALIDA (JSON):
-- Identificá aumentos fuertes, reclamos de vecinos y temas de mantenimiento.
-- Los IDs de los items deben ser únicos (ej: item_1, item_2...).
-- IMPORTANTE: "importance" debe ser: "high", "medium" o "low".
-- IMPORTANTE: "category" debe ser: "Mantenimiento", "Servicios", "Sueldos", "Administrativo" o "General".
+INSTRUCCIONES PARA EL CONTENIDO:
+1. Para cada punto detectado, redactá un "title" directo y una "description" que incluya un ARGUMENTO o PREGUNTA CLAVE para la administración.
+2. Identificá si hay patrones de aumento (ej: servicios que suben por encima de la inflación, sueldos con muchos retroactivos, etc.).
+3. Si hay reclamos de vecinos, convertilos en puntos de "Convivencia" o "Mantenimiento".
+4. Incluí siempre un punto final de "Estrategia de Gestión" con recomendaciones generales para bajar costos o mejorar la transparencia.
 
-ESTRUCTURA DE SALIDA:
+ESTRUCTURA DE SALIDA (JSON):
+- "importance" debe ser: "high" (Crítico), "medium" (Importante) o "low" (Rutinario).
+- "category" debe ser: "Mantenimiento", "Servicios", "Sueldos", "Administrativo", "Gestión" o "Convivencia".
+
 {
-  "title": "Temario Reunión de Consorcio - ${data.buildingName}",
+  "title": "Temario Estratégico: Reunión de Consorcio - ${data.buildingName}",
   "items": [
     {
-      "id": string,
-      "category": string,
-      "title": string,
-      "description": string,
-      "source": string,
-      "importance": string
+      "id": "item_1",
+      "category": "Mantenimiento",
+      "title": "Revisión de Abonos de Ascensores",
+      "description": "Se detectó un aumento del 40% en un solo mes. Es necesario pedir presupuestos comparativos para validar si el costo de mercado es menor.",
+      "source": "IA Alerta de Desvío",
+      "importance": "high"
     }
   ]
 }`;
