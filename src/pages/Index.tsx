@@ -62,9 +62,14 @@ const Header = () => {
             Precios
           </a>
           {session && (
-            <Link to="/historial" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
-              Mi historial
-            </Link>
+            <>
+              <Link to="/historial" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+                Mi historial
+              </Link>
+              <Link to="/preparar-reunion" className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+                Preparar Reunión
+              </Link>
+            </>
           )}
         </nav>
 
@@ -130,6 +135,13 @@ const Header = () => {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   Mi historial
+                </Link>
+                <Link
+                  to="/preparar-reunion"
+                  className="text-lg font-medium text-muted-foreground hover:text-primary transition-colors"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Preparar Reunión
                 </Link>
                 <Link
                   to="/perfil"
