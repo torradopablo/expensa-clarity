@@ -164,10 +164,10 @@ serve(async (req) => {
 
     // Get Mercado Pago Access Token
     const MERCADOPAGO_ACCESS_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
-    if (!MERCADOPAGO_ACCESS_TOKEN) {
-      console.error("MERCADOPAGO_ACCESS_TOKEN not configured");
+    if (!MERCADOPAGO_ACCESS_TOKEN || MERCADOPAGO_ACCESS_TOKEN.trim() === "") {
+      console.error("[mercadopago-webhook] CRITICAL: MERCADOPAGO_ACCESS_TOKEN not configured or empty");
       return new Response(
-        JSON.stringify({ error: "Configuration error" }),
+        JSON.stringify({ error: "Configuration error: Missing MP token" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

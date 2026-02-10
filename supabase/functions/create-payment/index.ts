@@ -67,13 +67,43 @@ serve(async (req) => {
 
     // Get Mercado Pago Access Token
     const MERCADOPAGO_ACCESS_TOKEN = Deno.env.get("MERCADOPAGO_ACCESS_TOKEN");
+
     if (!MERCADOPAGO_ACCESS_TOKEN) {
-      console.error("MERCADOPAGO_ACCESS_TOKEN not configured");
+      console.error("[create-payment] CRITICAL: MERCADOPAGO_ACCESS_TOKEN is not set in Supabase secrets.");
       return new Response(
-        JSON.stringify({ error: "Mercado Pago no está configurado" }),
+        JSON.stringify({
+          error: "Configuración incompleta",
+          details: "MERCADOPAGO_ACCESS_TOKEN no encontrado en el entorno."
+        }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+
+    if (MERCADOPAGO_ACCESS_TOKEN.trim() === "") {
+      console.error("[create-payment] CRITICAL: MERCADOPAGO_ACCESS_TOKEN is set but empty.");
+      return new Response(
+        JSON.stringify({
+          error: "Configuración inválida",
+          details: "MERCADOPAGO_ACCESS_TOKEN está vacío."
+        }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Build absolute back URLs
+    const rawOrigin = req.headers.get("origin") || req.headers.get("Origin") || "https://expensacheck.com";
+    const origin = rawOrigin.replace(/\/$/, ""); // Ensure no trailing slash
+
+    const finalSuccessUrl = `${origin}/analizar?payment=success&analysisId=${analysisId}`;
+    const finalFailureUrl = `${origin}/analizar?payment=failure`;
+    const finalPendingUrl = `${origin}/analizar?payment=pending&analysisId=${analysisId}`;
+
+    // IMPORTANT: Mercado Pago requires HTTPS for auto_return: "approved".
+    // If we're on localhost (http), we should disable auto_return to avoid 400 errors.
+    const isHttps = origin.startsWith("https://");
+    const autoReturn = isHttps ? "approved" : undefined;
+
+    console.log(`[create-payment] Origin detected: ${origin}. Protocol: ${isHttps ? "HTTPS" : "HTTP"}. Auto-return: ${autoReturn || "disabled"}`);
 
     // Create Mercado Pago preference
     const preference = {
@@ -91,11 +121,11 @@ serve(async (req) => {
         email: userEmail,
       },
       back_urls: {
-        success: successUrl || `${req.headers.get("origin")}/analizar?payment=success&analysisId=${analysisId}`,
-        failure: failureUrl || `${req.headers.get("origin")}/analizar?payment=failure`,
-        pending: `${req.headers.get("origin")}/analizar?payment=pending&analysisId=${analysisId}`,
+        success: finalSuccessUrl,
+        failure: finalFailureUrl,
+        pending: finalPendingUrl,
       },
-      auto_return: "approved",
+      auto_return: autoReturn,
       external_reference: analysisId,
       notification_url: `${Deno.env.get("SUPABASE_URL")}/functions/v1/mercadopago-webhook`,
       statement_descriptor: "EXPENSACHECK",
@@ -104,7 +134,7 @@ serve(async (req) => {
       expiration_date_to: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), // 24 hours
     };
 
-    console.log("Creating MP preference:", JSON.stringify(preference));
+    console.log("[create-payment] Sending preference to MP:", JSON.stringify(preference, null, 2));
 
     const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
