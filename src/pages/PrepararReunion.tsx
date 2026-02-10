@@ -27,7 +27,12 @@ import {
     Loader2,
     Printer,
     Download,
-    Copy
+    Copy,
+    Zap,
+    Brain,
+    HelpCircle,
+    Trophy,
+    Info
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -71,9 +76,25 @@ interface MeetingItem {
     selected?: boolean;
 }
 
+interface AnticipatedQuestion {
+    question: string;
+    answer: string;
+}
+
+interface KeyFigure {
+    label: string;
+    value: string;
+}
+
+interface PreparationGuide {
+    anticipated_questions: AnticipatedQuestion[];
+    key_figures: KeyFigure[];
+}
+
 interface MeetingSummary {
     title: string;
     items: MeetingItem[];
+    preparation_guide?: PreparationGuide;
 }
 
 const PrepararReunion = () => {
@@ -166,12 +187,24 @@ const PrepararReunion = () => {
     const handleCopy = () => {
         if (!summary) return;
         const activeSummaryItems = summary.items.filter(item => activeItems.has(item.id));
-        const text = activeSummaryItems.map(item =>
+        const agendaText = activeSummaryItems.map(item =>
             `[ ] ${item.title} (${item.category})\n    ${item.description}\n    Fuente: ${item.source}`
         ).join('\n\n');
 
-        navigator.clipboard.writeText(`${summary.title}\n\n${text}`);
-        toast.success("Copiado al portapapeles");
+        let fullText = `${summary.title}\n\n${agendaText}`;
+
+        if (summary.preparation_guide) {
+            const prepText = `\n\n=== GUÍA DE PREPARACIÓN (SOLO ADMINISTRADOR) ===\n\n` +
+                `DATOS CLAVE:\n` +
+                summary.preparation_guide.key_figures.map(f => `- ${f.label}: ${f.value}`).join('\n') +
+                `\n\nPREGUNTAS DIFÍCILES ANTICIPADAS:\n` +
+                summary.preparation_guide.anticipated_questions.map(q => `P: ${q.question}\nR: ${q.answer}`).join('\n\n');
+
+            fullText += prepText;
+        }
+
+        navigator.clipboard.writeText(fullText);
+        toast.success("Copiado al portapapeles (incluye guía de preparación)");
     };
 
 
@@ -427,7 +460,75 @@ const PrepararReunion = () => {
                                 </div>
                             </div>
 
+                            {/* PREPARATION GUIDE SECTION - NEW ASSET */}
+                            {summary.preparation_guide && (
+                                <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up delay-100">
+                                    <Card className="md:col-span-2 rounded-[2.5rem] border-primary/20 bg-primary/5 backdrop-blur-xl overflow-hidden">
+                                        <CardHeader className="p-8 border-b border-primary/10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                                                    <Brain className="w-5 h-5" />
+                                                </div>
+                                                <div>
+                                                    <CardTitle className="text-xl font-bold">Guía de Preparación</CardTitle>
+                                                    <CardDescription>Preguntas anticipadas y argumentos clave para el administrador</CardDescription>
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="p-0">
+                                            <div className="divide-y divide-primary/10">
+                                                {summary.preparation_guide.anticipated_questions.map((q, idx) => (
+                                                    <div key={idx} className="p-6 hover:bg-primary/10 transition-colors">
+                                                        <div className="flex items-start gap-4">
+                                                            <div className="mt-1 w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center flex-shrink-0">
+                                                                <HelpCircle className="w-4 h-4" />
+                                                            </div>
+                                                            <div>
+                                                                <p className="font-bold text-foreground mb-2">{q.question}</p>
+                                                                <p className="text-sm text-muted-foreground leading-relaxed italic">
+                                                                    <span className="text-primary font-bold not-italic mr-1">R:</span>
+                                                                    {q.answer}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card className="rounded-[2.5rem] border-secondary/20 bg-secondary/5 backdrop-blur-xl overflow-hidden h-fit">
+                                        <CardHeader className="p-8 border-b border-secondary/10">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center shadow-lg shadow-secondary/20">
+                                                    <Zap className="w-5 h-5" />
+                                                </div>
+                                                <CardTitle className="text-xl font-bold">Datos en Mano</CardTitle>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="p-8 space-y-6">
+                                            {summary.preparation_guide.key_figures.map((figure, idx) => (
+                                                <div key={idx} className="flex flex-col">
+                                                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{figure.label}</span>
+                                                    <span className="text-2xl font-black text-secondary">{figure.value}</span>
+                                                </div>
+                                            ))}
+                                            <div className="pt-4 border-t border-secondary/10">
+                                                <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 leading-tight">
+                                                    <Info className="w-3 h-3 flex-shrink-0" />
+                                                    Estos datos te ayudan a responder con precisión y autoridad durante la asamblea.
+                                                </p>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
+
                             <div className="space-y-4">
+                                <div className="flex items-center gap-3 px-2">
+                                    <ClipboardList className="w-5 h-5 text-primary" />
+                                    <h3 className="text-lg font-bold text-foreground">Temario de la Asamblea</h3>
+                                </div>
                                 {summary.items.map((item) => (
                                     <Card
                                         key={item.id}

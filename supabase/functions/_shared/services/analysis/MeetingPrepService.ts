@@ -28,47 +28,55 @@ export class MeetingPrepService {
         console.log(`[MeetingPrepService] Processing ${data.buildingName} with ${data.analyses.length} periods.`);
 
         const systemPrompt = `Eres un asistente experto en consorcios y administración de edificios en Argentina. 
-Tu tarea es generar un temario (checklist) estratégico y profesional para una reunión de consorcio.
+Tu tarea es generar un temario estratégico y una guía de preparación para el administrador para una reunión de consorcio.
 REGLA CRÍTICA: Debes responder EXCLUSIVAMENTE con un objeto JSON válido. No incluyas texto explicativo antes o después. 
 El JSON debe seguir la estructura solicitada estrictamente.`;
 
-        const prompt = `Generá un temario estratégico y detallado para la reunión del consorcio "${data.buildingName}". 
-El objetivo es que los propietarios tengan argumentos sólidos y claros para discutir con la administración o entre ellos.
+        const prompt = `Generá una propuesta integral para la reunión del consorcio "${data.buildingName}". 
+El objetivo es que el administrador esté 100% preparado para las consultas de los propietarios y tenga un temario claro.
 
 DATOS DE GASTOS Y ALERTAS (Basado en el análisis de expensas):
 ${data.analyses.map(a => `- Período ${a.period}: Total ${a.total_amount}. 
-  Alertas detectadas que requieren atención: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
+  Alertas detectadas: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
 
-RECLAMOS Y COMENTARIOS DE PROPIETARIOS:
+RECLAMOS Y COMENTARIOS DE PROPIETARIOS (Externos):
 ${data.commentsByType.shared.length > 0
                 ? data.commentsByType.shared.map(c => `- ${c.author_name} dijo: "${c.comment}"`).join('\n')
                 : "No hay comentarios externos registrados."}
 
-NOTAS ADICIONALES DEL ADMINISTRADOR/USUARIO:
-${data.analyses.map(a => `- ${a.period}: ${a.owner_notes || 'Sin notas adicionales'}`).join('\n')}
+NOTAS E INFORMACIÓN INTERNA DEL ADMINISTRADOR:
+${data.analyses.filter(a => a.owner_notes).map(a => `- Nota período ${a.period}: ${a.owner_notes}`).join('\n') || "No hay notas adicionales del administrador."}
+${data.commentsByType.owner.length > 0
+                ? data.commentsByType.owner.map(c => `- Comentario interno: "${c.comment}"`).join('\n')
+                : ""}
 
 INSTRUCCIONES PARA EL CONTENIDO:
-1. Para cada punto detectado, redactá un "title" directo y una "description" que incluya un ARGUMENTO o PREGUNTA CLAVE para la administración.
-2. Identificá si hay patrones de aumento (ej: servicios que suben por encima de la inflación, sueldos con muchos retroactivos, etc.).
-3. Si hay reclamos de vecinos, convertilos en puntos de "Convivencia" o "Mantenimiento".
-4. Incluí siempre un punto final de "Estrategia de Gestión" con recomendaciones generales para bajar costos o mejorar la transparencia.
+1. "items": Puntos del temario oficial. Cada uno con una "description" que sea un ARGUMENTO o EXPLICACIÓN clara. Integrá los reclamos de propietarios o notas administrativas si son relevantes.
+2. "preparation_guide": Una sección para uso exclusivo del administrador que contenga:
+    - "anticipated_questions": Las 3 o 4 preguntas más difíciles o probables que harán los propietarios basadas en los aumentos detectados y sus comentarios, y la respuesta sugerida con datos.
+    - "key_figures": 3 o 4 datos numéricos clave que el administrador debe tener "en la punta de la lengua" (ej: % de aumento acumulado, % de incidencia de sueldos, etc.).
 
 ESTRUCTURA DE SALIDA (JSON):
-- "importance" debe ser: "high" (Crítico), "medium" (Importante) o "low" (Rutinario).
-- "category" debe ser: "Mantenimiento", "Servicios", "Sueldos", "Administrativo", "Gestión" o "Convivencia".
-
 {
   "title": "Temario Estratégico: Reunión de Consorcio - ${data.buildingName}",
   "items": [
     {
-      "id": "item_1",
-      "category": "Mantenimiento",
-      "title": "Revisión de Abonos de Ascensores",
-      "description": "Se detectó un aumento del 40% en un solo mes. Es necesario pedir presupuestos comparativos para validar si el costo de mercado es menor.",
-      "source": "IA Alerta de Desvío",
-      "importance": "high"
+      "id": "string",
+      "category": "Mantenimiento|Servicios|Sueldos|Administrativo|Gestión|Convivencia",
+      "title": "string",
+      "description": "string",
+      "source": "string",
+      "importance": "high|medium|low"
     }
-  ]
+  ],
+  "preparation_guide": {
+     "anticipated_questions": [
+        { "question": "string", "answer": "string" }
+     ],
+     "key_figures": [
+        { "label": "string", "value": "string" }
+     ]
+  }
 }`;
 
         try {
