@@ -91,7 +91,9 @@ serve(async (req) => {
     }
 
     // Build absolute back URLs
-    const rawOrigin = req.headers.get("origin") || req.headers.get("Origin") || "https://expensacheck.com";
+    // Hierarchy: Origin header > SITE_URL secret > Fallback hardcoded
+    const siteUrl = Deno.env.get("SITE_URL") || "https://expensa-check.vercel.app";
+    const rawOrigin = req.headers.get("origin") || req.headers.get("Origin") || siteUrl;
     const origin = rawOrigin.replace(/\/$/, ""); // Ensure no trailing slash
 
     const finalSuccessUrl = `${origin}/analizar?payment=success&analysisId=${analysisId}`;
