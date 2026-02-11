@@ -6,6 +6,7 @@ import type { Analysis, Category, BuildingProfile } from "../types/analysis";
 export interface UseAnalysisState {
   analyses: Analysis[];
   buildings: string[];
+  categories: string[];
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   loading: boolean;
@@ -25,11 +26,16 @@ export interface UseAnalysisActions {
   reset: () => void;
 }
 
-export function useAnalysis(filters?: { buildingName?: string }) {
+export interface UseAnalysisFilters {
+  buildingName?: string;
+  pageSize?: number;
+}
+
+export function useAnalysis(filters?: UseAnalysisFilters) {
   const queryClient = useQueryClient();
 
   // Queries
-  const PAGE_SIZE = 10;
+  const PAGE_SIZE = filters?.pageSize || 10;
 
   // Infinite Query for analyses
   const {
@@ -76,6 +82,35 @@ export function useAnalysis(filters?: { buildingName?: string }) {
 
       if (error) throw error;
       const unique = [...new Set(data.map(d => d.building_name))];
+      return unique.sort() as string[];
+    }
+  });
+
+  // Query for unique categories
+  const { data: allCategories = [] } = useQuery({
+    queryKey: ["user-categories", filters?.buildingName],
+    queryFn: async () => {
+      let query = supabase
+        .from("expense_categories")
+        .select("name");
+
+      if (filters?.buildingName && filters.buildingName !== "all") {
+        const { data: buildingAnalyses } = await supabase
+          .from("expense_analyses")
+          .select("id")
+          .eq("building_name", filters.buildingName);
+
+        if (buildingAnalyses && buildingAnalyses.length > 0) {
+          query = query.in("analysis_id", buildingAnalyses.map(a => a.id));
+        } else {
+          return [];
+        }
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const unique = [...new Set(data.map(d => d.name))];
       return unique.sort() as string[];
     }
   });
@@ -224,6 +259,7 @@ export function useAnalysis(filters?: { buildingName?: string }) {
   return {
     analyses,
     buildings,
+    categories: allCategories,
     hasNextPage,
     isFetchingNextPage,
     loading: loadingAnalyses || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,

@@ -97,8 +97,6 @@ const Evolucion = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [isExporting, setIsExporting] = useState(false);
 
-  const { analyses, loading: loadingAnalyses, error: errorAnalyses } = useAnalysis();
-
   const [selectedBuilding, setSelectedBuilding] = useState<string>(
     searchParams.get("edificio") || "all"
   );
@@ -107,6 +105,11 @@ const Evolucion = () => {
   );
   const [aiAnalysis, setAiAnalysis] = useState<string | null>(null);
   const [deviation, setDeviation] = useState<any | null>(null);
+
+  const { analyses, buildings: hookBuildings, categories: hookCategories, loading: loadingAnalyses, error: errorAnalyses } = useAnalysis({
+    buildingName: selectedBuilding !== "all" ? selectedBuilding : undefined,
+    pageSize: 50 // Fetch more history for charts
+  });
 
   const {
     inflationData,
@@ -253,30 +256,28 @@ const Evolucion = () => {
     }
   };
 
-  // Get unique buildings from completed analyses
+  // Get unique buildings from the direct buildings query (more reliable than derived from paginated analyses)
   const buildings = useMemo(() => {
-    const completed = analyses.filter(a => a.status === "completed");
-    const unique = [...new Set(completed.map(a => a.building_name).filter(Boolean))] as string[];
-    return unique.sort();
-  }, [analyses]);
+    return hookBuildings || [];
+  }, [hookBuildings]);
 
-  // If no building is selected, try to pick one
+  // If no building is selected AND no search param exists, pick the first one as default
   useEffect(() => {
     if (selectedBuilding === "all" && buildings.length > 0 && !searchParams.get("edificio")) {
-      setSelectedBuilding(buildings[0]);
+      // We only auto-select the first building on initial load if no param is present
+      // To avoid overriding the user's choice of "all" later
+      const hasInitiallySelected = sessionStorage.getItem("hasInitiallySelectedBuilding");
+      if (!hasInitiallySelected) {
+        setSelectedBuilding(buildings[0]);
+        sessionStorage.setItem("hasInitiallySelectedBuilding", "true");
+      }
     }
   }, [buildings, selectedBuilding, searchParams]);
 
-  // Get unique categories for the selected building (or all buildings)
+  // Get unique categories from the hook (which queries the DB directly)
   const categories = useMemo(() => {
-    let filteredAnalyses = analyses.filter(a => a.status === "completed");
-    if (selectedBuilding !== "all") {
-      filteredAnalyses = filteredAnalyses.filter(a => a.building_name === selectedBuilding);
-    }
-
-    const allCategories = filteredAnalyses.flatMap(a => (a.expense_categories || []).map(c => c.name));
-    return [...new Set(allCategories)].sort();
-  }, [analyses, selectedBuilding]);
+    return hookCategories || [];
+  }, [hookCategories]);
 
   // Filter and prepare chart data
   const chartData = useMemo(() => {
