@@ -336,17 +336,27 @@
 .pdf-export-container {
   background-color: #ffffff !important;
   color: #000000 !important;
+  padding: 40px !important;
+}
+
+.pdf-export-container .pdf-card {
+  background-color: #ffffff !important;
+  border: 2px solid #000000 !important;
+  box-shadow: none !important;
+  margin-bottom: 24px !important;
+  border-radius: 16px !important;
+  color: #000000 !important;
+  opacity: 1 !important;
+  backdrop-filter: none !important;
 }
 
 .pdf-export-container .pdf-item-active {
   background-color: #ffffff !important;
-  border: 1.5px solid #000000 !important;
+  border-bottom: 1px solid #e2e8f0 !important;
   color: #000000 !important;
   opacity: 1 !important;
-  transform: none !important;
-  box-shadow: none !important;
-  margin-bottom: 20px !important;
-  border-radius: 12px !important;
+  padding: 24px 0 !important;
+  display: flex !important;
 }
 
 .pdf-export-container .pdf-item-hidden,
@@ -354,33 +364,64 @@
   display: none !important;
 }
 
-.pdf-export-container [class*="bg-primary"],
-.pdf-export-container [class*="bg-secondary"],
-.pdf-export-container .backdrop-blur-xl {
-  background-color: #ffffff !important;
-  backdrop-filter: none !important;
-  background-image: none !important;
+.pdf-export-container .pdf-hide-column {
+  display: none !important;
 }
 
+.pdf-export-container h1,
 .pdf-export-container h2,
 .pdf-export-container h3,
+.pdf-export-container h4,
 .pdf-export-container p,
-.pdf-export-container span {
+.pdf-export-container span,
+.pdf-export-container div:not(.bg-destructive\/5):not(.bg-primary\/5) {
   color: #000000 !important;
   opacity: 1 !important;
   text-shadow: none !important;
 }
 
 .pdf-export-container .text-muted-foreground {
-  color: #1a1a1a !important;
-  /* Casi negro para legibilidad máxima */
+  color: #1e293b !important;
+  /* Slate 800 para legibilidad máxima */
 }
 
-/* Ocultar botones y elementos de UI en el PDF */
+/* Conservar colores de cajas de alerta por legibilidad pero oscurecer texto */
+.pdf-export-container .bg-destructive\/5 {
+  background-color: #fff1f2 !important;
+  border: 1px solid #fda4af !important;
+}
+
+.pdf-export-container .bg-primary\/5 {
+  background-color: #f0fdf4 !important;
+  border: 1px solid #86efac !important;
+}
+
+.pdf-export-container .text-destructive {
+  color: #991b1b !important;
+}
+
+.pdf-export-container .text-primary {
+  color: #14532d !important;
+}
+
+/* Ocultar elementos de UI */
 .pdf-export-container .print\:hidden,
 .pdf-export-container button,
-.pdf-export-container .flex.items-center.gap-3.print\:hidden,
-.pdf-export-container input[type="checkbox"],
-.pdf-export-container .w-12.sm\:w-16.flex.items-center {
+.pdf-export-container .cursor-pointer,
+.pdf-export-container [role="checkbox"] {
   display: none !important;
+}
+
+/* Ajustes de badges */
+.pdf-export-container .badge,
+.pdf-export-container span[class*="Badge"] {
+  border: 1px solid #000000 !important;
+  color: #000000 !important;
+  background: #ffffff !important;
+  opacity: 1 !important;
+}
+
+/* Logo en PDF */
+.pdf-export-container #pdf-header {
+  border-bottom: 2px solid #000000 !important;
 }

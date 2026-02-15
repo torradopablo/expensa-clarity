@@ -6,7 +6,7 @@ import { MeetingPrepService } from "../_shared/services/analysis/MeetingPrepServ
 import { AuthenticationError, ValidationError, AppError } from "../_shared/utils/error.utils.ts";
 
 // Version: 1.0.3
-serve(async (req) => {
+serve(async (req: Request) => {
     // Handle CORS preflight
     if (req.method === "OPTIONS") {
         return new Response("ok", { headers: corsHeaders });
@@ -56,9 +56,18 @@ serve(async (req) => {
         const supabase = createSupabaseClient(authHeader);
         const meetingService = new MeetingPrepService();
 
-        // 0. Check Daily Limit (3 per day)
+        // 0. Check Daily Limit (3 per day, unless free_analysis is true)
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+
+        // Fetch user profile to check for free_analysis flag
+        const { data: profile } = await supabaseService
+            .from("profiles")
+            .select("free_analysis")
+            .eq("user_id", user.id)
+            .maybeSingle();
+
+        const isFreeUser = profile?.free_analysis === true;
 
         const { count, error: countError } = await supabase
             .from("meeting_preparation_logs")
@@ -68,7 +77,7 @@ serve(async (req) => {
 
         if (countError) {
             console.error("[prepare-meeting] Error checking daily limit:", countError);
-        } else if (count !== null && count >= 3) {
+        } else if (!isFreeUser && count !== null && count >= 3) {
             return new Response(
                 JSON.stringify({
                     error: "Límite diario alcanzado",
@@ -118,13 +127,13 @@ serve(async (req) => {
         }
 
         const commentsByType = {
-            owner: allComments?.filter(c => c.is_owner_comment) || [],
-            shared: allComments?.filter(c => !c.is_owner_comment) || []
+            owner: (allComments || []).filter((c: any) => c.is_owner_comment),
+            shared: (allComments || []).filter((c: any) => !c.is_owner_comment)
         };
 
         // 3. Map periods to shared comments for context
         const analysisMap = new Map(validAnalyses.map(a => [a.id, a.period]));
-        commentsByType.shared = commentsByType.shared.map(c => ({
+        commentsByType.shared = commentsByType.shared.map((c: any) => ({
             ...c,
             period: analysisMap.get(c.analysis_id) || "General"
         }));
