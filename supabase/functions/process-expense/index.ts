@@ -232,7 +232,9 @@ serve(async (req) => {
 
     // Delete file from storage after successful processing to save space
     if (filePath) {
-      const { error: deleteFileError } = await storageService.deleteFile("expense-files", filePath);
+      // Use service role to ensure deletion permissions regardless of user RLS
+      const systemStorageService = new StorageService();
+      const { error: deleteFileError } = await systemStorageService.deleteFile("expense-files", filePath);
 
       if (deleteFileError) {
         console.error("File deletion error:", deleteFileError);
