@@ -172,10 +172,10 @@ import { Logo } from "@/components/layout/ui/logo";
 const Header = () => {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight">ExpensaCheck</span>
         </Link>
         <Button asChild size="sm">
           <Link to="/analizar">
@@ -585,25 +585,29 @@ const SharedAnalysis = () => {
         comment: ownerReply.trim()
       });
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-owner-comment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data: responseData, error: responseError } = await supabaseFunctions.functions.invoke('add-owner-comment', {
+        body: {
           token,
           user_id: 'owner-user-id', // Esto debería venir del auth real
           parent_comment_id: replyingTo,
           comment: ownerReply.trim()
-        })
+        }
       });
 
-      const responseData = await response.json();
-      console.log('Response from owner-reply:', { status: response.status, data: responseData });
+      console.log('Response from owner-reply:', { data: responseData, error: responseError });
 
-      if (!response.ok) {
-        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      if (responseError) {
+        console.error('Owner reply error:', responseError);
+        let errorMsg = responseError.message;
+        if (responseError instanceof Error && (responseError as any).context) {
+          try {
+            const body = await (responseError as any).context.json();
+            if (body.error) errorMsg = body.error;
+          } catch (e) {
+            console.error('Failed to parse error body:', e);
+          }
+        }
+        throw new Error(errorMsg || 'Error al enviar la respuesta');
       }
 
       // Add new reply to local state
@@ -652,25 +656,29 @@ const SharedAnalysis = () => {
         comment: newComment.comment.trim()
       });
 
-      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/add-analysis-comment`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
-        },
-        body: JSON.stringify({
+      const { data: responseData, error: responseError } = await supabaseFunctions.functions.invoke('add-analysis-comment', {
+        body: {
           token,
           author_name: newComment.author_name.trim(),
           author_email: newComment.author_email.trim() || undefined,
           comment: newComment.comment.trim()
-        })
+        }
       });
 
-      const responseData = await response.json();
-      console.log('Response from add-comment:', { status: response.status, data: responseData });
+      console.log('Response from add-comment:', { data: responseData, error: responseError });
 
-      if (!response.ok) {
-        throw new Error(responseData.error || `Error ${response.status}: ${response.statusText}`);
+      if (responseError) {
+        console.error('Comment submission error:', responseError);
+        let errorMsg = responseError.message;
+        if (responseError instanceof Error && (responseError as any).context) {
+          try {
+            const body = await (responseError as any).context.json();
+            if (body.error) errorMsg = body.error;
+          } catch (e) {
+            console.error('Failed to parse error body:', e);
+          }
+        }
+        throw new Error(errorMsg || 'Error al enviar el comentario');
       }
 
       // Add the new comment to the local state
@@ -1114,7 +1122,7 @@ const SharedAnalysis = () => {
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {comments.map((comment) => (
+                    {comments.filter(c => !c.parent_comment_id).map((comment) => (
                       <div key={comment.id} className="group animate-fade-in-up">
                         <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
                           ? 'bg-primary/5 border-primary/20'

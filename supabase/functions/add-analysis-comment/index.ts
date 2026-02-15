@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+// Public comment function
 
+// Public comment function v2
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
@@ -20,7 +22,7 @@ interface CommentRequest {
 
 serve(async (req) => {
   console.log('Request received:', { method: req.method, url: req.url })
-  
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('CORS preflight request')
@@ -34,10 +36,10 @@ serve(async (req) => {
 
     // Validaciones básicas
     if (!token || !author_name || !comment) {
-      console.log('Validation error - missing fields:', { 
-        hasToken: !!token, 
-        hasAuthorName: !!author_name, 
-        hasComment: !!comment 
+      console.log('Validation error - missing fields:', {
+        hasToken: !!token,
+        hasAuthorName: !!author_name,
+        hasComment: !!comment
       })
       return new Response(
         JSON.stringify({ error: 'Token, author_name, and comment are required' }),
@@ -109,10 +111,10 @@ serve(async (req) => {
     // Validar restricción temporal
     const analysisDate = analysis.period_date ? new Date(analysis.period_date) : parsePeriodToDate(analysis.period);
     const now = new Date();
-    
-    const monthsDiff = (now.getFullYear() - analysisDate.getFullYear()) * 12 + 
-                     (now.getMonth() - analysisDate.getMonth());
-    
+
+    const monthsDiff = (now.getFullYear() - analysisDate.getFullYear()) * 12 +
+      (now.getMonth() - analysisDate.getMonth());
+
     if (monthsDiff < -1 || monthsDiff > 1) {
       return new Response(
         JSON.stringify({ error: 'Comments are only allowed within 1 month of the analysis period' }),
@@ -124,19 +126,19 @@ serve(async (req) => {
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
     const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-    
+
     const { data: recentHourComments, error: hourError } = await supabase
       .from('analysis_comments')
       .select('id')
       .eq('analysis_id', linkData.analysis_id)
       .gte('created_at', oneHourAgo.toISOString());
-    
+
     const { data: recentDayComments, error: dayError } = await supabase
       .from('analysis_comments')
       .select('id')
       .eq('analysis_id', linkData.analysis_id)
       .gte('created_at', oneDayAgo.toISOString());
-    
+
     const { data: recentMonthComments, error: monthError } = await supabase
       .from('analysis_comments')
       .select('id')
@@ -154,17 +156,17 @@ serve(async (req) => {
       console.error('Rate limiting check error:', { hourError, dayError, monthError });
     } else if (recentHourComments && recentHourComments.length >= MAX_COMMENTS_PER_HOUR) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_HOUR} comments per hour for this analysis.` }),
+        JSON.stringify({ error: `Límite excedido. Máximo ${MAX_COMMENTS_PER_HOUR} comentarios por hora para este análisis.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else if (recentDayComments && recentDayComments.length >= MAX_COMMENTS_PER_DAY) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_DAY} comments per day for this analysis.` }),
+        JSON.stringify({ error: `Límite excedido. Máximo ${MAX_COMMENTS_PER_DAY} comentarios por día para este análisis.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     } else if (recentMonthComments && recentMonthComments.length >= MAX_COMMENTS_PER_MONTH) {
       return new Response(
-        JSON.stringify({ error: `Rate limit exceeded. Maximum ${MAX_COMMENTS_PER_MONTH} comments per month for this analysis.` }),
+        JSON.stringify({ error: `Límite excedido. Máximo ${MAX_COMMENTS_PER_MONTH} comentarios por mes para este análisis.` }),
         { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -172,7 +174,7 @@ serve(async (req) => {
     // Extraer IP del cliente
     const forwardedFor = req.headers.get('x-forwarded-for');
     const realIP = req.headers.get('x-real-ip');
-    
+
     let clientIP = 'unknown';
     if (forwardedFor) {
       clientIP = forwardedFor.split(',')[0].trim();
@@ -212,10 +214,10 @@ serve(async (req) => {
     console.log(`Comment added for analysis ${linkData.analysis_id} by ${author_name}`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         comment: newComment,
-        message: 'Comment added successfully' 
+        message: 'Comment added successfully'
       }),
       { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

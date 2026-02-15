@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4"
+// Public function for shared analysis access
 import { periodToYearMonth } from "../_shared/utils/date.utils.ts"
 import { TrendService } from "../_shared/services/analysis/TrendService.ts"
 import { SharedAnalysisCacheService } from "../_shared/services/cache/SharedAnalysisCacheService.ts"
@@ -28,7 +29,7 @@ interface Analysis {
   created_at: string;
   building_address?: string;
   period_date?: string;
-  owner_notes?: string;
+  notes?: string;
   is_owner_view?: boolean;
 }
 
@@ -129,6 +130,7 @@ serve(async (req) => {
     }
 
     // 2. Find the shared link
+    console.log('Searching in shared_analysis_links for token:', token)
     const { data: linkData, error: linkError } = await supabase
       .from('shared_analysis_links')
       .select('*')
@@ -136,9 +138,13 @@ serve(async (req) => {
       .single()
 
     if (linkError || !linkData) {
-      console.log('Link not found:', linkError)
+      console.error('Shared link query failed or returned no data:', {
+        token,
+        error: linkError,
+        found: !!linkData
+      })
       return new Response(
-        JSON.stringify({ error: 'Link not found' }),
+        JSON.stringify({ error: `Link not found (token: ${token.substring(0, 8)}...)` }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -164,9 +170,9 @@ serve(async (req) => {
     // Get the analysis - Restrict fields for security
     const { data: analysis, error: analysisError } = (await supabase
       .from('expense_analyses')
-      .select('id, building_name, building_address, period, period_date, total_amount, previous_total, unit, status, created_at, owner_notes')
+      .select('id, user_id, building_name, period, period_date, total_amount, previous_total, unit, status, created_at, notes')
       .eq('id', linkData.analysis_id)
-      .single()) as { data: Analysis | null, error: any }
+      .single()) as { data: any | null, error: any }
 
     if (analysisError || !analysis) {
       console.log('Analysis not found:', analysisError)
@@ -176,9 +182,14 @@ serve(async (req) => {
       )
     }
 
-    // Assign a placeholder user_id if needed by the frontend comparison logic, 
-    // but don't leak the real UUID from the private user
+    // Store real user_id for internal checks before masking it
+    const realOwnerId = analysis.user_id;
+
+    // Mask for security
     analysis.user_id = 'shared-view';
+    // Map notes to owner_notes for frontend compatibility if needed, 
+    // but the interface now uses notes
+    analysis.owner_notes = analysis.notes;
 
     // Get categories for this analysis
     const { data: categories, error: categoriesError } = await supabase
@@ -274,7 +285,7 @@ serve(async (req) => {
 
     // Re-check owner_user_id to ensure it matches the analysis owner
     // This is an extra security layer for shared links
-    analysis.is_owner_view = (analysis.user_id === profile?.owner_user_id);
+    analysis.is_owner_view = (realOwnerId === profile?.owner_user_id);
 
     // Fetch buildings trend via TrendService
     const filters: any = {};
