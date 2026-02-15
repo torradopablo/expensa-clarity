@@ -5,6 +5,20 @@
 @tailwind utilities;
 
 @layer base {
+  html {
+    overflow-y: scroll;
+    /* Forces scrollbar to be always visible */
+    width: 100%;
+  }
+
+  body {
+    width: 100%;
+    /* Override any potential library-added padding-right */
+    padding-right: 0 !important;
+  }
+}
+
+@layer base {
   :root {
     /* ExpensaCheck Design System - Calm, Trustworthy, Clear */
 
