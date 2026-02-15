@@ -615,7 +615,7 @@ const PrepararReunion = () => {
                                             <div className="pt-4 border-t border-secondary/10">
                                                 <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 leading-tight">
                                                     <Info className="w-3 h-3 flex-shrink-0" />
-                                                    Estos datos te ayudan a responder con precisión y autoridad durante la asamblea.
+                                                    Estos datos te sirven como respaldo y guía informativa durante la asamblea.
                                                 </p>
                                             </div>
                                         </CardContent>
@@ -710,6 +710,15 @@ const PrepararReunion = () => {
                                         </div>
                                     </CardContent>
                                 </Card>
+
+                                {/* LEGAL DISCLAIMER */}
+                                <div className="mt-8 p-6 bg-muted/30 rounded-[1.5rem] border border-border/50">
+                                    <p className="text-[11px] text-muted-foreground leading-relaxed text-center">
+                                        <strong className="text-foreground font-bold">Aviso importante:</strong> Este contenido ha sido generado automáticamente por Inteligencia Artificial y debe ser utilizado únicamente como guía informativa.
+                                        ExpensaCheck no es una entidad de auditoría matriculada ni ofrece asesoramiento legal o contable.
+                                        Se recomienda validar toda la información con la liquidación original y consultar con profesionales idóneos.
+                                    </p>
+                                </div>
                             </div>
 
                             <div className="pt-16 flex flex-col items-center gap-6 print:hidden">

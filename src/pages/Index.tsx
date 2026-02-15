@@ -348,7 +348,7 @@ const BenefitsSection = () => {
         <div className="text-center space-y-6 mb-20">
           <h2 className="text-4xl md:text-5xl font-extrabold tracking-tight">Información que genera valor</h2>
           <p className="text-muted-foreground max-w-2xl mx-auto text-lg leading-relaxed">
-            Herramientas profesionales para una gestión transparente y eficiente de tus gastos compartidos.
+            Herramientas inteligentes para una visión clara y transparente de tus gastos compartidos.
           </p>
         </div>
         <div className="grid md:grid-cols-3 gap-10">
@@ -388,7 +388,7 @@ const UseCasesSection = () => {
     {
       icon: Briefcase,
       role: "Administradores",
-      title: "Gestión Profesional",
+      title: "Gestión Transparente",
       scenarios: [
         "Reportes visuales para reuniones",
         "Justificá gastos con IA y datos",

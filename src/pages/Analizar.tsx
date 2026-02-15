@@ -380,7 +380,7 @@ const PaymentStep = ({
               "Extracción IA de alta precisión",
               "Detección de anomalías en rubros",
               "Referencia de mercado actualizada",
-              "Resumen ejecutivo profesional"
+              "Resumen ejecutivo informativo"
             ].map((item, index) => (
               <div key={index} className="flex items-center gap-3">
                 <div className="w-5 h-5 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20">
@@ -390,6 +390,10 @@ const PaymentStep = ({
               </div>
             ))}
           </div>
+
+          <p className="text-[10px] text-center text-muted-foreground italic px-4">
+            * ExpensaCheck es una herramienta de asistencia basada en IA. No constituye asesoría contable ni profesional.
+          </p>
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4">
             <Button variant="ghost" onClick={onBack} disabled={isProcessing} className="rounded-xl px-8 order-2 sm:order-1 w-full sm:w-auto font-medium">
