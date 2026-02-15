@@ -480,8 +480,13 @@ const PricingSection = () => (
             </div>
 
             <div className="mb-8">
-              <span className="text-6xl font-black text-foreground">$1.500</span>
-              <span className="text-muted-foreground text-lg ml-2">/ análisis</span>
+              <div className="flex items-baseline mb-1">
+                <span className="text-6xl font-black text-foreground">$3.500</span>
+                <span className="text-muted-foreground text-lg ml-2">/ análisis</span>
+              </div>
+              <p className="text-xs text-muted-foreground font-medium italic pl-1 flex items-center gap-1.5 opacity-80">
+                (Equivale al valor de un café ☕)
+              </p>
             </div>
 
             <div className="bg-primary/5 border border-primary/10 rounded-2xl p-4 mb-10">
@@ -496,7 +501,7 @@ const PricingSection = () => (
                 "Comparativa con Red de Edificios",
                 "Monitoreo de Impacto Inflacionario",
                 "IA con Detección de Desvíos",
-                "Reporte Profesional Exportable",
+                "Reporte Exportable",
                 "Dashboard Histórico de Evolución"
               ].map((feature, index) => (
                 <li key={index} className="flex items-center gap-3">

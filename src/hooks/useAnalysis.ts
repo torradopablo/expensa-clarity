@@ -52,6 +52,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
       let query = supabase
         .from("expense_analyses")
         .select("*, expense_categories(*)")
+        .order("period_date", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
 
       if (filters?.buildingName && filters.buildingName !== "all") {

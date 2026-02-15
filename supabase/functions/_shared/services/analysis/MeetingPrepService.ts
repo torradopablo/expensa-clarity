@@ -51,10 +51,16 @@ ${data.commentsByType.owner.length > 0
                 : ""}
 
 INSTRUCCIONES PARA EL CONTENIDO:
-1. "items": Puntos del temario oficial. Cada uno con una "description" que sea un ARGUMENTO o EXPLICACIÓN clara. Integrá los reclamos de propietarios o notas administrativas si son relevantes.
+1. "items": Puntos del temario oficial.
+   - "title": Título breve y profesional.
+   - "description": Explicación DETALLADA del tema. Contexto completo para que todos entiendan de qué se trata.
+   - "problem": (Nuevo) Definición clara del problema o dolor detectado (ej: "Aumento desmedido en factura eléctrica").
+   - "proposed_solution": (Nuevo) Propuesta concreta de solución o curso de acción para votar (ej: "Instalar sensores de movimiento en palieres").
+   - Integrá los reclamos de propietarios o notas administrativas si son relevantes.
+
 2. "preparation_guide": Una sección para uso exclusivo del administrador que contenga:
-    - "anticipated_questions": Las 3 o 4 preguntas más difíciles o probables que harán los propietarios basadas en los aumentos detectados y sus comentarios, y la respuesta sugerida con datos.
-    - "key_figures": 3 o 4 datos numéricos clave que el administrador debe tener "en la punta de la lengua" (ej: % de aumento acumulado, % de incidencia de sueldos, etc.).
+    - "anticipated_questions": Las 3 o 4 preguntas más difíciles o probables que harán los propietarios basadas en los aumentos detectados y sus comentarios, y la respuesta sugerida con datos concretos.
+    - "key_figures": 3 o 4 datos numéricos clave que el administrador debe tener "en la punta de la lengua" (ej: % de aumento acumulado, % de incidencia de sueldos, monto total de morosos).
 
 ESTRUCTURA DE SALIDA (JSON):
 {
@@ -65,6 +71,8 @@ ESTRUCTURA DE SALIDA (JSON):
       "category": "Mantenimiento|Servicios|Sueldos|Administrativo|Gestión|Convivencia",
       "title": "string",
       "description": "string",
+      "problem": "string",
+      "proposed_solution": "string",
       "source": "string",
       "importance": "high|medium|low"
     }
@@ -77,7 +85,8 @@ ESTRUCTURA DE SALIDA (JSON):
         { "label": "string", "value": "string" }
      ]
   }
-}`;
+}
+`;
 
         try {
             const content = await this.aiService.generateContent(prompt, systemPrompt, { json: true });

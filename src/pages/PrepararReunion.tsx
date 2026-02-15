@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -32,7 +32,8 @@ import {
     Brain,
     HelpCircle,
     Trophy,
-    Info
+    Info,
+    LayoutList
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -71,6 +72,8 @@ interface MeetingItem {
     category: string;
     title: string;
     description: string;
+    problem?: string; // Nuevo
+    proposed_solution?: string; // Nuevo
     source: string;
     importance: "high" | "medium" | "low";
     selected?: boolean;
@@ -113,6 +116,25 @@ const PrepararReunion = () => {
     const [isExporting, setIsExporting] = useState(false);
     const [summary, setSummary] = useState<MeetingSummary | null>(null);
     const [activeItems, setActiveItems] = useState<Set<string>>(new Set());
+    const [isFreeUser, setIsFreeUser] = useState(false);
+
+    // Check if user has free_analysis (no limits)
+    useEffect(() => {
+        const checkFreeUser = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (user) {
+                const { data } = await supabase
+                    .from("profiles")
+                    .select("free_analysis")
+                    .eq("user_id", user.id)
+                    .maybeSingle();
+                if (data?.free_analysis) {
+                    setIsFreeUser(true);
+                }
+            }
+        };
+        checkFreeUser();
+    }, []);
 
     // Filter analyses for the selected building (done mostly by server now, but we keep it safe)
     const buildingAnalyses = useMemo(() => {
@@ -188,7 +210,10 @@ const PrepararReunion = () => {
         if (!summary) return;
         const activeSummaryItems = summary.items.filter(item => activeItems.has(item.id));
         const agendaText = activeSummaryItems.map(item =>
-            `[ ] ${item.title} (${item.category})\n    ${item.description}\n    Fuente: ${item.source}`
+            `[ ] ${item.title} (${item.category})\n    ${item.description}\n` +
+            (item.problem ? `    ⚠️ Problema detectado: ${item.problem}\n` : "") +
+            (item.proposed_solution ? `    ✅ Solución propuesta: ${item.proposed_solution}\n` : "") +
+            `    Fuente: ${item.source}`
         ).join('\n\n');
 
         let fullText = `${summary.title}\n\n${agendaText}`;
@@ -214,33 +239,43 @@ const PrepararReunion = () => {
         try {
             const element = document.getElementById("meeting-temario-content");
             if (!element) return;
-            // 1. Prepare View for Capture (High Contrast & Hide UI)
-            element.classList.add("pdf-export-container");
-            element.classList.add("bg-white"); // Force white background
 
+            // 1. Prepare View for Capture
+            const pdfHeader = document.getElementById("pdf-header");
+            if (pdfHeader) pdfHeader.style.display = "flex";
+
+            element.classList.add("pdf-export-container");
             const originalWidth = element.style.width;
             const originalPadding = element.style.padding;
             const originalMaxWidth = element.style.maxWidth;
 
             element.style.width = "1000px";
             element.style.maxWidth = "1000px";
-            element.style.padding = "60px";
+            element.style.padding = "40px";
 
-            // Simple PDF generation
+            // Use html2canvas to capture the element
             const canvas = await html2canvas(element, {
-                scale: 2,
+                scale: 2, // 2 is usually enough and more stable
                 useCORS: true,
                 backgroundColor: "#ffffff",
-                logging: false
+                logging: false,
+                windowWidth: 1000,
+                onclone: (clonedDoc) => {
+                    const el = clonedDoc.getElementById("meeting-temario-content");
+                    const header = clonedDoc.getElementById("pdf-header");
+                    if (el) el.style.backgroundColor = "#ffffff";
+                    if (header) header.style.display = "flex";
+                }
             });
 
-            // Restore View
+            // 2. Restore View
             element.classList.remove("pdf-export-container");
-            element.classList.remove("bg-white");
             element.style.width = originalWidth;
             element.style.maxWidth = originalMaxWidth;
             element.style.padding = originalPadding;
+            if (pdfHeader) pdfHeader.style.display = "none";
 
+            // 3. Generate PDF with multi-page support
             const imgData = canvas.toDataURL("image/png");
             const pdf = new jsPDF({
                 orientation: "portrait",
@@ -248,23 +283,69 @@ const PrepararReunion = () => {
                 format: "a4"
             });
 
-            const imgWidth = 190;
-            const pageHeight = 297;
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+            const pdfWidth = 210;
+            const pdfHeight = 297;
+            const margin = 10;
+            const footerHeight = 15;
+            const printWidth = pdfWidth - (margin * 2);
+            const imgHeight = (canvas.height * printWidth) / canvas.width;
+
             let heightLeft = imgHeight;
-            let position = 10;
+            let printedHeight = 0;
+            let pageNumber = 1;
 
-            pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-            heightLeft -= pageHeight;
+            const drawFooter = (pageNo: number) => {
+                const footerY = pdfHeight - 10;
+                pdf.setDrawColor(220, 220, 220);
+                pdf.line(margin, footerY - 5, pdfWidth - margin, footerY - 5);
+                pdf.setFontSize(8);
+                pdf.setTextColor(100);
+                pdf.text("ExpensaCheck - Temario de Reunión", margin, footerY);
+                pdf.text(`Generado el ${new Date().toLocaleDateString()}`, pdfWidth - margin, footerY, { align: "right" });
+                pdf.text(`Pág ${pageNo}`, pdfWidth / 2, footerY, { align: "center" });
+            };
 
-            while (heightLeft >= 0) {
-                position = heightLeft - imgHeight;
+            // First Page
+            const startY = margin;
+            const maxContentY = pdfHeight - margin - footerHeight;
+            const firstPageCap = maxContentY - startY;
+
+            pdf.addImage(imgData, "PNG", margin, startY, printWidth, imgHeight);
+
+            // Mask for footer
+            pdf.setFillColor(255, 255, 255);
+            pdf.rect(0, maxContentY, pdfWidth, pdfHeight - maxContentY, "F");
+            drawFooter(1);
+
+            heightLeft -= firstPageCap;
+            printedHeight += firstPageCap;
+
+            // Subsequent Pages
+            while (heightLeft > 0) {
+                pageNumber++;
                 pdf.addPage();
-                pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
+
+                const pageStartY = margin + 10;
+                const pageMaxContentY = pdfHeight - margin - footerHeight;
+                const availableHeight = pageMaxContentY - pageStartY;
+
+                pdf.addImage(imgData, "PNG", margin, pageStartY - (printedHeight * (imgHeight / imgHeight)), printWidth, imgHeight);
+                // Adjust position based on scale
+                const adjustedPrintedHeight = (printedHeight * imgHeight) / imgHeight; // Simplification, testing shows this works better
+
+                pdf.addImage(imgData, "PNG", margin, pageStartY - printedHeight, printWidth, imgHeight);
+
+                // Mask top and bottom
+                pdf.setFillColor(255, 255, 255);
+                pdf.rect(0, 0, pdfWidth, pageStartY, "F");
+                pdf.rect(0, pageMaxContentY, pdfWidth, pdfHeight - pageMaxContentY, "F");
+
+                drawFooter(pageNumber);
+                heightLeft -= availableHeight;
+                printedHeight += availableHeight;
             }
 
-            pdf.save(`Temario_${selectedBuilding}_${new Date().toLocaleDateString()}.pdf`);
+            pdf.save(`Temario_${selectedBuilding}_${new Date().toLocaleDateString("es-AR")}.pdf`);
             toast.success("Temario exportado como PDF");
         } catch (error) {
             console.error("Error exporting PDF:", error);
@@ -431,16 +512,34 @@ const PrepararReunion = () => {
                                             )}
                                         </Button>
 
-                                        <p className="text-center text-xs text-muted-foreground mt-4 font-medium flex items-center justify-center gap-1.5 opacity-70">
-                                            <AlertCircle className="w-3.5 h-3.5" />
-                                            Límite: 3 temarios estratégicos por día.
-                                        </p>
+                                        {!isFreeUser && (
+                                            <p className="text-center text-xs text-muted-foreground mt-4 font-medium flex items-center justify-center gap-1.5 opacity-70">
+                                                <AlertCircle className="w-3.5 h-3.5" />
+                                                Límite: 3 temarios estratégicos por día.
+                                            </p>
+                                        )}
                                     </CardContent>
                                 </Card>
                             )}
                         </div>
                     ) : (
                         <div id="meeting-temario-content" className="space-y-8 animate-fade-in print:p-0">
+                            {/* PDF ONLY HEADER */}
+                            <div id="pdf-header" className="hidden items-center justify-between mb-10 pb-6 border-b-2 border-primary/20">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12">
+                                        <Logo className="w-full h-full" />
+                                    </div>
+                                    <div>
+                                        <h1 className="text-3xl font-black tracking-tighter text-foreground leading-none">ExpensaCheck</h1>
+                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-1.5 opacity-80">Inteligencia Artificial para tus Expensas</p>
+                                    </div>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-sm font-bold text-foreground">{selectedBuilding}</p>
+                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</p>
+                                </div>
+                            </div>
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-8 print:hidden">
                                 <div>
                                     <h2 className="text-3xl font-black text-foreground">{summary.title}</h2>
@@ -462,8 +561,8 @@ const PrepararReunion = () => {
 
                             {/* PREPARATION GUIDE SECTION - NEW ASSET */}
                             {summary.preparation_guide && (
-                                <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up delay-100">
-                                    <Card className="md:col-span-2 rounded-[2.5rem] border-primary/20 bg-primary/5 backdrop-blur-xl overflow-hidden">
+                                <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up delay-100 pdf-section">
+                                    <Card className="md:col-span-2 rounded-[2.5rem] border-primary/20 bg-primary/5 backdrop-blur-xl overflow-hidden pdf-card">
                                         <CardHeader className="p-8 border-b border-primary/10">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
@@ -497,20 +596,20 @@ const PrepararReunion = () => {
                                         </CardContent>
                                     </Card>
 
-                                    <Card className="rounded-[2.5rem] border-secondary/20 bg-secondary/5 backdrop-blur-xl overflow-hidden h-fit">
+                                    <Card className="rounded-[2.5rem] border-secondary/20 bg-secondary/5 backdrop-blur-xl overflow-hidden h-fit pdf-card">
                                         <CardHeader className="p-8 border-b border-secondary/10">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-10 h-10 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center shadow-lg shadow-secondary/20">
                                                     <Zap className="w-5 h-5" />
                                                 </div>
-                                                <CardTitle className="text-xl font-bold">Datos en Mano</CardTitle>
+                                                <CardTitle className="text-lg font-bold">Datos en Mano</CardTitle>
                                             </div>
                                         </CardHeader>
                                         <CardContent className="p-8 space-y-6">
                                             {summary.preparation_guide.key_figures.map((figure, idx) => (
                                                 <div key={idx} className="flex flex-col">
-                                                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1">{figure.label}</span>
-                                                    <span className="text-2xl font-black text-secondary">{figure.value}</span>
+                                                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">{figure.label}</span>
+                                                    <span className="text-xl font-black text-secondary">{figure.value}</span>
                                                 </div>
                                             ))}
                                             <div className="pt-4 border-t border-secondary/10">
@@ -524,64 +623,93 @@ const PrepararReunion = () => {
                                 </div>
                             )}
 
-                            <div className="space-y-4">
-                                <div className="flex items-center gap-3 px-2">
-                                    <ClipboardList className="w-5 h-5 text-primary" />
-                                    <h3 className="text-lg font-bold text-foreground">Temario de la Asamblea</h3>
-                                </div>
-                                {summary.items.map((item) => (
-                                    <Card
-                                        key={item.id}
-                                        className={cn(
-                                            "rounded-[2rem] border-border/50 transition-all duration-300",
-                                            activeItems.has(item.id)
-                                                ? "bg-card/40 backdrop-blur-xl border-primary/20 shadow-xl opacity-100 scale-100 pdf-item-active"
-                                                : "bg-muted/10 border-transparent opacity-60 scale-[0.98] item-inactive pdf-item-hidden"
-                                        )}
-                                    >
-                                        <CardContent className="p-0">
-                                            <div className="flex items-stretch overflow-hidden">
+                            <div className="mb-8 pdf-section">
+                                <Card className="rounded-[2rem] border-primary/20 bg-card/40 backdrop-blur-xl shadow-xl overflow-hidden pdf-card">
+                                    <CardHeader className="p-6 border-b border-border/50 bg-primary/5">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-lg flex items-center gap-2">
+                                                <LayoutList className="w-5 h-5 text-primary" />
+                                                Temario Sugerido para Reunión
+                                            </CardTitle>
+                                            <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                                                Generado por IA
+                                            </Badge>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y divide-border/50">
+                                            {summary.items.map((item) => (
                                                 <div
+                                                    key={item.id}
                                                     className={cn(
-                                                        "w-12 sm:w-16 flex items-center justify-center cursor-pointer transition-colors border-r border-border/30",
-                                                        activeItems.has(item.id) ? "bg-primary/5" : "bg-transparent"
+                                                        "flex transition-colors",
+                                                        activeItems.has(item.id)
+                                                            ? "bg-card/40 hover:bg-card/60 pdf-item-active"
+                                                            : "bg-muted/5 opacity-60 hover:opacity-80 item-inactive pdf-item-hidden"
                                                     )}
-                                                    onClick={() => toggleItem(item.id)}
                                                 >
-                                                    <Checkbox
-                                                        checked={activeItems.has(item.id)}
-                                                        onCheckedChange={() => toggleItem(item.id)}
-                                                        className="w-6 h-6 rounded-lg border-2"
-                                                    />
-                                                </div>
-                                                <div className="flex-1 p-6 md:p-8">
-                                                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
-                                                        <div className="flex items-center gap-3">
+                                                    {/* Checkbox Column */}
+                                                    <div
+                                                        className="w-14 flex items-center justify-center border-r border-border/30 cursor-pointer pdf-hide-column"
+                                                        onClick={() => toggleItem(item.id)}
+                                                    >
+                                                        <Checkbox
+                                                            checked={activeItems.has(item.id)}
+                                                            onCheckedChange={() => toggleItem(item.id)}
+                                                            className="w-5 h-5 rounded-md border-2"
+                                                        />
+                                                    </div>
+
+                                                    {/* Content Column */}
+                                                    <div className="flex-1 p-6">
+                                                        <div className="flex items-center gap-3 mb-2">
                                                             <Badge className={cn(
-                                                                "rounded-full px-4 py-1 text-[10px] font-black uppercase tracking-widest",
-                                                                item.importance === 'high' ? "bg-secondary/20 text-secondary border-secondary/30" :
+                                                                "rounded-full px-3 py-0.5 text-[10px] font-black uppercase tracking-widest",
+                                                                item.importance === 'high' ? "bg-status-attention text-white" :
                                                                     item.importance === 'medium' ? "bg-primary/20 text-primary border-primary/30" :
-                                                                        "bg-muted text-muted-foreground border-border"
+                                                                        "bg-muted text-muted-foreground"
                                                             )}>
                                                                 {item.importance === 'high' ? 'Crítico' : item.importance === 'medium' ? 'Importante' : 'Rutinario'}
                                                             </Badge>
-                                                            <Badge variant="outline" className="rounded-full px-4 py-1 text-[10px] uppercase font-bold text-muted-foreground border-border">
-                                                                {item.category}
-                                                            </Badge>
+                                                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{item.category}</span>
                                                         </div>
-                                                        <span className="text-xs font-bold text-muted-foreground uppercase opacity-70 flex items-center gap-1.5">
-                                                            <Search className="w-3.5 h-3.5" />
-                                                            {item.source}
-                                                        </span>
-                                                    </div>
 
-                                                    <h3 className="text-xl font-bold mb-3">{item.title}</h3>
-                                                    <p className="text-muted-foreground text-base leading-relaxed">{item.description}</p>
+                                                        <h4 className="font-bold mb-1 text-lg">{item.title}</h4>
+                                                        <p className="text-sm text-muted-foreground leading-relaxed mb-4">{item.description}</p>
+
+                                                        {(item.problem || item.proposed_solution) && (
+                                                            <div className="grid gap-2 sm:grid-cols-2 mt-3 pt-3 border-t border-border/40">
+                                                                {item.problem && (
+                                                                    <div className="bg-destructive/5 rounded-lg p-2.5 border border-destructive/10">
+                                                                        <p className="text-[10px] font-bold text-destructive uppercase mb-1 flex items-center gap-1.5">
+                                                                            <AlertCircle className="w-3 h-3" />
+                                                                            Problema
+                                                                        </p>
+                                                                        <p className="text-xs text-foreground/80 font-medium">{item.problem}</p>
+                                                                    </div>
+                                                                )}
+                                                                {item.proposed_solution && (
+                                                                    <div className="bg-primary/5 rounded-lg p-2.5 border border-primary/10">
+                                                                        <p className="text-[10px] font-bold text-primary uppercase mb-1 flex items-center gap-1.5">
+                                                                            <CheckCircle2 className="w-3 h-3" />
+                                                                            Solución
+                                                                        </p>
+                                                                        <p className="text-xs text-foreground/80 font-medium">{item.proposed_solution}</p>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        )}
+
+                                                        <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-primary/70 uppercase">
+                                                            <ArrowRight className="w-3 h-3" />
+                                                            Fuente: {item.source}
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             </div>
 
                             <div className="pt-16 flex flex-col items-center gap-6 print:hidden">

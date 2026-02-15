@@ -341,15 +341,22 @@ const PaymentStep = ({
             <div className="flex justify-between items-center text-lg font-medium">
               <span className="text-muted-foreground tracking-tight">Servicio de Análisis IA</span>
               <span className={`${isFreeAnalysis ? "line-through text-muted-foreground opacity-50" : "text-foreground font-bold"}`}>
-                $1.500 ARS
+                $3.500 ARS
               </span>
             </div>
             <div className="border-t border-border/50 pt-6">
-              <div className="flex justify-between items-center">
-                <span className="text-xl font-bold">Total a abonar</span>
-                <span className={`text-4xl font-black ${isFreeAnalysis ? "text-primary" : "text-foreground"}`}>
-                  {isFreeAnalysis ? "GRATIS" : "$1.500 ARS"}
-                </span>
+              <div className="flex flex-col gap-1">
+                <div className="flex justify-between items-center">
+                  <span className="text-xl font-bold">Total a abonar</span>
+                  <span className={`text-4xl font-black ${isFreeAnalysis ? "text-primary" : "text-foreground"}`}>
+                    {isFreeAnalysis ? "GRATIS" : "$3.500 ARS"}
+                  </span>
+                </div>
+                {!isFreeAnalysis && (
+                  <p className="text-xs text-right text-muted-foreground font-medium italic">
+                    (Equivale al valor de un café ☕)
+                  </p>
+                )}
               </div>
             </div>
           </div>

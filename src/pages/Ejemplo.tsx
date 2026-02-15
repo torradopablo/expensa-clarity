@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   CheckCircle2,
   ArrowLeft,
@@ -30,7 +31,9 @@ import {
   LayoutList,
   ArrowRightCircle,
   Clock,
-  Globe
+  Globe,
+  Brain,
+  HelpCircle
 } from "lucide-react";
 import {
   AreaChart,
@@ -47,14 +50,16 @@ import { ComparisonChart } from "@/components/ComparisonChart";
 import { Logo } from "@/components/layout/ui/logo";
 
 const Header = () => (
-  <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-    <div className="container flex items-center justify-between h-16">
-      <Link to="/" className="flex items-center gap-2">
-        <Logo className="w-8 h-8" />
-        <span className="text-xl font-semibold">ExpensaCheck</span>
+  <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-xl border-b border-border/50">
+    <div className="container flex items-center justify-between h-20">
+      <Link to="/" className="flex items-center gap-2 group">
+        <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+        <span className="text-2xl font-bold tracking-tight bg-clip-text text-foreground">
+          ExpensaCheck
+        </span>
       </Link>
       <div className="flex items-center gap-2">
-        <Button asChild variant="outline" size="sm" className="hidden sm:flex">
+        <Button asChild variant="outline" size="sm" className="hidden sm:flex rounded-full">
           <Link to="/historial">
             <History className="w-4 h-4 mr-2" />
             Ver historial
@@ -65,7 +70,7 @@ const Header = () => (
             <History className="w-4 h-4" />
           </Link>
         </Button>
-        <Button asChild size="sm">
+        <Button asChild size="sm" className="rounded-full font-bold shadow-lg shadow-primary/20">
           <Link to="/analizar">
             <span className="hidden sm:inline">Analizar mi expensa</span>
             <span className="sm:hidden">Analizar</span>
@@ -173,7 +178,9 @@ const mockMeetingAgenda = [
     importance: "high",
     category: "Administración",
     title: "Revisión de honorarios vs Mercado",
-    description: "Se detectó que el aumento del 57.5% sitúa los honorarios significativamente por encima del promedio regional para edificios de similar categoría.",
+    description: "Se detectó que el aumento del 57.5% sitúa los honorarios significativamente por encima del promedio regional.",
+    problem: "Honorarios 57.5% por encima de la inflación anual.",
+    proposed_solution: "Solicitar recotización o presentar 3 presupuestos alternativos.",
     source: "Comparativa de Mercado"
   },
   {
@@ -181,7 +188,9 @@ const mockMeetingAgenda = [
     importance: "medium",
     category: "Servicios",
     title: "Plan de eficiencia energética",
-    description: "Debido al incremento del 56% en la tarifa eléctrica, se propone evaluar el cambio a luminarias LED en áreas comunes y sensores de movimiento.",
+    description: "Debido al incremento del 56% en la tarifa eléctrica, se propone evaluar el cambio a luminarias LED.",
+    problem: "Gasto en electricidad aumentó 56% intermensual.",
+    proposed_solution: "Instalación de sensores de movimiento en palieres (ROI est. 4 meses).",
     source: "Análisis de Evolución"
   },
   {
@@ -189,7 +198,9 @@ const mockMeetingAgenda = [
     importance: "low",
     category: "Mantenimiento",
     title: "Seguimiento reparación portón",
-    description: "Verificar garantía de la reparación realizada este mes para evitar cargos duplicados en períodos futuros.",
+    description: "Verificar garantía de la reparación realizada este mes para evitar cargos duplicados.",
+    problem: "Gasto recurrente en reparación de portón (3ra vez en el año).",
+    proposed_solution: "Exigir informe técnico y garantía escrita al proveedor.",
     source: "Detalle de Gastos"
   }
 ];
@@ -503,6 +514,86 @@ const Ejemplo = () => {
                 <strong className="text-foreground">El paso final:</strong> Una vez detectadas las anomalías, nuestra IA genera automáticamente un <strong className="text-foreground">temario para tu próxima asamblea</strong>. Te damos los argumentos basados en datos para que puedas plantear tus dudas con fundamentos sólidos.
               </p>
 
+
+              <div className="grid md:grid-cols-3 gap-6 animate-fade-in-up delay-100 mb-8">
+                <Card className="md:col-span-2 rounded-[2rem] border-primary/20 bg-primary/5 backdrop-blur-xl overflow-hidden">
+                  <CardHeader className="p-6 border-b border-primary/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center shadow-lg shadow-primary/20">
+                        <Brain className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <CardTitle className="text-lg font-bold">Guía de Preparación</CardTitle>
+                        <CardDescription className="text-xs">Preguntas anticipadas y argumentos clave</CardDescription>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <div className="divide-y divide-primary/10">
+                      <div className="p-6 hover:bg-primary/10 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center flex-shrink-0">
+                            <HelpCircle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-foreground mb-1 text-sm">¿Por qué aumentaron tanto los honorarios?</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed italic">
+                              <span className="text-primary font-bold not-italic mr-1">R:</span>
+                              El aumento del 57.5% supera la inflación acumulada (21%). Se sugiere pedir revisión del contrato.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="p-6 hover:bg-primary/10 transition-colors">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-1 w-6 h-6 rounded-full bg-secondary/20 text-secondary flex items-center justify-center flex-shrink-0">
+                            <HelpCircle className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <p className="font-bold text-foreground mb-1 text-sm">¿Es necesario cambiar las luces ahora?</p>
+                            <p className="text-xs text-muted-foreground leading-relaxed italic">
+                              <span className="text-primary font-bold not-italic mr-1">R:</span>
+                              Sí, la tarifa eléctrica subió 56%. La inversión en LED se recupera en 4 meses con el ahorro generado.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-[2rem] border-secondary/20 bg-secondary/5 backdrop-blur-xl overflow-hidden h-fit">
+                  <CardHeader className="p-6 border-b border-secondary/10">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-secondary text-secondary-foreground flex items-center justify-center shadow-lg shadow-secondary/20">
+                        <Zap className="w-5 h-5" />
+                      </div>
+                      <CardTitle className="text-lg font-bold">Datos en Mano</CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-6 space-y-4">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Inflación Acumulada</span>
+                      <span className="text-xl font-black text-secondary">21.4%</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Aumento Expensas</span>
+                      <span className="text-xl font-black text-secondary">42.6%</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground mb-1">Incidencia Sueldos</span>
+                      <span className="text-xl font-black text-secondary">41.3%</span>
+                    </div>
+                    <div className="pt-3 border-t border-secondary/10">
+                      <p className="text-[10px] text-muted-foreground flex items-center gap-1.5 leading-tight">
+                        <Info className="w-3 h-3 flex-shrink-0" />
+                        Datos clave para responder con autoridad.
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
               <Card className="rounded-[2rem] border-primary/20 bg-card/40 backdrop-blur-xl shadow-xl overflow-hidden">
                 <CardHeader className="p-6 border-b border-border/50 bg-primary/5">
                   <div className="flex items-center justify-between">
@@ -518,22 +609,53 @@ const Ejemplo = () => {
                 <CardContent className="p-0">
                   <div className="divide-y divide-border/50">
                     {mockMeetingAgenda.map((item) => (
-                      <div key={item.id} className="p-6 hover:bg-muted/30 transition-colors">
-                        <div className="flex items-center gap-3 mb-2">
-                          <Badge className={
-                            item.importance === 'high' ? "bg-status-attention text-white" :
-                              item.importance === 'medium' ? "bg-primary/20 text-primary border-primary/30" :
-                                "bg-muted text-muted-foreground"
-                          }>
-                            {item.importance === 'high' ? 'Crítico' : item.importance === 'medium' ? 'Importante' : 'Sugerencia'}
-                          </Badge>
-                          <span className="text-[10px] font-bold text-muted-foreground uppercase">{item.category}</span>
+                      <div key={item.id} className="flex transition-colors bg-card/40 hover:bg-card/60">
+                        {/* Checkbox Column */}
+                        <div className="w-14 flex items-center justify-center border-r border-border/30 cursor-pointer bg-primary/5">
+                          <Checkbox checked={true} className="w-5 h-5 rounded-md border-2" />
                         </div>
-                        <h4 className="font-bold mb-1">{item.title}</h4>
-                        <p className="text-sm text-muted-foreground leading-relaxed">{item.description}</p>
-                        <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-primary/70 uppercase">
-                          <ArrowRightCircle className="w-3 h-3" />
-                          Fuente: {item.source}
+
+                        <div className="flex-1 p-6">
+                          <div className="flex items-center gap-3 mb-2">
+                            <Badge className={
+                              item.importance === 'high' ? "bg-status-attention text-white" :
+                                item.importance === 'medium' ? "bg-primary/20 text-primary border-primary/30" :
+                                  "bg-muted text-muted-foreground"
+                            }>
+                              {item.importance === 'high' ? 'Crítico' : item.importance === 'medium' ? 'Importante' : 'Sugerencia'}
+                            </Badge>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase">{item.category}</span>
+                          </div>
+                          <h4 className="font-bold mb-1">{item.title}</h4>
+                          <p className="text-sm text-muted-foreground leading-relaxed mb-3">{item.description}</p>
+
+                          {(item.problem || item.proposed_solution) && (
+                            <div className="grid gap-2 sm:grid-cols-2 mt-3 pt-3 border-t border-border/40">
+                              {item.problem && (
+                                <div className="bg-destructive/5 rounded-lg p-2.5 border border-destructive/10">
+                                  <p className="text-[10px] font-bold text-destructive uppercase mb-1 flex items-center gap-1.5">
+                                    <AlertTriangle className="w-3 h-3" />
+                                    Problema
+                                  </p>
+                                  <p className="text-xs text-foreground/80 font-medium">{item.problem}</p>
+                                </div>
+                              )}
+                              {item.proposed_solution && (
+                                <div className="bg-primary/5 rounded-lg p-2.5 border border-primary/10">
+                                  <p className="text-[10px] font-bold text-primary uppercase mb-1 flex items-center gap-1.5">
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    Solución
+                                  </p>
+                                  <p className="text-xs text-foreground/80 font-medium">{item.proposed_solution}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+
+                          <div className="mt-3 flex items-center gap-1.5 text-[10px] font-bold text-primary/70 uppercase">
+                            <ArrowRightCircle className="w-3 h-3" />
+                            Fuente: {item.source}
+                          </div>
                         </div>
                       </div>
                     ))}

@@ -115,7 +115,7 @@ serve(async (req) => {
           title: "Análisis de Expensa - ExpensaCheck",
           description: "Análisis completo de tu liquidación de expensas con detección de anomalías",
           quantity: 1,
-          unit_price: 1500,
+          unit_price: 3500,
           currency_id: "ARS",
         },
       ],
@@ -185,7 +185,7 @@ serve(async (req) => {
         analysis_id: analysisId,
         user_id: userId,
         preference_id: mpData.id,
-        amount: 1500, // Matching the item price
+        amount: 3500, // Matching the item price
         status: "pending",
         raw_response: mpData
       });
