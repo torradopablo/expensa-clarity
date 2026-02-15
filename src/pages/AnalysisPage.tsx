@@ -81,10 +81,10 @@ const Header = () => {
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-background/80 backdrop-blur-md border-b border-border">
-      <div className="container flex items-center justify-between h-16">
-        <Link to="/" className="flex items-center gap-2">
-          <Logo className="w-8 h-8" />
-          <span className="text-xl font-semibold">ExpensaCheck</span>
+      <div className="container flex items-center justify-between h-20">
+        <Link to="/" className="flex items-center gap-2 group">
+          <Logo className="w-10 h-10 group-hover:rotate-12 transition-transform duration-500" />
+          <span className="text-2xl font-bold tracking-tight">ExpensaCheck</span>
         </Link>
         <div className="flex items-center gap-2">
           <Button asChild variant="outline" size="sm" className="hidden sm:flex">
@@ -918,7 +918,7 @@ Analizá tu expensa en ExpensaCheck`;
     <TooltipProvider delayDuration={200}>
       <div className="min-h-screen bg-gradient-soft">
         <Header />
-        <main className="pt-24 pb-20">
+        <main className="pt-32 pb-20">
           <div className="container max-w-4xl">
             <div className="flex items-center justify-between mb-8">
               <Button variant="ghost" asChild>
@@ -1280,7 +1280,7 @@ Analizá tu expensa en ExpensaCheck`;
                   </div>
                 ) : (
                   <div className="space-y-6">
-                    {comments.map((comment) => (
+                    {comments.filter(c => !c.parent_comment_id).map((comment) => (
                       <div key={comment.id} className="group animate-fade-in-up">
                         <div className={`p-6 rounded-[1.5rem] border transition-all hover:shadow-lg ${comment.is_owner_comment
                           ? 'bg-primary/5 border-primary/20'

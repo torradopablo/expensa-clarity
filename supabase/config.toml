@@ -30,6 +30,9 @@ verify_jwt = false
 [functions.invalidate-share-cache]
 verify_jwt = false
 
+[functions.add-analysis-comment]
+verify_jwt = false
+
 [functions.cache-maintenance]
 verify_jwt = false
 
