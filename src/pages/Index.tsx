@@ -24,6 +24,9 @@ import {
 import heroIllustration from "@/assets/hero-illustration.png";
 
 import { Logo } from "@/components/layout/ui/logo";
+import { formatCurrency } from "@/services/formatters/currency";
+
+const EXPENSE_PRICE = Number(import.meta.env.VITE_EXPENSE_PRICE || 5000);
 
 const Header = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -481,7 +484,7 @@ const PricingSection = () => (
 
             <div className="mb-8">
               <div className="flex items-baseline mb-1">
-                <span className="text-6xl font-black text-foreground">$3.500</span>
+                <span className="text-6xl font-black text-foreground">{formatCurrency(EXPENSE_PRICE)}</span>
                 <span className="text-muted-foreground text-lg ml-2">/ análisis</span>
               </div>
               <p className="text-xs text-muted-foreground font-medium italic pl-1 flex items-center gap-1.5 opacity-80">

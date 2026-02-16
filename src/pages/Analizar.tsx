@@ -20,6 +20,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
 import { Logo } from "@/components/layout/ui/logo";
+import { formatCurrency } from "@/services/formatters/currency";
+
+const EXPENSE_PRICE = Number(import.meta.env.VITE_EXPENSE_PRICE || 5000);
 
 const Header = () => {
   const navigate = useNavigate();
@@ -341,7 +344,7 @@ const PaymentStep = ({
             <div className="flex justify-between items-center text-lg font-medium">
               <span className="text-muted-foreground tracking-tight">Servicio de Análisis IA</span>
               <span className={`${isFreeAnalysis ? "line-through text-muted-foreground opacity-50" : "text-foreground font-bold"}`}>
-                $3.500 ARS
+                {formatCurrency(EXPENSE_PRICE)} ARS
               </span>
             </div>
             <div className="border-t border-border/50 pt-6">
@@ -349,7 +352,7 @@ const PaymentStep = ({
                 <div className="flex justify-between items-center">
                   <span className="text-xl font-bold">Total a abonar</span>
                   <span className={`text-4xl font-black ${isFreeAnalysis ? "text-primary" : "text-foreground"}`}>
-                    {isFreeAnalysis ? "GRATIS" : "$3.500 ARS"}
+                    {isFreeAnalysis ? "GRATIS" : `${formatCurrency(EXPENSE_PRICE)} ARS`}
                   </span>
                 </div>
                 {!isFreeAnalysis && (

@@ -92,6 +92,8 @@ serve(async (req) => {
 
     // Build absolute back URLs
     // Hierarchy: Origin header > SITE_URL secret > Fallback hardcoded
+    // Get configuration
+    const EXPENSE_PRICE = Number(Deno.env.get("EXPENSE_PRICE") || 5000);
     const siteUrl = Deno.env.get("SITE_URL") || "https://expensa-check.vercel.app";
     const rawOrigin = req.headers.get("origin") || req.headers.get("Origin") || siteUrl;
     const origin = rawOrigin.replace(/\/$/, ""); // Ensure no trailing slash
@@ -115,7 +117,7 @@ serve(async (req) => {
           title: "Análisis de Expensa - ExpensaCheck",
           description: "Análisis completo de tu liquidación de expensas con detección de anomalías",
           quantity: 1,
-          unit_price: 3500,
+          unit_price: EXPENSE_PRICE,
           currency_id: "ARS",
         },
       ],
@@ -185,7 +187,7 @@ serve(async (req) => {
         analysis_id: analysisId,
         user_id: userId,
         preference_id: mpData.id,
-        amount: 3500, // Matching the item price
+        amount: EXPENSE_PRICE, // Matching the item price
         status: "pending",
         raw_response: mpData
       });
