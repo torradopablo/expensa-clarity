@@ -169,8 +169,19 @@ REGLAS CRÍTICAS DE NEGOCIO:
    - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
    - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
    - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
-5. IMPORTANTE: Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, identifica si el documento pertenece a alguno de ellos (incluso si el nombre en el PDF varía levemente o tiene abreviaturas) y usa el nombre de la guía.
-6. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
+6. IMPORTANTE - IDENTIFICACIÓN DEL EDIFICIO (ESTRATEGIA ARGEN-HEADER):
+   - UBICACIÓN PREFERENTE: El nombre real suele estar ARRIBA de todo, a menudo centrado o a la izquierda.
+   - PATRONES COMUNES: 
+     a) "CONSORCIO [DIRECCIÓN]" (Ej: CONSORCIO CALLAO 1540) -> El nombre es "Callao 1540".
+     b) "CONSORCIO DE PROPIETARIOS DEL EDIFICIO [NOMBRE]" -> Usa el [NOMBRE].
+     c) Solo la dirección: "CALLE NUMERO, Ciudad" -> Usa "Calle Numero".
+   - CUIT DEL EDIFICIO: Casi siempre hay un CUIT (30-... o 33-...) cerca del nombre del consorcio. Úsalo como ancla. El CUIT de la administración suele estar en el pie de página o en un recuadro separado de "Datos del Administrador".
+   - REGLA DE EXCLUSIÓN TOTAL: Si un nombre está asociado a "Administración", "Administradora", "Adm.", "Estudio", "Adms. de Inmuebles" o "Liquidó", ESE NO ES EL EDIFICIO. 
+     - Ej: Si dice "Administración Los Robles" y abajo "CONSORCIO RIVADAVIA 500", el edificio es "Rivadavia 500".
+     - Si dice "Estudio Jurídico Pérez" en grande, ignóralo y busca el nombre del consorcio.
+   - Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, prioriza esos nombres si hay un match parcial (ej: el PDF dice "Arenales 10" y la guía dice "Arenales 10 - Torre A").
+   - IMPORTANTE: Si solo encuentras una dirección, ese ES el nombre del edificio. No inventes nombres si no están.
+7. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
 
 JSON Schema:
 {
@@ -204,6 +215,6 @@ JSON Schema:
   }
 
   private getAnalysisPrompt(isPDF: boolean): string {
-    return "Analizá esta liquidación de expensas y extraé los datos estructurados en JSON:";
+    return "Analizá esta liquidación de expensas y extraé los datos estructurados en JSON. ADVERTENCIA: No confundas el nombre de la ADMINISTRACIÓN (ej: quien liquida) con el nombre del CONSORCIO/EDIFICIO (ej: la dirección o nombre del inmueble). Es CRÍTICO extraer el nombre correcto para el historial del usuario:";
   }
 }
