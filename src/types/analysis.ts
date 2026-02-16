@@ -15,7 +15,7 @@ export interface Analysis {
   unit: string | null;
   total_amount: number;
   previous_total: number | null;
-  status: "pending" | "processing" | "completed" | "error";
+  status: "pending" | "paid" | "processing" | "completed" | "failed";
   created_at: string;
   period_date: string | null;
   file_url: string | null;

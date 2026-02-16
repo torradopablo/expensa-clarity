@@ -56,6 +56,30 @@ serve(async (req) => {
 
     const userId = user.id;
 
+    // Check if the analysis is already completed
+    const { data: currentAnalysis, error: fetchError } = await supabase
+      .from("expense_analyses")
+      .select("status, file_url")
+      .eq("id", analysisId)
+      .single();
+
+    if (fetchError) {
+      console.error("Error fetching current analysis status:", fetchError);
+    }
+
+    if (currentAnalysis?.status === "completed") {
+      return new Response(
+        JSON.stringify({ success: true, message: "Análisis ya completado previamente" }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Clean up any existing categories if this is a retry
+    await supabase
+      .from("expense_categories")
+      .delete()
+      .eq("analysis_id", analysisId);
+
     // Convert file to base64 for AI processing (safe for large files)
     const arrayBuffer = await file.arrayBuffer();
     const base64 = encode(new Uint8Array(arrayBuffer));
