@@ -483,20 +483,47 @@ const PaymentSuccessHandler = ({
 
   useEffect(() => {
     const processExpense = async () => {
-      if (!file) {
-        setError("No se encontró el archivo. Por favor, volvé a subir tu expensa.");
-        setIsProcessing(false);
-        return;
-      }
+      let currentFile = file;
 
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (!session) throw new Error("No autorizado");
 
+        // If file is missing (e.g. refresh), try to fetch it from storage using analysisId
+        if (!currentFile) {
+          console.log("File missing in state, attempting to recover from storage...");
+          const { data: analysis, error: fetchError } = await supabase
+            .from("expense_analyses")
+            .select("file_url")
+            .eq("id", analysisId)
+            .single();
+
+          if (fetchError || !analysis?.file_url) {
+            throw new Error("No se pudo recuperar el archivo descargado. Por favor, volvé a subir tu expensa desde el Historial.");
+          }
+
+          const { data: fileBlob, error: downloadError } = await supabase.storage
+            .from("expense-files")
+            .download(analysis.file_url);
+
+          if (downloadError || !fileBlob) {
+            throw new Error("Error al descargar el archivo para procesar.");
+          }
+
+          currentFile = new File([fileBlob], "expensa.pdf", { type: "application/pdf" });
+        }
+
         const formData = new FormData();
-        formData.append("file", file);
+        formData.append("file", currentFile);
         formData.append("analysisId", analysisId);
 
+        // Update status to processing
+        await supabase
+          .from("expense_analyses")
+          .update({ status: "processing" })
+          .eq("id", analysisId);
+
+        console.log("Starting analysis processing...");
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/process-expense`,
           {
@@ -513,12 +540,17 @@ const PaymentSuccessHandler = ({
           throw new Error(errorData.error || "Error al procesar la expensa");
         }
 
-        const responseData = await response.json();
         onProcessingComplete(analysisId);
       } catch (err: any) {
         console.error("Processing error:", err);
         setError(err.message || "Error al procesar la expensa");
         setIsProcessing(false);
+
+        // Mark as failed in DB
+        await supabase
+          .from("expense_analyses")
+          .update({ status: "failed" })
+          .eq("id", analysisId);
       }
     };
 
@@ -682,7 +714,7 @@ const Analizar = () => {
 
     setIsUploading(true);
     try {
-      // Create analysis record
+      // 1. Create analysis record
       const { data: analysis, error: analysisError } = await supabase
         .from("expense_analyses")
         .insert({
@@ -696,11 +728,30 @@ const Analizar = () => {
 
       if (analysisError) throw analysisError;
 
+      // 2. Upload file to storage immediately
+      const filePath = `${user.id}/${analysis.id}/${file.name}`;
+      const { error: uploadError } = await supabase.storage
+        .from("expense-files")
+        .upload(filePath, file, {
+          contentType: file.type,
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      // 3. Update record with file_url
+      const { error: updateError } = await supabase
+        .from("expense_analyses")
+        .update({ file_url: filePath })
+        .eq("id", analysis.id);
+
+      if (updateError) throw updateError;
+
       setAnalysisId(analysis.id);
       setCurrentStep(2);
     } catch (error: any) {
-      console.error("Error creating analysis:", error);
-      toast.error("Error al preparar el análisis");
+      console.error("Error creating analysis or uploading file:", error);
+      toast.error("Error al preparar el análisis. Por favor, intentá de nuevo.");
     } finally {
       setIsUploading(false);
     }

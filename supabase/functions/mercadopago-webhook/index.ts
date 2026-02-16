@@ -247,6 +247,24 @@ serve(async (req) => {
 
       console.log(`Analysis ${analysisId} updated to status: ${newStatus}`);
 
+      // Update the status in the database
+      const { error: updateError } = await supabase
+        .from("expense_analyses")
+        .update({
+          status: newStatus,
+          payment_id: payment.id.toString(),
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", analysisId);
+
+      if (updateError) {
+        console.error("Error updating expense analysis status:", updateError);
+        return new Response(
+          JSON.stringify({ error: "Error updating database" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
       // Fetch user_id for audit logging
       const { data: analysisData } = await supabase
         .from("expense_analyses")

@@ -227,8 +227,12 @@ const Historial = () => {
 
   // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
-    const completedAnalyses = analyses.filter(a => a.status === "completed");
-    const filtered = completedAnalyses.filter(analysis => {
+    // Show completed, processing, paid, and failed statuses
+    const relevantAnalyses = analyses.filter(a =>
+      ["completed", "processing", "paid", "failed"].includes(a.status)
+    );
+
+    const filtered = relevantAnalyses.filter(analysis => {
       // Search query filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
@@ -248,11 +252,11 @@ const Historial = () => {
       return true;
     });
 
-    // Sort by period_date (newest first), fallback to created_at
+    // Sort by period_date or created_at (newest first)
     return filtered.sort((a, b) => {
       const dateA = a.period_date ? new Date(a.period_date).getTime() : new Date(a.created_at).getTime();
       const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
-      return dateB - dateA; // Descending order (newest first)
+      return dateB - dateA;
     });
   }, [analyses, searchQuery, buildingFilter]);
 
@@ -437,12 +441,17 @@ const Historial = () => {
               {filteredAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
                 const isSelected = selectedIds.has(analysis.id);
+                const isCompleted = analysis.status === "completed";
+                const isProcessing = analysis.status === "processing" || analysis.status === "paid";
+                const isFailed = analysis.status === "failed";
 
                 const cardContent = (
                   <Card
                     className={cn(
                       "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg hover:shadow-2xl hover:shadow-primary/5",
-                      isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10"
+                      isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10",
+                      isProcessing && "border-primary/30",
+                      isFailed && "border-destructive/30"
                     )}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
@@ -451,7 +460,7 @@ const Historial = () => {
                         <div className="flex-1 p-6 md:p-8">
                           <div className="flex items-start justify-between gap-6">
                             <div className="flex items-start gap-5">
-                              {selectionMode && (
+                              {selectionMode && isCompleted && (
                                 <div className="mt-1" onClick={(e) => e.stopPropagation()}>
                                   <Checkbox
                                     checked={isSelected}
@@ -464,7 +473,7 @@ const Historial = () => {
                               <div className="min-w-0">
                                 <div className="flex items-center gap-3 mb-2">
                                   <p className="text-base font-bold text-foreground truncate">
-                                    {analysis.building_name || "Edificio"}
+                                    {analysis.building_name || (isProcessing ? "Edificio (identificando...)" : "Edificio desconocido")}
                                     {analysis.unit && (
                                       <span className="ml-2 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-black uppercase">
                                         UF {analysis.unit}
@@ -473,9 +482,23 @@ const Historial = () => {
                                   </p>
                                 </div>
                                 <h3 className="text-2xl font-black tracking-tight text-foreground line-height-none">{analysis.period}</h3>
-                                <div className="flex items-center gap-2 mt-3 text-sm font-medium text-muted-foreground">
-                                  <CheckCircle2 className="w-4 h-4 text-primary" />
-                                  Analizado el {formatDate(analysis.created_at)}
+                                <div className="flex items-center gap-2 mt-3 text-sm font-medium">
+                                  {isCompleted ? (
+                                    <>
+                                      <CheckCircle2 className="w-4 h-4 text-primary" />
+                                      <span className="text-muted-foreground">Analizado el {formatDate(analysis.created_at)}</span>
+                                    </>
+                                  ) : isProcessing ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 text-primary animate-spin" />
+                                      <span className="text-primary font-bold">Procesando con IA...</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <X className="w-4 h-4 text-destructive" />
+                                      <span className="text-destructive font-bold">Error en proceso - Hacer clic para reintentar</span>
+                                    </>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -494,8 +517,10 @@ const Historial = () => {
                         <div className="flex items-center justify-between sm:justify-center gap-8 p-6 md:p-8 bg-muted/20 sm:w-60 border-t sm:border-t-0 sm:border-l border-border/50 group-hover:bg-primary/5 transition-colors">
                           <div className="text-left sm:text-right">
                             <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Total abonado</p>
-                            <p className="text-2xl font-black text-foreground tabular-nums">{formatCurrency(analysis.total_amount)}</p>
-                            {change !== null && (
+                            <p className="text-2xl font-black text-foreground tabular-nums">
+                              {analysis.total_amount > 0 ? formatCurrency(analysis.total_amount) : "(pendiente)"}
+                            </p>
+                            {isCompleted && change !== null && (
                               <div className={`flex items-center sm:justify-end gap-1.5 text-sm font-extrabold mt-1.5 ${change > 10 ? "text-secondary" : change > 0 ? "text-muted-foreground" : "text-primary"
                                 }`}>
                                 {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
@@ -515,7 +540,7 @@ const Historial = () => {
                   </Card>
                 );
 
-                if (selectionMode) {
+                if (selectionMode && isCompleted) {
                   return (
                     <div
                       key={analysis.id}
@@ -530,7 +555,7 @@ const Historial = () => {
                 return (
                   <Link
                     key={analysis.id}
-                    to={`/analisis/${analysis.id}`}
+                    to={isCompleted ? `/analisis/${analysis.id}` : `/analizar?payment=success&analysisId=${analysis.id}`}
                     className="block"
                   >
                     {cardContent}
