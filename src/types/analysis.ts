@@ -23,6 +23,7 @@ export interface Analysis {
   expense_categories?: Category[];
   evolution_analysis?: string | null;
   deviation_stats?: any | null;
+  building_profile_id?: string | null;
 }
 
 export interface EvolutionData {
