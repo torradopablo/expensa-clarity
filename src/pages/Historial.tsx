@@ -137,6 +137,7 @@ const Historial = () => {
 
   const {
     analyses,
+    totalCount,
     buildings,
     loading,
     deleteAnalysis,
@@ -304,7 +305,9 @@ const Historial = () => {
               <div>
                 <h1 className="text-4xl font-extrabold tracking-tight">Mis Expensas</h1>
                 <p className="text-muted-foreground font-medium mt-1">
-                  {filteredAnalyses.length} {filteredAnalyses.length === 1 ? "análisis guardado" : "análisis guardados"}
+                  {totalCount > 0
+                    ? `Mostrando ${filteredAnalyses.length} de ${totalCount} análisis`
+                    : "0 análisis"}
                 </p>
               </div>
             </div>

@@ -329,10 +329,13 @@ const Evolucion = () => {
     const firstPeriod = periodToYearMonth(baseEvolution[0].period, null);
     const baseInflation = firstPeriod ? inflationMap.get(firstPeriod) : null;
 
-    // Create a map of buildings trend by period
+    // Create a map of buildings trend by period using the raw average
     const buildingsTrendMap = new Map(
-      buildingsTrend.map((t: any) => [t.period, t.normalizedPercent])
+      buildingsTrend.map((t: any) => [t.period, t.average])
     );
+
+    // Get the market average for the first period of our series
+    const baseMarketAvg = buildingsTrendMap.get(baseEvolution[0].period);
 
     return baseEvolution.map(point => {
       const yyyymm = periodToYearMonth(point.period, (point as any).periodDate);
@@ -345,8 +348,12 @@ const Evolucion = () => {
         }
       }
 
-      // Get buildings percent for this specific period
-      const buildingsPercent = buildingsTrendMap.get(point.period) ?? null;
+      // Get buildings percent for this specific period, re-normalized to our base period
+      let buildingsPercent = null;
+      const currentMarketAvg = buildingsTrendMap.get(point.period);
+      if (currentMarketAvg !== undefined && baseMarketAvg) {
+        buildingsPercent = ((Number(currentMarketAvg) - Number(baseMarketAvg)) / Number(baseMarketAvg)) * 100;
+      }
 
       return {
         ...point,
