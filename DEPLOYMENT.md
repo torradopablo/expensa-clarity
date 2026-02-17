@@ -2,7 +2,16 @@
 
 This file contains implementation considerations and strategies for each project release.
 
-## Unreleased
+## [1.2.0] - 2026-02-17
+
+### Deployment Strategy & Considerations
+> **Information**: This version introduces performance optimizations, contextual filtering for market benchmarks, and header UI standardization.
+
+1. **Database (SQL Migration)**: A new migration file `20260217194500_add_performance_indexes.sql` has been added. If not using the Supabase CLI, execute the following in the SQL Editor:
+2. **Edge Functions**: Redeploy the following functions to apply the new caching and contextual filtering logic:
+   - `get-buildings-trend`: Handles the optimized market comparison with building profile attributes.
+   - `fetch-inflation`: Updated to support internal caching mechanisms.
+3. **Frontend**: Deploy the web application. Verify that the history page correctly displays the "Showing X of Y" indicator and that headers are consistent across legal pages.
 
 ## [1.1.1] - 2026-02-17
 

@@ -5,6 +5,7 @@ import type { Analysis, Category, BuildingProfile } from "../types/analysis";
 
 export interface UseAnalysisState {
   analyses: Analysis[];
+  totalCount: number;
   buildings: string[];
   categories: string[];
   hasNextPage: boolean;
@@ -51,7 +52,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     queryFn: async ({ pageParam = 0 }) => {
       let query = supabase
         .from("expense_analyses")
-        .select("*, expense_categories(*)")
+        .select("*, expense_categories(*)", { count: 'exact' })
         .order("period_date", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
 
@@ -59,18 +60,22 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
         query = query.eq("building_name", filters.buildingName);
       }
 
-      const { data, error } = await query.range(pageParam, pageParam + PAGE_SIZE - 1);
+      const { data, error, count } = await query.range(pageParam, pageParam + PAGE_SIZE - 1);
 
       if (error) throw error;
-      return data as Analysis[];
+      return {
+        data: data as Analysis[],
+        totalCount: count || 0
+      };
     },
     getNextPageParam: (lastPage, allPages) => {
-      return lastPage.length === PAGE_SIZE ? allPages.length * PAGE_SIZE : undefined;
+      return lastPage.data.length === PAGE_SIZE ? allPages.length * PAGE_SIZE : undefined;
     },
     initialPageParam: 0,
   });
 
-  const analyses = infiniteAnalyses?.pages.flat() || [];
+  const analyses = infiniteAnalyses?.pages.map(p => p.data).flat() || [];
+  const totalCount = infiniteAnalyses?.pages[0]?.totalCount || 0;
 
   // Query for unique buildings
   const { data: buildings = [] } = useQuery({
@@ -253,12 +258,13 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
       queryClient.invalidateQueries({ queryKey: ["analyses"] });
     } catch (error) {
       console.error("Error al procesar archivo:", error);
-      await updateMutation.mutateAsync({ id: analysisId, data: { status: "error" } });
+      await updateMutation.mutateAsync({ id: analysisId, data: { status: "failed" } });
     }
   };
 
   return {
     analyses,
+    totalCount,
     buildings,
     categories: allCategories,
     hasNextPage,
