@@ -24,6 +24,32 @@ export interface UseEvolutionActions {
 export function useEvolution(category?: string, buildingName?: string) {
   const queryClient = useQueryClient();
 
+  // Query to fetch building profile for better filtering
+  const { data: buildingProfile } = useQuery({
+    queryKey: ["building-profile", buildingName],
+    queryFn: async () => {
+      if (!buildingName || buildingName === "all") return null;
+
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return null;
+
+      const { data, error } = await supabase
+        .from("building_profiles")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .eq("building_name", buildingName)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching building profile:", error);
+        return null;
+      }
+      return data;
+    },
+    enabled: !!buildingName && buildingName !== "all",
+    staleTime: 1000 * 60 * 60, // 1 hour
+  });
+
   // Queries
   const {
     data: inflationData = [],
@@ -50,7 +76,7 @@ export function useEvolution(category?: string, buildingName?: string) {
     isLoading: loadingTrend,
     error: errorTrend
   } = useQuery({
-    queryKey: ["buildings-trend", category, buildingName],
+    queryKey: ["buildings-trend", category, buildingName, buildingProfile?.id],
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
       const filters: any = {};
@@ -67,6 +93,15 @@ export function useEvolution(category?: string, buildingName?: string) {
 
       if (session?.user?.id) {
         filters.excludeUserId = session.user.id;
+      }
+
+      // Add profile filters if we have a building profile
+      if (buildingProfile) {
+        if (buildingProfile.neighborhood) filters.neighborhood = buildingProfile.neighborhood;
+        if (buildingProfile.zone) filters.zone = buildingProfile.zone;
+        if (buildingProfile.unit_count_range) filters.unit_count_range = buildingProfile.unit_count_range;
+        if (buildingProfile.age_category) filters.age_category = buildingProfile.age_category;
+        if (buildingProfile.has_amenities !== null) filters.has_amenities = buildingProfile.has_amenities;
       }
 
       const { data, error } = await supabase.functions.invoke("get-buildings-trend", {
