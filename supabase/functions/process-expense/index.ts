@@ -198,6 +198,24 @@ serve(async (req) => {
       }
     }
 
+    // Update or create building profile using repository
+    let buildingProfileId: string | undefined;
+    if (normalizedBuildingName) {
+      try {
+        const { data: profile } = await buildingRepository.mergeBuildingProfile(
+          userId,
+          normalizedBuildingName,
+          extractedData.building_profile || {}
+        );
+        if (profile) {
+          buildingProfileId = (profile as any).id;
+          console.log(`Linked analysis to building profile: ${buildingProfileId}`);
+        }
+      } catch (error) {
+        console.error("Building profile error:", error);
+      }
+    }
+
     // Update analysis record with extracted data using repository
     const { error: updateError } = await analysisRepository.updateAnalysis(analysisId, {
       building_name: normalizedBuildingName,
@@ -208,6 +226,7 @@ serve(async (req) => {
       file_url: filePath,
       status: "completed",
       scanned_at: new Date().toISOString(),
+      building_profile_id: buildingProfileId,
     });
 
     if (updateError) {
@@ -230,17 +249,6 @@ serve(async (req) => {
 
       if (catError) {
         console.error("Categories creation error:", catError);
-      }
-    }
-
-    // Update or create building profile using repository
-    if (normalizedBuildingName && extractedData.building_profile) {
-      const profileData = extractedData.building_profile;
-
-      try {
-        await buildingRepository.mergeBuildingProfile(userId, normalizedBuildingName, profileData);
-      } catch (error) {
-        console.error("Building profile error:", error);
       }
     }
 
