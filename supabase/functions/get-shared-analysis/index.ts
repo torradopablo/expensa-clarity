@@ -276,16 +276,17 @@ serve(async (req) => {
     // Initialize TrendService
     const trendService = new TrendService();
 
-    // Fetch building profile for filtering
+    // Fetch building profile for filtering — filter by user_id to avoid cross-user collisions
     const { data: profile } = await supabase
       .from('building_profiles')
-      .select('unit_count_range, age_category, neighborhood, zone, has_amenities, owner_user_id')
+      .select('unit_count_range, age_category, neighborhood, zone, has_amenities, user_id')
       .eq('building_name', analysis.building_name)
+      .eq('user_id', realOwnerId)
       .maybeSingle();
 
-    // Re-check owner_user_id to ensure it matches the analysis owner
+    // Re-check user_id to ensure it matches the analysis owner
     // This is an extra security layer for shared links
-    analysis.is_owner_view = (realOwnerId === profile?.owner_user_id);
+    analysis.is_owner_view = (realOwnerId === profile?.user_id);
 
     // Fetch buildings trend via TrendService
     const filters: any = {};
@@ -297,11 +298,11 @@ serve(async (req) => {
       if (profile.has_amenities !== null) filters.has_amenities = profile.has_amenities;
     }
     filters.excludeBuilding = analysis.building_name;
-    filters.excludeUserId = profile?.owner_user_id; // Use real owner ID for exclusion
+    filters.excludeUserId = realOwnerId; // Use real owner ID for exclusion
 
     const { data: trendData, stats: trendStats } = await trendService.getMarketTrend(
       Object.keys(filters).length > 0 ? filters : {},
-      false // Be strict
+      true // Use fallback to ensure we always have comparison data
     );
 
     const buildingsTrend = trendData || [];
@@ -399,10 +400,11 @@ serve(async (req) => {
         let inflationPercent: number | null = null
         let inflationEstimated = false
         const periodYYYYMM = periodToYearMonth(h.period, h.period_date)
-        if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+        if (periodYYYYMM && baseInflation !== null && baseInflation.value > 0) {
           const inflationItem = inflationMap.get(periodYYYYMM)
           if (inflationItem) {
-            inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100
+            // Compound: ((current / base) - 1) * 100
+            inflationPercent = parseFloat(((inflationItem.value / baseInflation.value - 1) * 100).toFixed(1))
             inflationEstimated = inflationItem.is_estimated
           }
         }
@@ -411,7 +413,8 @@ serve(async (req) => {
         if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
           const buildingsItem = buildingsTrend.find((b: any) => b.period === h.period)
           if (buildingsItem && buildingsItem.average !== undefined) {
-            buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100
+            // Compound: ((current / base) - 1) * 100
+            buildingsPercent = parseFloat(((buildingsItem.average / baseBuildingsAverage - 1) * 100).toFixed(1))
           }
         }
 

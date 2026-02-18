@@ -22,15 +22,12 @@ serve(async (req) => {
     return new Response("ok", { status: 200, headers: corsHeaders });
   }
 
+  let analysisId = "";
+
   try {
     const formData = await req.formData();
-    const file = formData.get("file") as File;
-    const analysisId = formData.get("analysisId") as string;
-
-    // Validate inputs
-    if (!file) {
-      throw new ValidationError("No se proporcionó ningún archivo");
-    }
+    let file = formData.get("file") as File | null;
+    analysisId = formData.get("analysisId") as string;
 
     validateUUID(analysisId);
 
@@ -56,22 +53,40 @@ serve(async (req) => {
 
     const userId = user.id;
 
-    // Check if the analysis is already completed
-    const { data: currentAnalysis, error: fetchError } = await supabase
-      .from("expense_analyses")
-      .select("status, file_url")
-      .eq("id", analysisId)
-      .single();
+    // Fetch existing analysis to check status and file_url
+    const { data: currentAnalysis, error: fetchError } = await analysisRepository.getAnalysis(analysisId);
 
-    if (fetchError) {
-      console.error("Error fetching current analysis status:", fetchError);
+    if (fetchError || !currentAnalysis) {
+      throw new ValidationError("Análisis no encontrado");
     }
 
-    if (currentAnalysis?.status === "completed") {
+    if (currentAnalysis.status === "completed") {
       return new Response(
         JSON.stringify({ success: true, message: "Análisis ya completado previamente" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
+    }
+
+    // If file is missing, try to recover from storage
+    if (!file) {
+      console.log("File missing in request, attempting to recover from storage...");
+      if (!currentAnalysis.file_url) {
+        throw new ValidationError("No se proporcionó ningún archivo y no se encontró uno previo en el historial");
+      }
+
+      const { data: fileBlob, error: downloadError } = await supabase.storage
+        .from("expense-files")
+        .download(currentAnalysis.file_url);
+
+      if (downloadError || !fileBlob) {
+        console.error("Storage download error:", downloadError);
+        throw new ValidationError("No se pudo recuperar el archivo del almacenamiento para reintentar");
+      }
+
+      // Convert blob to File
+      const fileName = currentAnalysis.file_url.split('/').pop() || "expensa.pdf";
+      file = new File([fileBlob], fileName, { type: "application/pdf" });
+      console.log(`Recovered file "${fileName}" from storage`);
     }
 
     // Clean up any existing categories if this is a retry
@@ -94,7 +109,7 @@ serve(async (req) => {
       console.log(`Extracted ${pdfText.length} characters from PDF`);
     }
 
-    // Upload file to storage
+    // Upload file to storage (ensure it exists and update if necessary)
     const filePath = storageService.createFilePath(userId, analysisId, file.name);
     const { error: uploadError } = await storageService.uploadFile(
       "expense-files",
@@ -104,8 +119,14 @@ serve(async (req) => {
     );
 
     if (uploadError) {
-      console.error("File upload error:", uploadError);
+      console.warn("File storage sync warning (continuing processing):", uploadError);
     }
+
+    // Update analysis with the latest file_url and status processing
+    await analysisRepository.updateAnalysis(analysisId, {
+      file_url: filePath,
+      status: "processing"
+    });
 
     // Fetch existing building names for the user to help with matching
     const { data: existingAnalyses } = await analysisRepository.getBuildingNames(userId, analysisId);
@@ -231,6 +252,7 @@ serve(async (req) => {
 
     if (updateError) {
       console.error("Analysis update error:", updateError);
+      throw new Error(`No se pudo actualizar el estado del análisis: ${updateError.message}`);
     }
 
     // Insert categories using repository
@@ -262,14 +284,17 @@ serve(async (req) => {
       }
     }
 
-    // Delete file from storage after successful processing to save space
+    // CRITICAL: We only delete the file from storage if the processing was 100% successful.
+    // If we reached this point, the analysis is 'completed' and categories are saved.
+    // This allows the user to retry (re-procesar) if anything failed before this.
     if (filePath) {
+      console.log("Success! Cleaning up storage...");
       // Use service role to ensure deletion permissions regardless of user RLS
       const systemStorageService = new StorageService();
       const { error: deleteFileError } = await systemStorageService.deleteFile("expense-files", filePath);
 
       if (deleteFileError) {
-        console.error("File deletion error:", deleteFileError);
+        console.error("File deletion error (non-critical):", deleteFileError);
       } else {
         // Update the analysis to clear the file_url since the file no longer exists
         await analysisRepository.updateAnalysis(analysisId, { file_url: "" });
@@ -286,6 +311,17 @@ serve(async (req) => {
     );
   } catch (error) {
     console.error("Process expense error:", error);
+
+    // Update status to failed in DB if we have an analysisId
+    try {
+      const authHeader = req.headers.get("Authorization");
+      if (authHeader && analysisId) {
+        const repo = new AnalysisRepository(authHeader);
+        await repo.updateAnalysis(analysisId, { status: "failed" });
+      }
+    } catch (dbError) {
+      console.error("Failed to update status to failed:", dbError);
+    }
 
     if (error instanceof ValidationError || error instanceof AuthenticationError) {
       return new Response(

@@ -149,13 +149,13 @@ export function useEvolution(category?: string, buildingName?: string) {
       const userPercent = baseAmount > 0 ? ((currentAmount - baseAmount) / baseAmount) * 100 : 0;
       return {
         period: analysis.period,
-        periodDate: analysis.period_date, // Pass period_date specifically for date utils
+        periodDate: analysis.period_date,
         userPercent: parseFloat(userPercent.toFixed(1)),
         inflationPercent: null,
         inflationEstimated: false,
         buildingsPercent: null,
-      };
-    }) as EvolutionData[];
+      } as EvolutionData;
+    });
   }, []);
 
   const calculateDeviation = useCallback((evolutionData: EvolutionData[], stats: BuildingsTrendStats | null) => {
