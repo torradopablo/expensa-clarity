@@ -2,6 +2,14 @@
 
 This file contains implementation considerations and strategies for each project release.
 
+## [1.4.0] - 2026-02-18
+
+### Deployment Strategy & Considerations
+> **Information**: This version introduces security improvements for cache tables.
+
+1. **Database (SQL Migration)**: A new security migration `20260218160000_secure_building_profiles_cache.sql` has been added to enable Row Level Security (RLS) on all cache tables. Execute the following in the SQL Editor if not using Supabase CLI:
+2. **Frontend**: Deploy the web application.
+
 ## [1.3.0] - 2026-02-18
 
 ### Deployment Strategy & Considerations
