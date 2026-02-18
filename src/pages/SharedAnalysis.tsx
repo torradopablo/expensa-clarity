@@ -519,10 +519,11 @@ const SharedAnalysis = () => {
       let inflationEstimated = false;
 
       const periodYYYYMM = periodToYearMonth(h.period, h.period_date);
-      if (periodYYYYMM && baseInflation !== null && baseInflation.value !== 0) {
+      if (periodYYYYMM && baseInflation !== null && baseInflation.value > 0) {
         const inflationItem = inflationMap.get(periodYYYYMM);
         if (inflationItem) {
-          inflationPercent = ((inflationItem.value - baseInflation.value) / baseInflation.value) * 100;
+          // Compound: ((current / base) - 1) * 100
+          inflationPercent = parseFloat(((inflationItem.value / baseInflation.value - 1) * 100).toFixed(1));
           inflationEstimated = inflationItem.is_estimated;
         }
       }
@@ -531,7 +532,7 @@ const SharedAnalysis = () => {
       if (baseBuildingsAverage !== null && baseBuildingsAverage > 0) {
         const buildingsItem = buildingsTrendRaw.find((b: any) => b.period === h.period);
         if (buildingsItem) {
-          buildingsPercent = ((buildingsItem.average - baseBuildingsAverage) / baseBuildingsAverage) * 100;
+          buildingsPercent = parseFloat(((buildingsItem.average / baseBuildingsAverage - 1) * 100).toFixed(1));
         }
       }
 

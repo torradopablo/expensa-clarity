@@ -117,7 +117,8 @@ const Evolucion = () => {
     buildingsTrendStats,
     loading: loadingEvolution,
     error: errorEvolution,
-    calculateEvolution
+    calculateEvolution,
+    calculateDeviation
   } = useEvolution(selectedCategory, selectedBuilding);
 
   useEffect(() => {
@@ -325,11 +326,13 @@ const Evolucion = () => {
     if (baseEvolution.length < 2) return [];
 
     // Enhance with inflation and buildings data
+    // Build a map: YYYY-MM -> cumulative index value (for compound accumulation)
     const inflationMap = new Map(inflationData.map(d => [d.period, d.value]));
-    const firstPeriod = periodToYearMonth(baseEvolution[0].period, null);
-    const baseInflation = firstPeriod ? inflationMap.get(firstPeriod) : null;
+    const firstPeriodYM = periodToYearMonth(baseEvolution[0].period, baseEvolution[0].periodDate ?? null);
+    const baseInflationIndex = firstPeriodYM ? inflationMap.get(firstPeriodYM) ?? null : null;
 
     // Create a map of buildings trend by period using the raw average
+    // The trend periods are in Spanish ("enero 2024"), same as analysis.period
     const buildingsTrendMap = new Map(
       buildingsTrend.map((t: any) => [t.period, t.average])
     );
@@ -338,21 +341,23 @@ const Evolucion = () => {
     const baseMarketAvg = buildingsTrendMap.get(baseEvolution[0].period);
 
     return baseEvolution.map(point => {
-      const yyyymm = periodToYearMonth(point.period, (point as any).periodDate);
+      const yyyymm = periodToYearMonth(point.period, point.periodDate ?? null);
 
-      let infPercent = null;
-      if (yyyymm && baseInflation) {
-        const currentInf = inflationMap.get(yyyymm);
-        if (currentInf) {
-          infPercent = ((currentInf - baseInflation) / baseInflation) * 100;
+      // Compound (multiplicative) inflation accumulation from base period
+      let infPercent: number | null = null;
+      if (yyyymm && baseInflationIndex !== null && baseInflationIndex > 0) {
+        const currentInfIndex = inflationMap.get(yyyymm) ?? null;
+        if (currentInfIndex !== null) {
+          // Compound: ((current / base) - 1) * 100
+          infPercent = parseFloat(((currentInfIndex / baseInflationIndex - 1) * 100).toFixed(1));
         }
       }
 
       // Get buildings percent for this specific period, re-normalized to our base period
-      let buildingsPercent = null;
+      let buildingsPercent: number | null = null;
       const currentMarketAvg = buildingsTrendMap.get(point.period);
-      if (currentMarketAvg !== undefined && baseMarketAvg) {
-        buildingsPercent = ((Number(currentMarketAvg) - Number(baseMarketAvg)) / Number(baseMarketAvg)) * 100;
+      if (currentMarketAvg !== undefined && baseMarketAvg !== undefined && Number(baseMarketAvg) > 0) {
+        buildingsPercent = parseFloat(((Number(currentMarketAvg) / Number(baseMarketAvg) - 1) * 100).toFixed(1));
       }
 
       return {
@@ -361,7 +366,12 @@ const Evolucion = () => {
         buildingsPercent
       } as EvolutionData;
     });
-  }, [analyses, selectedBuilding, selectedCategory, inflationData, buildingsTrend, buildingsTrendStats, calculateEvolution]);
+  }, [analyses, selectedBuilding, selectedCategory, inflationData, buildingsTrend, calculateEvolution]);
+
+  // Derive deviation from the latest comparison data point
+  const comparisonDeviation = useMemo(() => {
+    return calculateDeviation(comparisonData, buildingsTrendStats);
+  }, [comparisonData, buildingsTrendStats, calculateDeviation]);
 
   // Update AI analysis based on selected building
   useEffect(() => {
@@ -698,6 +708,8 @@ const Evolucion = () => {
                       data={comparisonData}
                       buildingName={selectedBuilding !== "all" ? selectedBuilding : "Mis edificios"}
                       categoryName={selectedCategory !== "all" ? selectedCategory : "Total"}
+                      deviation={comparisonDeviation ?? undefined}
+                      analysis={aiAnalysis}
                       buildingsTrendStats={buildingsTrendStats}
                     />
                   </div>
