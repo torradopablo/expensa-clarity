@@ -2,6 +2,16 @@
 
 This file contains implementation considerations and strategies for each project release.
 
+## [1.3.0] - 2026-02-18
+
+### Deployment Strategy & Considerations
+> **Information**: This version introduces retries for expense analysis.
+
+1. **Edge Functions**: Redeploy the following functions to apply the new retry logic:
+   - `process-expense`: Handles the retry logic for expense analysis.
+   - `get-shared-analysis`: Updated to support the retry logic.
+2. **Frontend**: Deploy the web application.
+
 ## [1.2.0] - 2026-02-17
 
 ### Deployment Strategy & Considerations

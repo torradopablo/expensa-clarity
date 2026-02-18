@@ -491,30 +491,33 @@ const PaymentSuccessHandler = ({
 
         // If file is missing (e.g. refresh), try to fetch it from storage using analysisId
         if (!currentFile) {
-          console.log("File missing in state, attempting to recover from storage...");
+          console.log("File missing in state, checking for file_url in DB...");
           const { data: analysis, error: fetchError } = await supabase
             .from("expense_analyses")
             .select("file_url")
             .eq("id", analysisId)
             .single();
 
-          if (fetchError || !analysis?.file_url) {
-            throw new Error("No se pudo recuperar el archivo descargado. Por favor, volvé a subir tu expensa desde el Historial.");
+          if (!fetchError && analysis?.file_url) {
+            console.log("File URL found in DB, attempting to download...");
+            const { data: fileBlob, error: downloadError } = await supabase.storage
+              .from("expense-files")
+              .download(analysis.file_url);
+
+            if (!downloadError && fileBlob) {
+              const fileName = analysis.file_url.split('/').pop() || "expensa.pdf";
+              currentFile = new File([fileBlob], fileName, { type: "application/pdf" });
+              console.log("File recovered from storage");
+            } else {
+              console.warn("Could not download file from storage, Edge Function will try to recover it");
+            }
           }
-
-          const { data: fileBlob, error: downloadError } = await supabase.storage
-            .from("expense-files")
-            .download(analysis.file_url);
-
-          if (downloadError || !fileBlob) {
-            throw new Error("Error al descargar el archivo para procesar.");
-          }
-
-          currentFile = new File([fileBlob], "expensa.pdf", { type: "application/pdf" });
         }
 
         const formData = new FormData();
-        formData.append("file", currentFile);
+        if (currentFile) {
+          formData.append("file", currentFile);
+        }
         formData.append("analysisId", analysisId);
 
         // Update status to processing

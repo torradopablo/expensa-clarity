@@ -8,15 +8,16 @@ export class StorageService {
   }
 
   async uploadFile(
-    bucket: string, 
-    filePath: string, 
-    file: File, 
+    bucket: string,
+    filePath: string,
+    file: File,
     options: { contentType?: string } = {}
   ): Promise<{ error?: { message: string } }> {
     const { error } = await this.supabase.storage
       .from(bucket)
-      .upload(filePath, file, { 
-        contentType: options.contentType || file.type 
+      .upload(filePath, file, {
+        contentType: options.contentType || file.type,
+        upsert: true
       });
 
     return { error };

@@ -28,6 +28,7 @@ export interface Analysis {
 
 export interface EvolutionData {
   period: string;
+  periodDate?: string | null;
   userPercent: number;
   inflationPercent: number | null;
   inflationEstimated: boolean;
