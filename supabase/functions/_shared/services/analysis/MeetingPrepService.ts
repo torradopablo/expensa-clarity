@@ -36,8 +36,16 @@ El JSON debe seguir la estructura solicitada estrictamente.`;
 El objetivo es que el administrador esté 100% preparado para las consultas de los propietarios y tenga un temario claro.
 
 DATOS DE GASTOS Y ALERTAS (Basado en el análisis de expensas):
-${data.analyses.map(a => `- Período ${a.period}: Total ${a.total_amount}. 
-  Alertas detectadas: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
+${data.analyses.map(a => {
+            const categoriesText = a.categories?.filter((c: any) => c.status !== 'ok' || (c.expense_subcategories && c.expense_subcategories.length > 0))
+                .map((c: any) => {
+                    const subitems = c.expense_subcategories && c.expense_subcategories.length > 0
+                        ? ` (Desglose: ${c.expense_subcategories.map((s: any) => `${s.name}: $${s.amount}`).join(', ')})`
+                        : '';
+                    return `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}${subitems}`;
+                }).join('; ');
+            return `- Período ${a.period}: Total ${a.total_amount}.\n  Rubros Relevantes/Alertas: ${categoriesText || 'Ninguna'}`;
+        }).join('\n')}
 
 RECLAMOS Y COMENTARIOS DE PROPIETARIOS (Externos):
 ${data.commentsByType.shared.length > 0

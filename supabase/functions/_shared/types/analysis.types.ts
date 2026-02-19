@@ -1,3 +1,9 @@
+export interface Subcategory {
+  name: string;
+  amount: number;
+  percentage?: number;
+}
+
 export interface Category {
   name: string;
   icon?: string | null;
@@ -5,6 +11,7 @@ export interface Category {
   previous_amount?: number | null;
   status?: "ok" | "attention" | "info";
   explanation?: string | null;
+  subcategories?: Subcategory[];
 }
 
 export interface BuildingProfile {

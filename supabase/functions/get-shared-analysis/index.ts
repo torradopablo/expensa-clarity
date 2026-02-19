@@ -194,7 +194,7 @@ serve(async (req) => {
     // Get categories for this analysis
     const { data: categories, error: categoriesError } = await supabase
       .from('expense_categories')
-      .select('*')
+      .select('*, expense_subcategories(*)')
       .eq('analysis_id', linkData.analysis_id)
       .order('current_amount', { ascending: false })
 

@@ -1,6 +1,12 @@
 import { z } from "https://esm.sh/zod@3.23.8";
 import type { Category, BuildingProfile, AIResponse } from "../types/analysis.types.ts";
 
+export const SubcategorySchema = z.object({
+  name: z.string().min(1).max(200).transform(s => s.trim()),
+  amount: z.number().min(0),
+  percentage: z.number().optional()
+});
+
 export const CategorySchema = z.object({
   name: z.string().min(1).max(100).transform(s => s.trim()),
   icon: z.string().max(50).nullable().optional(),
@@ -11,6 +17,7 @@ export const CategorySchema = z.object({
     z.enum(["ok", "attention", "info"]).default("ok")
   ),
   explanation: z.string().max(1000).nullable().optional().transform(s => s ? s.trim().slice(0, 1000) : s),
+  subcategories: z.array(SubcategorySchema).optional(),
 });
 
 export const BuildingProfileSchema = z.object({

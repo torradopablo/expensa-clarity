@@ -181,36 +181,44 @@ REGLAS CRÍTICAS DE NEGOCIO:
      - Si dice "Estudio Jurídico Pérez" en grande, ignóralo y busca el nombre del consorcio.
    - Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, prioriza esos nombres si hay un match parcial (ej: el PDF dice "Arenales 10" y la guía dice "Arenales 10 - Torre A").
    - IMPORTANTE: Si solo encuentras una dirección, ese ES el nombre del edificio. No inventes nombres si no están.
-7. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
 
-JSON Schema:
+
+8. SUBCATEGORÍAS (DETALLE - OBLIGATORIO SI EXISTE):
+   - BUSCA ACTIVAMENTE el desglose de cada rubro.
+   - Ejemplos típicos:
+     - "Sueldos y Cargas Sociales": "Sueldo Encargado", "Sueldo Ayudante", "Cargas Sociales 931", "Suterh".
+     - "Servicios Públicos": "AySA", "Edesur", "Metrogas".
+     - "Mantenimiento": "Abono Ascensores", "Limpieza Tanques", "Fumigación".
+   - Si encuentras estos ítems detallados con sus montos, agrégalos al array "subcategories".
+   - La suma de las subcategorías debe coincidir con el monto de la categoría.
+
+JSON Schema (Ejemplo de estructura esperada):
 {
-  "building_name": string,
-  "period": string,
-  "period_month": number (1-12),
-  "period_year": number (YYYY),
-  "unit": string o null,
-  "total_amount": number,
+  "building_name": "Edificio Ejemplo",
+  "period": "Enero 2024",
+  ...
   "categories": [
     {
-      "name": string,
-      "icon": string (use Lucide icon name),
-      "current_amount": number,
-      "status": "ok" | "attention" | "info",
-      "explanation": string o null
+      "name": "Sueldos y Cargas Sociales",
+      "current_amount": 1500000,
+      "status": "ok",
+      "subcategories": [
+        { "name": "Sueldo Encargado", "amount": 800000 },
+        { "name": "Cargas Sociales F931", "amount": 400000 },
+        { "name": "Suterh", "amount": 300000 }
+      ]
+    },
+    {
+      "name": "Abonos de Mantenimiento",
+      "current_amount": 200000,
+      "status": "ok",
+      "subcategories": [
+        { "name": "Ascensores", "amount": 150000 },
+        { "name": "Bombas", "amount": 50000 }
+      ]
     }
   ],
-  "building_profile": {
-    "country": "Argentina",
-    "province": string o null,
-    "city": string o null,
-    "neighborhood": string o null,
-    "zone": "CABA" | "GBA Norte" | "GBA Oeste" | "GBA Sur" | "Interior" | null,
-    "unit_count_range": "1-10" | "11-30" | "31-50" | "51-100" | "100+" | null,
-    "age_category": string o null,
-    "has_amenities": boolean,
-    "amenities": string[]
-  }
+  ...
 }`;
   }
 

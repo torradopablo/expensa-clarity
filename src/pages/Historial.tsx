@@ -228,12 +228,8 @@ const Historial = () => {
 
   // Filter and sort analyses by period (newest first)
   const filteredAnalyses = useMemo(() => {
-    // Show completed, processing, paid, and failed statuses
-    const relevantAnalyses = analyses.filter(a =>
-      ["completed", "processing", "paid", "failed"].includes(a.status)
-    );
-
-    const filtered = relevantAnalyses.filter(analysis => {
+    // Filter analyses based on search and building filters
+    const filtered = analyses.filter(analysis => {
       // Search query filter
       if (searchQuery.trim()) {
         const query = searchQuery.toLowerCase().trim();
@@ -245,7 +241,7 @@ const Historial = () => {
         }
       }
 
-      // Building filter (now mostly done by server, but we keep the logic consistent)
+      // Building filter
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
@@ -253,13 +249,24 @@ const Historial = () => {
       return true;
     });
 
-    // Sort by period_date or created_at (newest first)
-    return filtered.sort((a, b) => {
+    // Sort by date (newest first)
+    const sortByDateDesc = (a: any, b: any) => {
       const dateA = a.period_date ? new Date(a.period_date).getTime() : new Date(a.created_at).getTime();
       const dateB = b.period_date ? new Date(b.period_date).getTime() : new Date(b.created_at).getTime();
       return dateB - dateA;
-    });
+    };
+
+    return filtered.sort(sortByDateDesc);
   }, [analyses, searchQuery, buildingFilter]);
+
+  // Separate into two distinct lists
+  const failedAnalyses = useMemo(() => {
+    return filteredAnalyses.filter(a => a.status === "failed");
+  }, [filteredAnalyses]);
+
+  const successfulAnalyses = useMemo(() => {
+    return filteredAnalyses.filter(a => a.status === "completed");
+  }, [filteredAnalyses]);
 
   const hasActiveFilters = searchQuery.trim() !== "" || buildingFilter !== "all";
 
@@ -268,7 +275,7 @@ const Historial = () => {
     setBuildingFilter("all");
   };
 
-  if (loading && analyses.length === 0) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-gradient-soft">
         <Header />
@@ -305,8 +312,10 @@ const Historial = () => {
               <div>
                 <h1 className="text-4xl font-extrabold tracking-tight">Mis Expensas</h1>
                 <p className="text-muted-foreground font-medium mt-1">
-                  {totalCount > 0
-                    ? `Mostrando ${filteredAnalyses.length} de ${totalCount} análisis`
+                  {successfulAnalyses.length > 0
+                    ? `${successfulAnalyses.length} expensas procesadas exitosamente`
+                    : failedAnalyses.length > 0
+                    ? "0 expensas procesadas exitosamente"
                     : "0 análisis"}
                 </p>
               </div>
@@ -406,7 +415,7 @@ const Historial = () => {
             </Card>
           )}
 
-          {analyses.filter(a => a.status === "completed").length === 0 ? (
+          {successfulAnalyses.length === 0 && failedAnalyses.length === 0 ? (
             <Card variant="soft" className="animate-fade-in-up">
               <CardContent className="p-12 text-center">
                 <div className="w-16 h-16 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-6">
@@ -424,148 +433,250 @@ const Historial = () => {
                 </Button>
               </CardContent>
             </Card>
-          ) : filteredAnalyses.length === 0 ? (
-            <Card variant="soft" className="animate-fade-in-up">
-              <CardContent className="p-8 text-center">
-                <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
-                  <Filter className="w-6 h-6 text-muted-foreground" />
-                </div>
-                <h2 className="text-lg font-semibold mb-2">Sin resultados</h2>
-                <p className="text-muted-foreground mb-4 text-sm">
-                  No hay análisis que coincidan con los filtros seleccionados.
-                </p>
-                <Button variant="outline" onClick={clearFilters}>
-                  Limpiar filtros
-                </Button>
-              </CardContent>
-            </Card>
           ) : (
-            <div className="space-y-4">
-              {filteredAnalyses.map((analysis, index) => {
-                const change = calculateChange(analysis.total_amount, analysis.previous_total);
-                const isSelected = selectedIds.has(analysis.id);
-                const isCompleted = analysis.status === "completed";
-                const isProcessing = analysis.status === "processing" || analysis.status === "paid";
-                const isFailed = analysis.status === "failed";
+            <>
+              {/* Failed Analyses Section */}
+              {failedAnalyses.length > 0 && (
+                <div className="mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-destructive/10 flex items-center justify-center">
+                      <X className="w-5 h-5 text-destructive" />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">Análisis con errores</h2>
+                      <p className="text-sm text-muted-foreground">
+                        {failedAnalyses.length} {failedAnalyses.length === 1 ? 'expensa necesita' : 'expensas necesitan'} tu atención
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {failedAnalyses.map((analysis, index) => {
+                      const isSelected = selectedIds.has(analysis.id);
+                      const isFailed = analysis.status === "failed";
 
-                const cardContent = (
-                  <Card
-                    className={cn(
-                      "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg hover:shadow-2xl hover:shadow-primary/5",
-                      isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10",
-                      isProcessing && "border-primary/30",
-                      isFailed && "border-destructive/30"
-                    )}
-                    style={{ animationDelay: `${index * 0.05}s` }}
-                  >
-                    <CardContent className="p-0">
-                      <div className="flex flex-col sm:flex-row items-stretch">
-                        <div className="flex-1 p-6 md:p-8">
-                          <div className="flex items-start justify-between gap-6">
-                            <div className="flex items-start gap-5">
-                              {selectionMode && isCompleted && (
-                                <div className="mt-1" onClick={(e) => e.stopPropagation()}>
-                                  <Checkbox
-                                    checked={isSelected}
-                                    disabled={!isSelected && selectedIds.size >= 2}
-                                    onCheckedChange={() => toggleSelection(analysis.id, { preventDefault: () => { }, stopPropagation: () => { } } as any)}
-                                    className="w-6 h-6 rounded-lg border-2"
-                                  />
-                                </div>
-                              )}
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-3 mb-2">
-                                  <p className="text-base font-bold text-foreground truncate">
-                                    {analysis.building_name || (isProcessing ? "Edificio (identificando...)" : "Edificio desconocido")}
-                                    {analysis.unit && (
-                                      <span className="ml-2 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-black uppercase">
-                                        UF {analysis.unit}
-                                      </span>
-                                    )}
-                                  </p>
-                                </div>
-                                <h3 className="text-2xl font-black tracking-tight text-foreground line-height-none">{analysis.period}</h3>
-                                <div className="flex items-center gap-2 mt-3 text-sm font-medium">
-                                  {isCompleted ? (
-                                    <>
-                                      <CheckCircle2 className="w-4 h-4 text-primary" />
-                                      <span className="text-muted-foreground">Analizado el {formatDate(analysis.created_at)}</span>
-                                    </>
-                                  ) : isProcessing ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 text-primary animate-spin" />
-                                      <span className="text-primary font-bold">Procesando con IA...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <X className="w-4 h-4 text-destructive" />
-                                      <span className="text-destructive font-bold">Error en proceso - Hacer clic para reintentar</span>
-                                    </>
+                      const cardContent = (
+                        <Card
+                          className={cn(
+                            "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-destructive/50 shadow-lg hover:shadow-2xl hover:shadow-destructive/5",
+                            isSelected && "ring-2 ring-destructive bg-destructive/5 shadow-2xl shadow-destructive/10",
+                            isFailed && "border-destructive/30"
+                          )}
+                          style={{ animationDelay: `${index * 0.05}s` }}
+                        >
+                          <CardContent className="p-0">
+                            <div className="flex flex-col sm:flex-row items-stretch">
+                              <div className="flex-1 p-6 md:p-8">
+                                <div className="flex items-start justify-between gap-6">
+                                  <div className="flex items-start gap-5">
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <p className="text-base font-bold text-foreground truncate">
+                                          {analysis.building_name || "Edificio desconocido"}
+                                          {analysis.unit && (
+                                            <span className="ml-2 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-black uppercase">
+                                              UF {analysis.unit}
+                                            </span>
+                                          )}
+                                        </p>
+                                      </div>
+                                      <h3 className="text-2xl font-black tracking-tight text-foreground line-height-none">{analysis.period}</h3>
+                                      <div className="flex items-center gap-2 mt-3 text-sm font-medium">
+                                        <>
+                                          <X className="w-4 h-4 text-destructive" />
+                                          <span className="text-destructive font-bold">Error en proceso - Hacer clic para reintentar</span>
+                                        </>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {!selectionMode && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-10 w-10 shrink-0 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                                      onClick={(e) => handleDeleteClick(analysis, e)}
+                                    >
+                                      <Trash2 className="w-5 h-5" />
+                                    </Button>
                                   )}
                                 </div>
                               </div>
-                            </div>
-                            {!selectionMode && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-10 w-10 shrink-0 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
-                                onClick={(e) => handleDeleteClick(analysis, e)}
-                              >
-                                <Trash2 className="w-5 h-5" />
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between sm:justify-center gap-8 p-6 md:p-8 bg-muted/20 sm:w-60 border-t sm:border-t-0 sm:border-l border-border/50 group-hover:bg-primary/5 transition-colors">
-                          <div className="text-left sm:text-right">
-                            <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Total abonado</p>
-                            <p className="text-2xl font-black text-foreground tabular-nums">
-                              {analysis.total_amount > 0 ? formatCurrency(analysis.total_amount) : "(pendiente)"}
-                            </p>
-                            {isCompleted && change !== null && (
-                              <div className={`flex items-center sm:justify-end gap-1.5 text-sm font-extrabold mt-1.5 ${change > 10 ? "text-secondary" : change > 0 ? "text-muted-foreground" : "text-primary"
-                                }`}>
-                                {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-                                {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                              <div className="flex items-center justify-between sm:justify-center gap-8 p-6 md:p-8 bg-muted/20 sm:w-60 border-t sm:border-t-0 sm:border-l border-border/50 group-hover:bg-destructive/5 transition-colors">
+                                <div className="text-left sm:text-right">
+                                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Estado</p>
+                                  <p className="text-lg font-black text-destructive tabular-nums">
+                                    Falló
+                                  </p>
+                                </div>
+                                <div className="hidden sm:block">
+                                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center border border-destructive/20 group-hover:scale-110 transition-all duration-300">
+                                    <ArrowRight className="w-5 h-5 text-destructive" />
+                                  </div>
+                                </div>
                               </div>
-                            )}
-                          </div>
-                          <ArrowRight className="w-6 h-6 text-primary sm:hidden group-hover:translate-x-1 transition-transform" />
-                          <div className="hidden sm:block">
-                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
-                              <ArrowRight className="w-5 h-5" />
                             </div>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
+                          </CardContent>
+                        </Card>
+                      );
 
-                if (selectionMode && isCompleted) {
-                  return (
-                    <div
-                      key={analysis.id}
-                      className="cursor-pointer"
-                      onClick={(e) => toggleSelection(analysis.id, e)}
-                    >
-                      {cardContent}
+                      return (
+                        <Link
+                          key={analysis.id}
+                          to={`/analizar?payment=success&analysisId=${analysis.id}`}
+                          className="block"
+                        >
+                          {cardContent}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Successful Analyses Section */}
+              {successfulAnalyses.length > 0 && (
+                <div className="mb-12">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                      <CheckCircle2 className="w-5 h-5 text-primary" />
                     </div>
-                  );
-                }
+                    <div>
+                      <h2 className="text-xl font-bold text-foreground">Expensas procesadas</h2>
+                      <p className="text-sm text-muted-foreground">
+                        Mostrando <span className="text-foreground font-bold">{successfulAnalyses.length}</span> de <span className="text-foreground font-bold">{totalCount}</span> expensas exitosas
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {successfulAnalyses.map((analysis, index) => {
+                      const change = calculateChange(analysis.total_amount, analysis.previous_total);
+                      const isSelected = selectedIds.has(analysis.id);
+                      const isCompleted = analysis.status === "completed";
 
-                return (
-                  <Link
-                    key={analysis.id}
-                    to={isCompleted ? `/analisis/${analysis.id}` : `/analizar?payment=success&analysisId=${analysis.id}`}
-                    className="block"
-                  >
-                    {cardContent}
-                  </Link>
-                );
-              })}
-            </div>
+                      const cardContent = (
+                        <Card
+                          className={cn(
+                            "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg hover:shadow-2xl hover:shadow-primary/5",
+                            isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10"
+                          )}
+                          style={{ animationDelay: `${index * 0.05}s` }}
+                        >
+                          <CardContent className="p-0">
+                            <div className="flex flex-col sm:flex-row items-stretch">
+                              <div className="flex-1 p-6 md:p-8">
+                                <div className="flex items-start justify-between gap-6">
+                                  <div className="flex items-start gap-5">
+                                    {selectionMode && isCompleted && (
+                                      <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                                        <Checkbox
+                                          checked={isSelected}
+                                          disabled={!isSelected && selectedIds.size >= 2}
+                                          onCheckedChange={() => toggleSelection(analysis.id, { preventDefault: () => { }, stopPropagation: () => { } } as any)}
+                                          className="w-6 h-6 rounded-lg border-2"
+                                        />
+                                      </div>
+                                    )}
+                                    <div className="min-w-0">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <p className="text-base font-bold text-foreground truncate">
+                                          {analysis.building_name || "Edificio desconocido"}
+                                          {analysis.unit && (
+                                            <span className="ml-2 px-2 py-0.5 rounded-md bg-muted text-muted-foreground text-[10px] font-black uppercase">
+                                              UF {analysis.unit}
+                                            </span>
+                                          )}
+                                        </p>
+                                      </div>
+                                      <h3 className="text-2xl font-black tracking-tight text-foreground line-height-none">{analysis.period}</h3>
+                                      <div className="flex items-center gap-2 mt-3 text-sm font-medium">
+                                        <>
+                                          <CheckCircle2 className="w-4 h-4 text-primary" />
+                                          <span className="text-muted-foreground">Analizado el {formatDate(analysis.created_at)}</span>
+                                        </>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  {!selectionMode && (
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-10 w-10 shrink-0 rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                                      onClick={(e) => handleDeleteClick(analysis, e)}
+                                    >
+                                      <Trash2 className="w-5 h-5" />
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-between sm:justify-center gap-8 p-6 md:p-8 bg-muted/20 sm:w-60 border-t sm:border-t-0 sm:border-l border-border/50 group-hover:bg-primary/5 transition-colors">
+                                <div className="text-left sm:text-right">
+                                  <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground mb-1">Total abonado</p>
+                                  <p className="text-2xl font-black text-foreground tabular-nums">
+                                    {analysis.total_amount > 0 ? formatCurrency(analysis.total_amount) : "(pendiente)"}
+                                  </p>
+                                  {isCompleted && change !== null && (
+                                    <div className={`flex items-center sm:justify-end gap-1.5 text-sm font-extrabold mt-1.5 ${change > 10 ? "text-secondary" : change > 0 ? "text-muted-foreground" : "text-primary"
+                                      }`}>
+                                      {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+                                      {change > 0 ? "+" : ""}{change.toFixed(1)}%
+                                    </div>
+                                  )}
+                                </div>
+                                <ArrowRight className="w-6 h-6 text-primary sm:hidden group-hover:translate-x-1 transition-transform" />
+                                <div className="hidden sm:block">
+                                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center border border-primary/20 group-hover:scale-110 group-hover:bg-primary group-hover:text-primary-foreground transition-all duration-300">
+                                    <ArrowRight className="w-5 h-5" />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+
+                      if (selectionMode && isCompleted) {
+                        return (
+                          <div
+                            key={analysis.id}
+                            className="cursor-pointer"
+                            onClick={(e) => toggleSelection(analysis.id, e)}
+                          >
+                            {cardContent}
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <Link
+                          key={analysis.id}
+                          to={`/analisis/${analysis.id}`}
+                          className="block"
+                        >
+                          {cardContent}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Show message when no results after filtering */}
+              {filteredAnalyses.length === 0 && (
+                <Card variant="soft" className="animate-fade-in-up">
+                  <CardContent className="p-8 text-center">
+                    <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
+                      <Filter className="w-6 h-6 text-muted-foreground" />
+                    </div>
+                    <h2 className="text-lg font-semibold mb-2">Sin resultados</h2>
+                    <p className="text-muted-foreground mb-4 text-sm">
+                      No hay análisis que coincidan con los filtros seleccionados.
+                    </p>
+                    <Button variant="outline" onClick={clearFilters}>
+                      Limpiar filtros
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </>
           )}
 
           {/* Load More Button */}

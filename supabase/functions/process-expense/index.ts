@@ -267,10 +267,67 @@ serve(async (req) => {
         explanation: cat.explanation || null,
       }));
 
-      const { error: catError } = await analysisRepository.createCategories(categories);
+      const { data: insertedCategories, error: catError } = await analysisRepository.createCategories(categories);
 
       if (catError) {
         console.error("Categories creation error:", catError);
+      } else if (insertedCategories && insertedCategories.length > 0) {
+        // Process subcategories
+        const subcategoriesToInsert: {
+          category_id: string;
+          name: string;
+          amount: number;
+          percentage: number;
+        }[] = [];
+
+        // Map categories by name to link IDs
+        // insertedCategories is an array of objects { id, name, ... }
+        const categoryMap = new Map();
+        insertedCategories.forEach((c: any) => {
+          if (c && c.name && c.id) {
+            categoryMap.set(c.name, c.id);
+          }
+        });
+
+        console.log("Category Map created:", categoryMap.size, "entries");
+
+        extractedData.categories.forEach((cat) => {
+          if (cat.subcategories && cat.subcategories.length > 0) {
+            const catId = categoryMap.get(cat.name);
+
+            if (catId) {
+              console.log(`Processing ${cat.subcategories.length} subcategories for category: ${cat.name} (${catId})`);
+
+              cat.subcategories.forEach((sub) => {
+                // Calculate percentage if not provided (defaulting to 0 if total is 0)
+                let percentage = sub.percentage;
+                if (percentage === undefined && cat.current_amount > 0) {
+                  percentage = Number(((sub.amount / cat.current_amount) * 100).toFixed(2));
+                }
+
+                subcategoriesToInsert.push({
+                  category_id: catId,
+                  name: sub.name,
+                  amount: sub.amount,
+                  percentage: percentage || 0,
+                });
+              });
+            } else {
+              console.warn(`Category not found in map for subcategories: ${cat.name}`);
+            }
+          }
+        });
+
+        console.log(`Total subcategories to insert: ${subcategoriesToInsert.length}`);
+
+        if (subcategoriesToInsert.length > 0) {
+          const { error: subCatError } = await analysisRepository.createSubcategories(subcategoriesToInsert);
+          if (subCatError) {
+            console.error("Subcategories creation error:", subCatError);
+          } else {
+            console.log("Subcategories inserted successfully");
+          }
+        }
       }
     }
 

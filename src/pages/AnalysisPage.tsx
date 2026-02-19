@@ -34,8 +34,11 @@ import {
   Loader2,
   User,
   MessageSquare,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp
 } from "lucide-react";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -140,6 +143,7 @@ interface Category {
   previous_amount: number | null;
   status: string;
   explanation: string | null;
+  expense_subcategories?: { id: string; name: string; amount: number; percentage: number | null }[];
 }
 
 interface Analysis {
@@ -241,6 +245,9 @@ const AnalysisPage = () => {
   const [inflationDataRaw, setInflationDataRaw] = useState<any[]>([]);
   const [buildingsTrendRaw, setBuildingsTrendRaw] = useState<any[]>([]);
   const [isBuildingsTrendLoading, setIsBuildingsTrendLoading] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+
+  const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#06b6d4'];
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -265,15 +272,15 @@ const AnalysisPage = () => {
         if (analysisError) throw analysisError;
         setAnalysis(analysisData);
 
-        // Fetch categories
+        // Fetch categories with subcategories
         const { data: categoriesData, error: categoriesError } = await supabase
           .from("expense_categories")
-          .select("*")
+          .select("*, expense_subcategories(*)")
           .eq("analysis_id", id)
           .order("current_amount", { ascending: false });
 
         if (categoriesError) throw categoriesError;
-        const rawCategories = (categoriesData || []) as Category[];
+        const rawCategories = (categoriesData || []) as unknown as Category[];
         setCategories(rawCategories);
         setPreviousPeriodLabel(null);
 
@@ -1063,11 +1070,21 @@ Analizá tu expensa en ExpensaCheck`;
                       <Card
                         key={category.id}
                         variant="default"
-                        className="animate-fade-in-up overflow-hidden"
+                        className="animate-fade-in-up overflow-hidden transition-all duration-300"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <CardContent className="p-0">
-                          <div className="flex flex-col md:flex-row">
+                          <div
+                            className="flex flex-col md:flex-row cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(category.id)) next.delete(category.id);
+                                else next.add(category.id);
+                                return next;
+                              });
+                            }}
+                          >
                             <div className="flex-1 p-5 md:p-6">
                               <div className="flex items-start gap-4">
                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
@@ -1099,6 +1116,15 @@ Analizá tu expensa en ExpensaCheck`;
                                   <p className="text-sm text-muted-foreground">
                                     {category.explanation || "Sin observaciones"}
                                   </p>
+                                  {category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2 text-primary font-medium text-xs">
+                                      {expandedCategories.has(category.id) ? (
+                                        <>Ocultar detalle <ChevronUp className="w-3 h-3" /></>
+                                      ) : (
+                                        <>Ver detalle <ChevronDown className="w-3 h-3" /></>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1116,6 +1142,98 @@ Analizá tu expensa en ExpensaCheck`;
                               )}
                             </div>
                           </div>
+
+                          {/* Expanded Detail Section */}
+                          {expandedCategories.has(category.id) && category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                            <div className="p-6 bg-muted/10 border-t border-border animate-fade-in cursor-default" onClick={(e) => e.stopPropagation()}>
+                              <h4 className="text-sm font-bold mb-4 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-primary" />
+                                Distribución de gastos
+                              </h4>
+                              <div className="grid md:grid-cols-2 gap-8 items-start">
+                                {/* Chart */}
+                                <div className="min-h-[350px] md:min-h-[400px] w-full flex flex-col justify-center bg-background/40 rounded-2xl p-4 border border-border/30">
+                                  <ResponsiveContainer width="100%" height={350}>
+                                    <PieChart>
+                                      <defs>
+                                        {COLORS.map((color, idx) => (
+                                          <linearGradient key={`grad-${idx}`} id={`colorGrad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                            <stop offset="100%" stopColor={color} stopOpacity={0.8} />
+                                          </linearGradient>
+                                        ))}
+                                      </defs>
+                                      <Pie
+                                        data={category.expense_subcategories}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={120}
+                                        paddingAngle={3}
+                                        dataKey="amount"
+                                        nameKey="name"
+                                        stroke="transparent"
+                                        cornerRadius={6}
+                                      >
+                                        {category.expense_subcategories.map((entry, index) => (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={`url(#colorGrad-${index % COLORS.length})`}
+                                            className="hover:opacity-90 transition-opacity cursor-pointer focus:outline-none"
+                                            style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))' }}
+                                          />
+                                        ))}
+                                      </Pie>
+                                      <RechartsTooltip
+                                        formatter={(value: number, name: string, props: any) => {
+                                          const percent = props.payload.percentage ? ` (${props.payload.percentage}%)` : '';
+                                          return [`${formatCurrency(value)}${percent}`, name];
+                                        }}
+                                        contentStyle={{
+                                          borderRadius: '16px',
+                                          border: '1px solid hsl(var(--border)/0.5)',
+                                          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+                                          padding: '16px',
+                                          backgroundColor: 'hsl(var(--background)/0.95)',
+                                          backdropFilter: 'blur(8px)'
+                                        }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700, paddingTop: '4px' }}
+                                        labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}
+                                        cursor={{ fill: 'transparent' }}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+
+                                {/* List */}
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
+                                  {category.expense_subcategories.map((sub, idx) => (
+                                    <div
+                                      key={sub.id || idx}
+                                      className="flex justify-between items-center p-4 rounded-xl bg-card border border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 group"
+                                    >
+                                      <div className="flex items-center gap-4">
+                                        <div
+                                          className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm transition-transform group-hover:scale-110"
+                                          style={{
+                                            background: `linear-gradient(to bottom, ${COLORS[idx % COLORS.length]}, ${COLORS[idx % COLORS.length]}dd)`,
+                                            boxShadow: `0 0 10px ${COLORS[idx % COLORS.length]}40`
+                                          }}
+                                        />
+                                        <span className="text-sm font-semibold line-clamp-2 text-foreground/90 group-hover:text-foreground transition-colors">{sub.name}</span>
+                                      </div>
+                                      <div className="text-right pl-4">
+                                        <div className="font-bold text-sm">{formatCurrency(sub.amount)}</div>
+                                        {sub.percentage && (
+                                          <div className="text-xs text-muted-foreground font-bold bg-muted/50 inline-block px-2 py-0.5 rounded-md mt-1">{sub.percentage}%</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     );

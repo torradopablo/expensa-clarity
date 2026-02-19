@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import type { Analysis, Category, BuildingProfile } from "../types/analysis";
@@ -50,9 +50,14 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
   } = useInfiniteQuery({
     queryKey: ["analyses", filters],
     queryFn: async ({ pageParam = 0 }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Usuario no autenticado");
+
       let query = supabase
         .from("expense_analyses")
         .select("*, expense_categories(*)", { count: 'exact' })
+        .eq("user_id", user.id)
+        .eq("status", "completed")
         .order("period_date", { ascending: false, nullsFirst: false })
         .order("created_at", { ascending: false });
 
@@ -74,16 +79,52 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     initialPageParam: 0,
   });
 
+  // Query for failed analyses (non-paginated)
+  const { data: failedAnalysesData = [], isLoading: isLoadingFailed } = useQuery({
+    queryKey: ["failed-analyses", filters?.buildingName],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
+      let query = supabase
+        .from("expense_analyses")
+        .select("*, expense_categories(*)")
+        .eq("user_id", user.id)
+        .eq("status", "failed")
+        .order("period_date", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false });
+
+      if (filters?.buildingName && filters.buildingName !== "all") {
+        query = query.eq("building_name", filters.buildingName);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return data as Analysis[];
+    }
+  });
+
   const analyses = infiniteAnalyses?.pages.map(p => p.data).flat() || [];
   const totalCount = infiniteAnalyses?.pages[0]?.totalCount || 0;
+
+  // Combine completed analyses (paginated) with failed analyses (non-paginated)
+  const allAnalyses = useMemo(() => {
+    const completedAnalyses = analyses.filter(a => a.status === "completed");
+    return [...failedAnalysesData, ...completedAnalyses];
+  }, [analyses, failedAnalysesData]);
 
   // Query for unique buildings
   const { data: buildings = [] } = useQuery({
     queryKey: ["user-buildings"],
     queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return [];
+
       const { data, error } = await supabase
         .from("expense_analyses")
         .select("building_name")
+        .eq("user_id", user.id)
+        .in("status", ["completed", "failed"])
         .not("building_name", "is", null);
 
       if (error) throw error;
@@ -159,6 +200,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["analyses"] });
+      queryClient.invalidateQueries({ queryKey: ["failed-analyses"] });
     },
   });
 
@@ -176,6 +218,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["analyses"] });
+      queryClient.invalidateQueries({ queryKey: ["failed-analyses"] });
     },
   });
 
@@ -190,6 +233,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["analyses"] });
+      queryClient.invalidateQueries({ queryKey: ["failed-analyses"] });
     },
   });
 
@@ -263,13 +307,13 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
   };
 
   return {
-    analyses,
+    analyses: allAnalyses,
     totalCount,
     buildings,
     categories: allCategories,
     hasNextPage,
     isFetchingNextPage,
-    loading: loadingAnalyses || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
+    loading: loadingAnalyses || isLoadingFailed || createMutation.isPending || updateMutation.isPending || deleteMutation.isPending,
     error: errorAnalyses ? (errorAnalyses as Error).message : null,
     fetchAnalyses: async () => { await fetchAnalyses(); },
     fetchNextPage: () => { if (hasNextPage && !isFetchingNextPage) fetchNextPage(); },
@@ -281,6 +325,7 @@ export function useAnalysis(filters?: UseAnalysisFilters) {
     clearError: () => { }, // Handled by React Query's error state
     reset: () => {
       queryClient.resetQueries({ queryKey: ["analyses"] });
+      queryClient.resetQueries({ queryKey: ["failed-analyses"] });
     },
   };
 }
