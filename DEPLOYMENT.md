@@ -2,6 +2,13 @@
 
 This file contains implementation considerations and strategies for each project release.
 
+## [1.5.0] - 2026-02-19
+
+### Deployment Strategy & Considerations
+> **Information**: This version introduces comprehensive SEO optimizations for the Argentine market.
+
+1. **Frontend**: Deploy the web application.
+
 ## [1.4.0] - 2026-02-18
 
 ### Deployment Strategy & Considerations
