@@ -42,7 +42,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
             />
             <span className="text-muted-foreground">{entry.name}:</span>
             <span className="font-medium">
-              {entry.value !== null ? `${entry.value > 0 ? "+" : ""}${entry.value.toFixed(1)}%` : "N/A"}
+              {entry.value !== null && !isNaN(entry.value) ? `${entry.value > 0 ? "+" : ""}${entry.value.toFixed(1)}%` : "N/A"}
             </span>
           </div>
         ))}
@@ -250,7 +250,7 @@ export const EvolutionComparisonChart = ({
                 <p className={`font-semibold ${deviation.fromInflation > 5 ? "text-red-600 dark:text-red-400" :
                   deviation.fromInflation <= 0 ? "text-status-ok" : ""
                   }`}>
-                  {deviation.fromInflation > 0 ? "+" : ""}{deviation.fromInflation.toFixed(1)} pp
+                  {!isNaN(deviation.fromInflation) ? `${deviation.fromInflation > 0 ? "+" : ""}${deviation.fromInflation.toFixed(1)} pp` : "N/A pp"}
                   {deviation.fromInflation <= 0 && " ✓"}
                 </p>
               </div>
@@ -274,7 +274,7 @@ export const EvolutionComparisonChart = ({
                 <p className={`font-semibold ${deviation.fromBuildings > 5 ? "text-red-600 dark:text-red-400" :
                   deviation.fromBuildings <= 0 ? "text-status-ok" : ""
                   }`}>
-                  {deviation.fromBuildings > 0 ? "+" : ""}{deviation.fromBuildings.toFixed(1)} pp
+                  {!isNaN(deviation.fromBuildings) ? `${deviation.fromBuildings > 0 ? "+" : ""}${deviation.fromBuildings.toFixed(1)} pp` : "N/A pp"}
                   {deviation.fromBuildings <= 0 && " ✓"}
                 </p>
               </div>

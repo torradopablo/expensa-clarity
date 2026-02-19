@@ -448,6 +448,7 @@ const AnalysisPage = () => {
         filters.excludeBuilding = analysis.building_name;
         filters.excludeUserId = session.user.id;
 
+        // Use consistent fallback strategy across all sections
         const trendResponse = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-buildings-trend`,
           {
@@ -458,7 +459,7 @@ const AnalysisPage = () => {
             },
             body: JSON.stringify({
               filters: Object.keys(filters).length > 0 ? filters : undefined,
-              fallbackIfEmpty: true // More lenient when filtering by category
+              fallbackIfEmpty: true // Consistent with useEvolution hook
             }),
           }
         );
@@ -547,10 +548,10 @@ const AnalysisPage = () => {
     // Calculate deviation for latest period
     const latestEvolution = evolution[evolution.length - 1];
     if (latestEvolution) {
-      const fromInflation = latestEvolution.inflationPercent !== null
+      const fromInflation = latestEvolution.inflationPercent !== null && !isNaN(latestEvolution.inflationPercent)
         ? latestEvolution.userPercent - latestEvolution.inflationPercent
         : 0;
-      const fromBuildings = latestEvolution.buildingsPercent !== null
+      const fromBuildings = latestEvolution.buildingsPercent !== null && !isNaN(latestEvolution.buildingsPercent)
         ? latestEvolution.userPercent - latestEvolution.buildingsPercent
         : 0;
 

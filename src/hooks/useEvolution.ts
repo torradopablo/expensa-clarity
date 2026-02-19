@@ -107,7 +107,7 @@ export function useEvolution(category?: string, buildingName?: string) {
       const { data, error } = await supabase.functions.invoke("get-buildings-trend", {
         body: {
           filters,
-          fallbackIfEmpty: true
+          fallbackIfEmpty: true // Consistent fallback strategy
         }
       });
 
@@ -163,12 +163,12 @@ export function useEvolution(category?: string, buildingName?: string) {
 
     const lastPoint = evolutionData[evolutionData.length - 1];
     let fromInflation = 0;
-    if (lastPoint.inflationPercent !== null) {
+    if (lastPoint.inflationPercent !== null && !isNaN(lastPoint.inflationPercent)) {
       fromInflation = lastPoint.userPercent - lastPoint.inflationPercent;
     }
 
     let fromBuildings = 0;
-    if (stats) {
+    if (stats && stats.averageIncrease !== null && !isNaN(stats.averageIncrease)) {
       fromBuildings = lastPoint.userPercent - stats.averageIncrease;
     }
 
