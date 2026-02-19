@@ -1,8 +1,10 @@
 User-agent: Googlebot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Bingbot
 Allow: /
+Crawl-delay: 1
 
 User-agent: Twitterbot
 Allow: /
@@ -12,3 +14,13 @@ Allow: /
 
 User-agent: *
 Allow: /
+Crawl-delay: 2
+
+# Sitemap
+Sitemap: https://expensacheck.com/sitemap.xml
+
+# Bloquear rutas de API y administrativas
+User-agent: *
+Disallow: /api/
+Disallow: /admin/
+Disallow: /.well-known/

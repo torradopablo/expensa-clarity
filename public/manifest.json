@@ -1,0 +1,49 @@
+{
+  "name": "ExpensaCheck - Análisis Inteligente de Expensas",
+  "short_name": "ExpensaCheck",
+  "description": "Analizá tus expensas con inteligencia artificial, comparando con el mercado argentino y la inflación.",
+  "lang": "es",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "orientation": "portrait-primary",
+  "categories": ["finance", "productivity", "business"],
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Analizar Expensas",
+      "short_name": "Analizar",
+      "description": "Subí y analizá tu liquidación de expensas",
+      "url": "/analizar",
+      "icons": [
+        {
+          "src": "/logo.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Ver Historial",
+      "short_name": "Historial",
+      "description": "Revisá tus análisis anteriores",
+      "url": "/historial",
+      "icons": [
+        {
+          "src": "/logo.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
