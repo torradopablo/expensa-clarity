@@ -551,10 +551,10 @@ const SharedAnalysis = () => {
     // Calculate deviation for latest period
     const latestEvolution = evolution[evolution.length - 1];
     if (latestEvolution) {
-      const fromInflation = latestEvolution.inflationPercent !== null
+      const fromInflation = latestEvolution.inflationPercent !== null && !isNaN(latestEvolution.inflationPercent)
         ? latestEvolution.userPercent - latestEvolution.inflationPercent
         : 0;
-      const fromBuildings = latestEvolution.buildingsPercent !== null
+      const fromBuildings = latestEvolution.buildingsPercent !== null && !isNaN(latestEvolution.buildingsPercent)
         ? latestEvolution.userPercent - latestEvolution.buildingsPercent
         : 0;
 
