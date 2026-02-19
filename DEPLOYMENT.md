@@ -2,6 +2,14 @@
 
 This file contains implementation considerations and strategies for each project release.
 
+## [1.6.0] - 2026-02-19
+
+### Deployment Strategy & Considerations
+> **Information**: This version fixes consistency issues in comparative charts across all sections.
+
+1. **Frontend**: Deploy the web application.
+
+
 ## [1.5.0] - 2026-02-19
 
 ### Deployment Strategy & Considerations
