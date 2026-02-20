@@ -100,6 +100,18 @@ REGLAS DE SALIDA:
           console.warn(`Programmatically adjusting total_amount from ${data.total_amount} to ${categoriesSum} for consistency.`);
           data.total_amount = categoriesSum;
         }
+
+        // Sanitize subcategory amounts to ensure they're non-negative
+        data.categories.forEach((cat: any) => {
+          if (cat.subcategories && Array.isArray(cat.subcategories)) {
+            cat.subcategories.forEach((sub: any) => {
+              if (typeof sub.amount === 'number' && sub.amount < 0) {
+                console.warn(`Found negative subcategory amount: ${sub.amount} for "${sub.name}" in category "${cat.name}". Converting to positive.`);
+                sub.amount = Math.abs(sub.amount);
+              }
+            });
+          }
+        });
       }
 
       return data;
@@ -163,7 +175,7 @@ Si hay muchas categorías, sé breve en las descripciones.
 ${buildingGuide}${categoriesGuide}
 REGLAS CRÍTICAS DE NEGOCIO:
 1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
-2. Los montos deben ser números positivos.
+2. Los montos deben ser números positivos (mayores o iguales a 0). NUNCA negativos.
 3. El JSON debe ser válido y completo.
 4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". 
    - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
@@ -191,6 +203,7 @@ REGLAS CRÍTICAS DE NEGOCIO:
      - "Mantenimiento": "Abono Ascensores", "Limpieza Tanques", "Fumigación".
    - Si encuentras estos ítems detallados con sus montos, agrégalos al array "subcategories".
    - La suma de las subcategorías debe coincidir con el monto de la categoría.
+   - CRÍTICO: Los montos de las subcategorías SIEMPRE deben ser positivos (>= 0). NUNCA negativos.
 
 JSON Schema (Ejemplo de estructura esperada):
 {
