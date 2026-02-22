@@ -255,7 +255,7 @@ const PrepararReunion = () => {
 
             // Use html2canvas to capture the element
             const canvas = await html2canvas(element, {
-                scale: 2, // 2 is usually enough and more stable
+                scale: 3, // Increased from 2 for better sharpness
                 useCORS: true,
                 backgroundColor: "#ffffff",
                 logging: false,
@@ -524,20 +524,22 @@ const PrepararReunion = () => {
                         </div>
                     ) : (
                         <div id="meeting-temario-content" className="space-y-8 animate-fade-in print:p-0">
-                            {/* PDF ONLY HEADER */}
-                            <div id="pdf-header" className="hidden items-center justify-between mb-10 pb-6 border-b-2 border-primary/20">
-                                <div className="flex items-center gap-4">
-                                    <div className="w-12 h-12">
+                            {/* PDF ONLY HEADER - Standardized */}
+                            <div id="pdf-header" className="hidden pdf-header-standard">
+                                <div className="logo-section">
+                                    <div className="w-14 h-14">
                                         <Logo className="w-full h-full" />
                                     </div>
-                                    <div>
-                                        <h1 className="text-3xl font-black tracking-tighter text-foreground leading-none">ExpensaCheck</h1>
-                                        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest leading-none mt-1.5 opacity-80">Inteligencia Artificial para tus Expensas</p>
+                                    <div className="branding">
+                                        <h1>ExpensaCheck</h1>
+                                        <p>Inteligencia Artificial para tus Expensas</p>
                                     </div>
                                 </div>
-                                <div className="text-right">
-                                    <p className="text-sm font-bold text-foreground">{selectedBuilding}</p>
-                                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}</p>
+                                <div className="info-section">
+                                    <p>{selectedBuilding}</p>
+                                    <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+                                        {new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                                    </p>
                                 </div>
                             </div>
                             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 mb-8 print:hidden">

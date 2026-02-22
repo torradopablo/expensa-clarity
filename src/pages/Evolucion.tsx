@@ -138,10 +138,12 @@ const Evolucion = () => {
 
       const filtersCard = document.getElementById("filters-card");
       const pdfFilterSummary = document.getElementById("pdf-filter-summary");
+      const pdfHeader = document.getElementById("pdf-header");
 
       // 1. Prepare View for Capture
       if (filtersCard) filtersCard.style.display = "none";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "block";
+      if (pdfHeader) pdfHeader.style.display = "flex";
 
       // 2. Set fixed width and high contrast class for consistency
       const originalWidth = element.style.width;
@@ -152,7 +154,7 @@ const Evolucion = () => {
       element.style.padding = "40px";
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
@@ -166,6 +168,7 @@ const Evolucion = () => {
 
       if (filtersCard) filtersCard.style.display = "";
       if (pdfFilterSummary) pdfFilterSummary.style.display = "none";
+      if (pdfHeader) pdfHeader.style.display = "none";
 
       // 4. Generate PDF
       const imgData = canvas.toDataURL("image/png");
@@ -195,7 +198,7 @@ const Evolucion = () => {
 
         pdf.setFontSize(8);
         pdf.setTextColor(100);
-        pdf.text("ExpensaCheck", margin, footerY);
+        pdf.text("ExpensaCheck - Informe de Evolución", margin, footerY);
         pdf.text(`Generado el ${new Date().toLocaleDateString()}`, pdfWidth - margin, footerY, { align: "right" });
         pdf.text(`Pág ${pageNo}`, pdfWidth / 2, footerY, { align: "center" });
       };
@@ -477,7 +480,26 @@ const Evolucion = () => {
           </div>
 
           <div id="evolucion-report-content">
-            <div className="mb-12">
+            {/* PDF ONLY HEADER - Standardized */}
+            <div id="pdf-header" className="hidden pdf-header-standard">
+              <div className="logo-section">
+                <div className="w-14 h-14">
+                  <Logo className="w-full h-full" />
+                </div>
+                <div className="branding">
+                  <h1>ExpensaCheck</h1>
+                  <p>Inteligencia Artificial para tus Expensas</p>
+                </div>
+              </div>
+              <div className="info-section">
+                <p>{selectedBuilding !== "all" ? selectedBuilding : "Reporte Global de Evolución"}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+                  {new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-12 pdf-hide">
               <h1 className="text-5xl font-extrabold tracking-tight mb-4">Evolución de Expensas</h1>
               <p className="text-xl text-muted-foreground font-medium max-w-2xl">
                 Visualizá el comportamiento de tus gastos y comparalos con indicadores clave del mercado.

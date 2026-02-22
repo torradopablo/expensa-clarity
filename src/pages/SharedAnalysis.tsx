@@ -27,7 +27,11 @@ import {
   MessageSquare,
   Send,
   User,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  CreditCard
 } from "lucide-react";
 import {
   Select,
@@ -41,6 +45,7 @@ import { createClient } from "@supabase/supabase-js";
 import { Sparkles } from "lucide-react";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
 import { ComparisonChart } from "@/components/ComparisonChart";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend } from 'recharts';
 import {
   AreaChart,
   Area,
@@ -48,7 +53,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
-  ResponsiveContainer,
   ReferenceLine,
 } from "recharts";
 
@@ -105,6 +109,13 @@ interface Category {
   previous_amount: number | null;
   status: string;
   explanation: string | null;
+  expense_subcategories?: {
+    id: string;
+    name: string;
+    amount: number;
+    percentage: number | null;
+    expense_type: "ordinaria" | "extraordinaria" | "fondo_reserva"
+  }[];
 }
 
 interface Analysis {
@@ -166,6 +177,8 @@ interface BuildingsTrendStats {
   filtersApplied?: boolean;
   usedFallback?: boolean;
 }
+
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#06b6d4'];
 
 import { Logo } from "@/components/layout/ui/logo";
 
@@ -386,6 +399,7 @@ const SharedAnalysis = () => {
   const [comments, setComments] = useState<AnalysisComment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [availableCategories, setAvailableCategories] = useState<string[]>([]);
@@ -717,6 +731,22 @@ const SharedAnalysis = () => {
     });
   };
 
+  const extraordinaryExpenses = useMemo(() => {
+    const subs = categories.flatMap(cat => cat.expense_subcategories || []);
+    const extraordinary = subs.filter(sub => sub.expense_type === "extraordinaria");
+    const totalExtraordinary = extraordinary.reduce((sum, sub) => sum + sub.amount, 0);
+    const reserveFund = subs.filter(sub => sub.expense_type === "fondo_reserva");
+    const totalReserveFund = reserveFund.reduce((sum, sub) => sum + sub.amount, 0);
+
+    return {
+      items: extraordinary,
+      total: totalExtraordinary,
+      reserveItems: reserveFund,
+      reserveTotal: totalReserveFund,
+      hasExtraordinary: extraordinary.length > 0 || reserveFund.length > 0
+    };
+  }, [categories]);
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-soft">
@@ -863,6 +893,45 @@ const SharedAnalysis = () => {
               </CardContent>
             </Card>
 
+            {/* Extraordinary Expenses Alert for Tenants */}
+            {extraordinaryExpenses.hasExtraordinary && (
+              <Card className="mb-12 bg-amber-500/5 backdrop-blur-md border-amber-500/30 shadow-xl rounded-[1.5rem] animate-fade-in-up">
+                <CardContent className="p-8">
+                  <div className="flex items-start gap-6">
+                    <div className="w-16 h-16 rounded-[1.25rem] bg-amber-500/20 flex items-center justify-center flex-shrink-0 border border-amber-500/30">
+                      <ShieldAlert className="w-8 h-8 text-amber-600" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                        <h3 className="text-2xl font-black text-amber-700 flex flex-wrap items-center gap-3">
+                          Atención Inquilinos
+                          <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200 uppercase tracking-widest text-[10px] font-black px-3 py-1">
+                            Detección de Extraordinarias
+                          </Badge>
+                        </h3>
+                        <span className="text-2xl font-black text-amber-600">
+                          {formatCurrency(extraordinaryExpenses.total + extraordinaryExpenses.reserveTotal)}
+                        </span>
+                      </div>
+                      <p className="text-base text-amber-900/80 mb-6 leading-relaxed font-medium">
+                        Hemos detectado conceptos que suelen ser considerados <strong>Extraordinarios</strong> o <strong>Fondo de Reserva</strong>.
+                        En Argentina, por ley, estos gastos no deberían ser abonados por el inquilino, sino por el propietario.
+                      </p>
+
+                      <div className="grid gap-3">
+                        {[...extraordinaryExpenses.items, ...extraordinaryExpenses.reserveItems].map((item, i) => (
+                          <div key={i} className="flex justify-between items-center py-3.5 px-5 bg-amber-500/10 rounded-2xl border border-amber-500/10 transition-all hover:bg-amber-500/15">
+                            <span className="font-bold text-amber-900">{item.name}</span>
+                            <span className="font-black text-amber-700">{formatCurrency(item.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Categories Breakdown */}
             {categories.length > 0 && (
               <div className="grid gap-6 mb-12">
@@ -878,28 +947,47 @@ const SharedAnalysis = () => {
                     return (
                       <Card
                         key={category.id}
-                        className="bg-card/30 backdrop-blur-md border border-border/50 shadow-lg rounded-[1.5rem] overflow-hidden animate-fade-in-up hover:bg-card/40 transition-colors"
+                        className="bg-card/30 backdrop-blur-md border border-border/50 shadow-lg rounded-[1.5rem] overflow-hidden animate-fade-in-up hover:bg-card/40 transition-all duration-300"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <CardContent className="p-0">
-                          <div className="flex flex-col md:flex-row">
+                          <div
+                            className="flex flex-col md:flex-row cursor-pointer hover:bg-muted/10 transition-colors"
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(category.id)) next.delete(category.id);
+                                else next.add(category.id);
+                                return next;
+                              });
+                            }}
+                          >
                             <div className="flex-1 p-6 md:p-8">
                               <div className="flex items-start gap-5">
-                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 border ${category.status === "attention" ? "bg-status-attention-bg border-status-attention/30" : "bg-status-ok-bg border-status-ok/30"
+                                <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 border ${category.status === "attention" ? "bg-status-attention-bg border-status-attention/30" : category.status === "info" ? "bg-status-info-bg border-status-info/30" : "bg-status-ok-bg border-status-ok/30"
                                   }`}>
-                                  <Icon className={`w-7 h-7 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                  <Icon className={`w-7 h-7 ${category.status === "attention" ? "text-status-attention" : category.status === "info" ? "text-status-info" : "text-status-ok"
                                     }`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-3 mb-2">
                                     <h3 className="text-xl font-bold">{category.name}</h3>
                                     <Badge variant={category.status as any} className="px-3">
-                                      {category.status === "ok" ? "OK" : "Revisar"}
+                                      {category.status === "ok" ? "OK" : category.status === "info" ? "Info" : "Revisar"}
                                     </Badge>
                                   </div>
                                   <p className="text-base text-muted-foreground leading-relaxed font-medium">
                                     {category.explanation || "Sin observaciones específicas para este rubro."}
                                   </p>
+                                  {category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-3 text-primary font-bold text-sm">
+                                      {expandedCategories.has(category.id) ? (
+                                        <>Ocultar detalle <ChevronUp className="w-4 h-4" /></>
+                                      ) : (
+                                        <>Ver detalle <ChevronDown className="w-4 h-4" /></>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -917,6 +1005,108 @@ const SharedAnalysis = () => {
                               )}
                             </div>
                           </div>
+
+                          {/* Subcategories Details */}
+                          {expandedCategories.has(category.id) && category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                            <div className="p-6 md:p-8 bg-muted/20 border-t border-border/50 animate-fade-in">
+                              <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-6 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-primary" />
+                                Distribución de gastos
+                              </h4>
+                              <div className="grid md:grid-cols-2 gap-8 items-start">
+                                {/* Chart */}
+                                <div className="min-h-[350px] md:min-h-[400px] w-full flex flex-col justify-center bg-background/40 rounded-2xl p-4 border border-border/30">
+                                  <ResponsiveContainer width="100%" height={350}>
+                                    <PieChart>
+                                      <defs>
+                                        {COLORS.map((color, idx) => (
+                                          <linearGradient key={`grad-${idx}`} id={`colorGrad-shared-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                            <stop offset="100%" stopColor={color} stopOpacity={0.8} />
+                                          </linearGradient>
+                                        ))}
+                                      </defs>
+                                      <Pie
+                                        data={category.expense_subcategories}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={120}
+                                        paddingAngle={3}
+                                        dataKey="amount"
+                                        nameKey="name"
+                                        stroke="transparent"
+                                        cornerRadius={6}
+                                      >
+                                        {category.expense_subcategories.map((entry, index) => (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={`url(#colorGrad-shared-${index % COLORS.length})`}
+                                            className="hover:opacity-90 transition-opacity cursor-pointer focus:outline-none"
+                                            style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))' }}
+                                          />
+                                        ))}
+                                      </Pie>
+                                      <RechartsTooltip
+                                        formatter={(value: number, name: string, props: any) => {
+                                          const percent = props.payload.percentage ? ` (${props.payload.percentage}%)` : '';
+                                          return [`${formatCurrency(value)}${percent}`, name];
+                                        }}
+                                        contentStyle={{
+                                          borderRadius: '16px',
+                                          border: '1px solid hsl(var(--border)/0.5)',
+                                          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+                                          padding: '16px',
+                                          backgroundColor: 'hsl(var(--background)/0.95)',
+                                          backdropFilter: 'blur(8px)'
+                                        }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700, paddingTop: '4px' }}
+                                        labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}
+                                        cursor={{ fill: 'transparent' }}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+
+                                {/* List */}
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
+                                  {category.expense_subcategories.map((sub, idx) => (
+                                    <div
+                                      key={sub.id || idx}
+                                      className="flex justify-between items-center p-4 rounded-xl bg-card border border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 group"
+                                    >
+                                      <div className="flex items-center gap-4">
+                                        <div
+                                          className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm transition-transform group-hover:scale-110"
+                                          style={{
+                                            background: `linear-gradient(to bottom, ${COLORS[idx % COLORS.length]}, ${COLORS[idx % COLORS.length]}dd)`,
+                                            boxShadow: `0 0 10px ${COLORS[idx % COLORS.length]}40`
+                                          }}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-semibold line-clamp-2 text-foreground/90 group-hover:text-foreground transition-colors">{sub.name}</span>
+                                          {sub.expense_type && sub.expense_type !== "ordinaria" && (
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full w-fit ${sub.expense_type === "extraordinaria"
+                                              ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                              : "bg-blue-100 text-blue-700 border border-blue-200"
+                                              }`}>
+                                              {sub.expense_type === "extraordinaria" ? "Extraordinaria" : "Fondo Reserva"}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right pl-4">
+                                        <div className="font-bold text-sm">{formatCurrency(sub.amount)}</div>
+                                        {sub.percentage && (
+                                          <div className="text-xs text-muted-foreground font-bold bg-muted/50 inline-block px-2 py-0.5 rounded-md mt-1">{sub.percentage}%</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     );
@@ -939,7 +1129,9 @@ const SharedAnalysis = () => {
                       diff: c.current_amount - (c.previous_amount || 0),
                       changePercent: c.previous_amount
                         ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100
-                        : null
+                        : null,
+                      leftSubcategories: [],
+                      rightSubcategories: c.expense_subcategories || []
                     }))
                     .sort((a, b) => b.rightAmount - a.rightAmount)}
                   leftLabel="Mes anterior"

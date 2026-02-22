@@ -2,6 +2,17 @@
 
 This file contains implementation considerations and strategies for each project release.
 
+## [1.7.0] - 2026-02-22
+
+### Deployment Strategy & Considerations
+> **Information**: This version introduces hierarchical market benchmarks, advanced mathematical consistency checks, and standardized diagnostic UI.
+
+1. **Database (SQL Migration)**: Execute `20260222190000_add_expense_subcategories` and `20260223000000_add_expense_type_to_subcategories.sql` to add the `expense_type` column to subcategories.
+2. **Edge Functions**: Redeploy the following functions:
+   - `get-buildings-trend`: Implements the new hierarchical fallback logic (Neighborhood -> City -> Zone).
+   - `process-expense`: Includes the updated AI prompt and programmatic mathematical validation of subcategories.
+3. **Frontend**: Deploy the web application. Verify that the "EvolutionComparisonChart" displays the applied filters badge correctly.
+
 ## [1.6.0] - 2026-02-19
 
 ### Deployment Strategy & Considerations

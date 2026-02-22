@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,7 +34,11 @@ import {
   Loader2,
   User,
   MessageSquare,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp,
+  ShieldAlert,
+  CreditCard
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -58,6 +62,7 @@ import { AnomalyAlerts } from "@/components/AnomalyAlerts";
 import { HistoricalEvolutionChart } from "@/components/HistoricalEvolutionChart";
 import { EvolutionComparisonChart } from "@/components/EvolutionComparisonChart";
 import { ComparisonChart } from "@/components/ComparisonChart";
+import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip as RechartsTooltip } from 'recharts';
 
 
 const iconMap: Record<string, any> = {
@@ -140,6 +145,13 @@ interface Category {
   previous_amount: number | null;
   status: string;
   explanation: string | null;
+  expense_subcategories?: {
+    id: string;
+    name: string;
+    amount: number;
+    percentage: number | null;
+    expense_type: "ordinaria" | "extraordinaria" | "fondo_reserva"
+  }[];
 }
 
 interface Analysis {
@@ -214,6 +226,8 @@ const formatShortCurrency = (value: number) => {
   return `$${value}`;
 };
 
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316', '#6366f1', '#06b6d4'];
+
 const AnalysisPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -241,6 +255,7 @@ const AnalysisPage = () => {
   const [inflationDataRaw, setInflationDataRaw] = useState<any[]>([]);
   const [buildingsTrendRaw, setBuildingsTrendRaw] = useState<any[]>([]);
   const [isBuildingsTrendLoading, setIsBuildingsTrendLoading] = useState(false);
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const fetchAnalysis = async () => {
@@ -268,12 +283,12 @@ const AnalysisPage = () => {
         // Fetch categories
         const { data: categoriesData, error: categoriesError } = await supabase
           .from("expense_categories")
-          .select("*")
+          .select("*, expense_subcategories(*)")
           .eq("analysis_id", id)
           .order("current_amount", { ascending: false });
 
         if (categoriesError) throw categoriesError;
-        const rawCategories = (categoriesData || []) as Category[];
+        const rawCategories = (categoriesData || []) as unknown as Category[];
         setCategories(rawCategories);
         setPreviousPeriodLabel(null);
 
@@ -562,6 +577,22 @@ const AnalysisPage = () => {
       });
     }
   }, [selectedCategory, historicalData, inflationDataRaw, buildingsTrendRaw]);
+
+  const extraordinaryExpenses = useMemo(() => {
+    const subs = categories.flatMap(cat => cat.expense_subcategories || []);
+    const extraordinary = subs.filter(sub => sub.expense_type === "extraordinaria");
+    const totalExtraordinary = extraordinary.reduce((sum, sub) => sum + sub.amount, 0);
+    const reserveFund = subs.filter(sub => sub.expense_type === "fondo_reserva");
+    const totalReserveFund = reserveFund.reduce((sum, sub) => sum + sub.amount, 0);
+
+    return {
+      items: extraordinary,
+      total: totalExtraordinary,
+      reserveItems: reserveFund,
+      reserveTotal: totalReserveFund,
+      hasExtraordinary: extraordinary.length > 0 || reserveFund.length > 0
+    };
+  }, [categories]);
 
   if (isLoading) {
     return (
@@ -1050,6 +1081,45 @@ Analizá tu expensa en ExpensaCheck`;
               </CardContent>
             </Card>
 
+            {/* Extraordinary Expenses Alert for Tenants */}
+            {extraordinaryExpenses.hasExtraordinary && (
+              <Card variant="soft" className="mb-8 animate-fade-in-up border-amber-500/30 bg-amber-500/5">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-2xl bg-amber-500/10 flex items-center justify-center flex-shrink-0 border border-amber-500/20">
+                      <ShieldAlert className="w-6 h-6 text-amber-500" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+                        <h3 className="text-lg font-bold text-amber-600 flex flex-wrap items-center gap-2">
+                          Atención Inquilinos
+                          <Badge variant="outline" className="bg-amber-100 text-amber-700 border-amber-200">
+                            Detección de Extraordinarias
+                          </Badge>
+                        </h3>
+                        <span className="text-xl font-black text-amber-700">
+                          {formatCurrency(extraordinaryExpenses.total + extraordinaryExpenses.reserveTotal)}
+                        </span>
+                      </div>
+                      <p className="text-sm text-amber-800/80 mb-6 leading-relaxed">
+                        Hemos detectado conceptos que suelen ser considerados <strong>Extraordinarios</strong> o <strong>Fondo de Reserva</strong>.
+                        En Argentina, por ley, estos gastos no deberían ser abonados por el inquilino, sino por el propietario.
+                      </p>
+
+                      <div className="grid gap-2">
+                        {[...extraordinaryExpenses.items, ...extraordinaryExpenses.reserveItems].map((item, i) => (
+                          <div key={i} className="flex justify-between items-center text-xs py-2.5 px-4 bg-amber-500/10 rounded-xl border border-amber-500/10">
+                            <span className="font-semibold text-amber-900">{item.name}</span>
+                            <span className="font-bold text-amber-700">{formatCurrency(item.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Categories Breakdown */}
             {categories.length > 0 && (
               <div className="grid gap-4 mb-8">
@@ -1063,16 +1133,26 @@ Analizá tu expensa en ExpensaCheck`;
                       <Card
                         key={category.id}
                         variant="default"
-                        className="animate-fade-in-up overflow-hidden"
+                        className="animate-fade-in-up overflow-hidden transition-all duration-300"
                         style={{ animationDelay: `${index * 0.1}s` }}
                       >
                         <CardContent className="p-0">
-                          <div className="flex flex-col md:flex-row">
+                          <div
+                            className="flex flex-col md:flex-row cursor-pointer hover:bg-muted/50 transition-colors"
+                            onClick={() => {
+                              setExpandedCategories(prev => {
+                                const next = new Set(prev);
+                                if (next.has(category.id)) next.delete(category.id);
+                                else next.add(category.id);
+                                return next;
+                              });
+                            }}
+                          >
                             <div className="flex-1 p-5 md:p-6">
                               <div className="flex items-start gap-4">
-                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : category.status === "info" ? "bg-status-info-bg" : "bg-status-ok-bg"
                                   }`}>
-                                  <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                  <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : category.status === "info" ? "text-status-info" : "text-status-ok"
                                     }`} />
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1084,12 +1164,14 @@ Analizá tu expensa en ExpensaCheck`;
                                           variant={category.status as any}
                                           className="cursor-help transition-transform hover:scale-105"
                                         >
-                                          {category.status === "ok" ? "OK" : "Revisar"}
+                                          {category.status === "ok" ? "OK" : category.status === "info" ? "Info" : "Revisar"}
                                         </Badge>
                                       </TooltipTrigger>
                                       <TooltipContent side="top" className="max-w-xs">
                                         {category.status === "ok" ? (
                                           <p>✅ Este gasto está dentro de los parámetros normales.</p>
+                                        ) : category.status === "info" ? (
+                                          <p>ℹ️ Información relevante sobre este gasto para tu conocimiento.</p>
                                         ) : (
                                           <p>⚠️ Este gasto tuvo un aumento significativo. Te recomendamos verificarlo con la administración.</p>
                                         )}
@@ -1099,6 +1181,15 @@ Analizá tu expensa en ExpensaCheck`;
                                   <p className="text-sm text-muted-foreground">
                                     {category.explanation || "Sin observaciones"}
                                   </p>
+                                  {category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                                    <div className="flex items-center gap-1 mt-2 text-primary font-medium text-xs">
+                                      {expandedCategories.has(category.id) ? (
+                                        <>Ocultar detalle <ChevronUp className="w-3 h-3" /></>
+                                      ) : (
+                                        <>Ver detalle <ChevronDown className="w-3 h-3" /></>
+                                      )}
+                                    </div>
+                                  )}
                                 </div>
                               </div>
                             </div>
@@ -1116,6 +1207,108 @@ Analizá tu expensa en ExpensaCheck`;
                               )}
                             </div>
                           </div>
+
+                          {/* Subcategories Details */}
+                          {expandedCategories.has(category.id) && category.expense_subcategories && category.expense_subcategories.length > 0 && (
+                            <div className="p-6 md:p-8 bg-muted/20 border-t border-border/50 animate-fade-in">
+                              <h4 className="text-sm font-bold uppercase tracking-wider text-muted-foreground mb-6 flex items-center gap-2">
+                                <TrendingUp className="w-4 h-4 text-primary" />
+                                Distribución de gastos
+                              </h4>
+                              <div className="grid md:grid-cols-2 gap-8 items-start">
+                                {/* Chart */}
+                                <div className="min-h-[350px] md:min-h-[400px] w-full flex flex-col justify-center bg-background/40 rounded-2xl p-4 border border-border/30">
+                                  <ResponsiveContainer width="100%" height={350}>
+                                    <PieChart>
+                                      <defs>
+                                        {COLORS.map((color, idx) => (
+                                          <linearGradient key={`grad-${idx}`} id={`colorGrad-${idx}`} x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor={color} stopOpacity={1} />
+                                            <stop offset="100%" stopColor={color} stopOpacity={0.8} />
+                                          </linearGradient>
+                                        ))}
+                                      </defs>
+                                      <Pie
+                                        data={category.expense_subcategories}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={80}
+                                        outerRadius={120}
+                                        paddingAngle={3}
+                                        dataKey="amount"
+                                        nameKey="name"
+                                        stroke="transparent"
+                                        cornerRadius={6}
+                                      >
+                                        {category.expense_subcategories.map((entry, index) => (
+                                          <Cell
+                                            key={`cell-${index}`}
+                                            fill={`url(#colorGrad-${index % COLORS.length})`}
+                                            className="hover:opacity-90 transition-opacity cursor-pointer focus:outline-none"
+                                            style={{ filter: 'drop-shadow(0px 2px 4px rgba(0,0,0,0.1))' }}
+                                          />
+                                        ))}
+                                      </Pie>
+                                      <RechartsTooltip
+                                        formatter={(value: number, name: string, props: any) => {
+                                          const percent = props.payload.percentage ? ` (${props.payload.percentage}%)` : '';
+                                          return [`${formatCurrency(value)}${percent}`, name];
+                                        }}
+                                        contentStyle={{
+                                          borderRadius: '16px',
+                                          border: '1px solid hsl(var(--border)/0.5)',
+                                          boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)',
+                                          padding: '16px',
+                                          backgroundColor: 'hsl(var(--background)/0.95)',
+                                          backdropFilter: 'blur(8px)'
+                                        }}
+                                        itemStyle={{ color: 'hsl(var(--foreground))', fontWeight: 700, paddingTop: '4px' }}
+                                        labelStyle={{ color: 'hsl(var(--muted-foreground))', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}
+                                        cursor={{ fill: 'transparent' }}
+                                      />
+                                    </PieChart>
+                                  </ResponsiveContainer>
+                                </div>
+
+                                {/* List */}
+                                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-3 custom-scrollbar">
+                                  {category.expense_subcategories.map((sub, idx) => (
+                                    <div
+                                      key={sub.id || idx}
+                                      className="flex justify-between items-center p-4 rounded-xl bg-card border border-border/40 hover:border-primary/30 hover:shadow-md transition-all duration-300 group"
+                                    >
+                                      <div className="flex items-center gap-4">
+                                        <div
+                                          className="w-4 h-4 rounded-full flex-shrink-0 shadow-sm transition-transform group-hover:scale-110"
+                                          style={{
+                                            background: `linear-gradient(to bottom, ${COLORS[idx % COLORS.length]}, ${COLORS[idx % COLORS.length]}dd)`,
+                                            boxShadow: `0 0 10px ${COLORS[idx % COLORS.length]}40`
+                                          }}
+                                        />
+                                        <div className="flex flex-col">
+                                          <span className="text-sm font-semibold line-clamp-2 text-foreground/90 group-hover:text-foreground transition-colors">{sub.name}</span>
+                                          {sub.expense_type && sub.expense_type !== "ordinaria" && (
+                                            <span className={`text-[10px] font-bold uppercase tracking-wider mt-1 px-2 py-0.5 rounded-full w-fit ${sub.expense_type === "extraordinaria"
+                                              ? "bg-amber-100 text-amber-700 border border-amber-200"
+                                              : "bg-blue-100 text-blue-700 border border-blue-200"
+                                              }`}>
+                                              {sub.expense_type === "extraordinaria" ? "Extraordinaria" : "Fondo Reserva"}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                      <div className="text-right pl-4">
+                                        <div className="font-bold text-sm">{formatCurrency(sub.amount)}</div>
+                                        {sub.percentage && (
+                                          <div className="text-xs text-muted-foreground font-bold bg-muted/50 inline-block px-2 py-0.5 rounded-md mt-1">{sub.percentage}%</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </CardContent>
                       </Card>
                     );
@@ -1145,7 +1338,9 @@ Analizá tu expensa en ExpensaCheck`;
                       diff: c.current_amount - (c.previous_amount || 0),
                       changePercent: c.previous_amount
                         ? ((c.current_amount - c.previous_amount) / c.previous_amount) * 100
-                        : null
+                        : null,
+                      leftSubcategories: [], // We don't have the previous subcategories easily here without a deep fetch
+                      rightSubcategories: c.expense_subcategories || []
                     }))
                     .sort((a, b) => b.rightAmount - a.rightAmount)}
                   leftLabel={previousPeriodLabel ? previousPeriodLabel : "Mes anterior"}

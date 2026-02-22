@@ -1,3 +1,12 @@
+export interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+  amount: number;
+  percentage?: number | null;
+  expense_type: "ordinaria" | "extraordinaria" | "fondo_reserva";
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -6,6 +15,7 @@ export interface Category {
   previous_amount: number | null;
   status: "ok" | "attention" | "normal" | "high" | "low" | "new";
   explanation: string | null;
+  expense_subcategories?: Subcategory[];
 }
 
 export interface Analysis {
@@ -72,6 +82,7 @@ export interface BuildingsTrendStats {
   periodsCount?: number;
   filtersApplied?: boolean;
   usedFallback?: boolean;
+  appliedFilters?: string[];
 }
 
 export interface SharedAnalysis {

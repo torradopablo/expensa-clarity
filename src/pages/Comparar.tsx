@@ -90,6 +90,13 @@ const calculateChange = (current: number, previous: number) => {
   return ((current - previous) / previous) * 100;
 };
 
+interface Subcategory {
+  id: string;
+  category_id: string;
+  name: string;
+  amount: number;
+}
+
 interface Category {
   id: string;
   name: string;
@@ -98,6 +105,7 @@ interface Category {
   previous_amount: number | null;
   status: string;
   explanation: string | null;
+  expense_subcategories?: Subcategory[];
 }
 
 interface Analysis {
@@ -180,15 +188,15 @@ const CompararPage = () => {
         setRightAnalysis(rightData.data);
 
         const [leftCats, rightCats] = await Promise.all([
-          supabase.from("expense_categories").select("*").eq("analysis_id", leftId).order("current_amount", { ascending: false }),
-          supabase.from("expense_categories").select("*").eq("analysis_id", rightId).order("current_amount", { ascending: false }),
+          supabase.from("expense_categories").select("*, expense_subcategories(*)").eq("analysis_id", leftId).order("current_amount", { ascending: false }),
+          supabase.from("expense_categories").select("*, expense_subcategories(*)").eq("analysis_id", rightId).order("current_amount", { ascending: false }),
         ]);
 
         if (leftCats.error) throw leftCats.error;
         if (rightCats.error) throw rightCats.error;
 
-        setLeftCategories(leftCats.data || []);
-        setRightCategories(rightCats.data || []);
+        setLeftCategories(leftCats.data as unknown as Category[] || []);
+        setRightCategories(rightCats.data as unknown as Category[] || []);
       } catch (error: any) {
         console.error("Error fetching details:", error);
         toast.error("Error al cargar los detalles");
@@ -223,6 +231,8 @@ const CompararPage = () => {
         rightAmount,
         diff,
         changePercent,
+        leftSubcategories: left?.expense_subcategories || [],
+        rightSubcategories: right?.expense_subcategories || [],
       };
     }).sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff));
   }, [leftCategories, rightCategories]);
@@ -249,10 +259,12 @@ const CompararPage = () => {
 
       const filtersCard = document.getElementById("comparison-filters-card");
       const pdfSummary = document.getElementById("pdf-comparison-summary");
+      const pdfHeader = document.getElementById("pdf-header");
 
       // 1. Prepare View for Capture
       if (filtersCard) filtersCard.style.display = "none";
       if (pdfSummary) pdfSummary.style.display = "block";
+      if (pdfHeader) pdfHeader.style.display = "flex";
 
       // 2. Set fixed width and high contrast class for consistency
       const originalWidth = element.style.width;
@@ -263,7 +275,7 @@ const CompararPage = () => {
       element.style.padding = "40px";
 
       const canvas = await html2canvas(element, {
-        scale: 2,
+        scale: 3,
         useCORS: true,
         logging: false,
         backgroundColor: "#ffffff",
@@ -277,6 +289,7 @@ const CompararPage = () => {
 
       if (filtersCard) filtersCard.style.display = "";
       if (pdfSummary) pdfSummary.style.display = "none";
+      if (pdfHeader) pdfHeader.style.display = "none";
 
       // 4. Generate PDF
       const imgData = canvas.toDataURL("image/png");
@@ -306,7 +319,7 @@ const CompararPage = () => {
 
         pdf.setFontSize(8);
         pdf.setTextColor(100);
-        pdf.text("ExpensaCheck", margin, footerY);
+        pdf.text("ExpensaCheck - Comparativa de Expensas", margin, footerY);
         pdf.text(`Generado el ${new Date().toLocaleDateString()}`, pdfWidth - margin, footerY, { align: "right" });
         pdf.text(`Pág ${pageNo}`, pdfWidth / 2, footerY, { align: "center" });
       };
@@ -453,7 +466,26 @@ const CompararPage = () => {
           </div>
 
           <div id="comparar-report-content">
-            <div className="mb-10">
+            {/* PDF ONLY HEADER - Standardized */}
+            <div id="pdf-header" className="hidden pdf-header-standard">
+              <div className="logo-section">
+                <div className="w-14 h-14">
+                  <Logo className="w-full h-full" />
+                </div>
+                <div className="branding">
+                  <h1>ExpensaCheck</h1>
+                  <p>Inteligencia Artificial para tus Expensas</p>
+                </div>
+              </div>
+              <div className="info-section">
+                <p>{leftAnalysis?.building_name || "Comparativa lado a lado"}</p>
+                <p className="text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
+                  {new Date().toLocaleDateString('es-AR', { month: 'long', year: 'numeric' })}
+                </p>
+              </div>
+            </div>
+
+            <div className="mb-10 pdf-hide">
               <h1 className="text-5xl font-extrabold tracking-tight mb-4">Comparativa Lado a Lado</h1>
               <p className="text-xl text-muted-foreground font-medium max-w-2xl">
                 Analizá las variaciones específicas entre dos períodos de liquidación.
@@ -624,6 +656,15 @@ const CompararPage = () => {
                           <div className="grid grid-cols-[1fr,auto,1fr] gap-8 items-center">
                             <div className="text-right">
                               <p className="text-xl font-bold tabular-nums text-foreground/80">{formatCurrency(cat.leftAmount)}</p>
+                              {cat.leftSubcategories.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {cat.leftSubcategories.map((sub: any) => (
+                                    <p key={sub.id} className="text-[10px] text-muted-foreground">
+                                      {sub.name}: <span className="font-medium text-foreground/60">{formatCurrency(sub.amount)}</span>
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                             </div>
 
                             <div className="flex flex-col items-center gap-3 min-w-[180px]">
@@ -650,6 +691,15 @@ const CompararPage = () => {
 
                             <div className="text-left">
                               <p className="text-xl font-bold tabular-nums text-foreground">{formatCurrency(cat.rightAmount)}</p>
+                              {cat.rightSubcategories.length > 0 && (
+                                <div className="mt-2 space-y-1">
+                                  {cat.rightSubcategories.map((sub: any) => (
+                                    <p key={sub.id} className="text-[10px] text-muted-foreground">
+                                      {sub.name}: <span className="font-medium text-foreground/80">{formatCurrency(sub.amount)}</span>
+                                    </p>
+                                  ))}
+                                </div>
+                              )}
                             </div>
                           </div>
                         </CardContent>

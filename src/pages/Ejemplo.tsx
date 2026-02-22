@@ -94,7 +94,7 @@ const expenseData = {
       icon: Users,
       current: 52000,
       previous: 45000,
-      status: "ok" as const,
+      status: "ok" as "ok" | "attention" | "info",
       explanation: "Aumento del 15.5% por paritarias. Dentro de lo esperado."
     },
     {
@@ -102,31 +102,43 @@ const expenseData = {
       icon: Zap,
       current: 28500,
       previous: 18200,
-      status: "attention" as const,
-      explanation: "Subió un 56%. Coincide con el aumento de tarifas de noviembre."
+      status: "attention" as "ok" | "attention" | "info",
+      explanation: "Subió un 56%. Coincide con el aumento de tarifas de noviembre.",
+      subcategories: [
+        { name: "Edesur (Consumo)", amount: 24200 },
+        { name: "Alumbrado pasillos", amount: 4300 }
+      ]
     },
     {
       name: "Agua",
       icon: Droplets,
       current: 12300,
       previous: 11800,
-      status: "ok" as const,
-      explanation: "Variación mínima del 4.2%."
+      status: "ok" as "ok" | "attention" | "info",
+      explanation: "Variación mínima del 4.2%.",
+      subcategories: [
+        { name: "AySA - Cargo Fijo", amount: 8100 },
+        { name: "AySA - Excedente", amount: 4200 }
+      ]
     },
     {
       name: "Mantenimiento",
       icon: Wrench,
       current: 18500,
       previous: 12000,
-      status: "attention" as const,
-      explanation: "Reparación del portón eléctrico incluida este mes."
+      status: "attention" as "ok" | "attention" | "info",
+      explanation: "Reparación del portón eléctrico incluida este mes.",
+      subcategories: [
+        { name: "Reparación Portón", amount: 12500 },
+        { name: "Abono Ascensores", amount: 6000 }
+      ]
     },
     {
       name: "Seguro",
       icon: Shield,
       current: 8200,
       previous: 7500,
-      status: "ok" as const,
+      status: "ok" as "ok" | "attention" | "info",
       explanation: "Ajuste anual del 9.3%."
     },
     {
@@ -134,7 +146,7 @@ const expenseData = {
       icon: Building,
       current: 6300,
       previous: 4000,
-      status: "attention" as const,
+      status: "attention" as "ok" | "attention" | "info",
       explanation: "Aumento del 57.5%. Verificar con la administración."
     },
   ]
@@ -169,7 +181,8 @@ const mockComparisonData = expenseData.categories.map(c => ({
   leftAmount: c.previous,
   rightAmount: c.current,
   diff: c.current - c.previous,
-  changePercent: ((c.current - c.previous) / c.previous) * 100
+  changePercent: ((c.current - c.previous) / c.previous) * 100,
+  subcategories: (c as any).subcategories || []
 })).sort((a, b) => b.rightAmount - a.rightAmount);
 
 const mockMeetingAgenda = [
@@ -369,9 +382,9 @@ const Ejemplo = () => {
                         <div className="flex flex-col md:flex-row">
                           <div className="flex-1 p-5 md:p-6">
                             <div className="flex items-start gap-4">
-                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : "bg-status-ok-bg"
+                              <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${category.status === "attention" ? "bg-status-attention-bg" : category.status === "info" ? "bg-status-info-bg" : "bg-status-ok-bg"
                                 }`}>
-                                <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : "text-status-ok"
+                                <Icon className={`w-6 h-6 ${category.status === "attention" ? "text-status-attention" : category.status === "info" ? "text-status-info" : "text-status-ok"
                                   }`} />
                               </div>
                               <div className="flex-1 min-w-0">
@@ -383,12 +396,14 @@ const Ejemplo = () => {
                                         variant={category.status}
                                         className="cursor-help transition-transform hover:scale-105"
                                       >
-                                        {category.status === "ok" ? "OK" : "Revisar"}
+                                        {category.status === "ok" ? "OK" : category.status === "info" ? "Info" : "Revisar"}
                                       </Badge>
                                     </TooltipTrigger>
                                     <TooltipContent side="top" className="max-w-xs">
                                       {category.status === "ok" ? (
                                         <p>✅ Este gasto está dentro de los parámetros normales.</p>
+                                      ) : category.status === "info" ? (
+                                        <p>ℹ️ Información relevante sobre este gasto para tu conocimiento.</p>
                                       ) : (
                                         <p>⚠️ Este gasto tuvo un aumento significativo. Te recomendamos verificarlo con la administración.</p>
                                       )}
@@ -398,6 +413,15 @@ const Ejemplo = () => {
                                 <p className="text-sm text-muted-foreground">
                                   {category.explanation}
                                 </p>
+                                {(category as any).subcategories && (
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    {(category as any).subcategories.map((sub: any, i: number) => (
+                                      <Badge key={i} variant="outline" className="text-[10px] bg-background/50 border-border/50 font-medium">
+                                        {sub.name}: {formatCurrency(sub.amount)}
+                                      </Badge>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -482,13 +506,51 @@ const Ejemplo = () => {
                 <strong className="text-foreground">¿Estás pagando de más?</strong> Comparamos tus costos contra una <strong className="text-foreground">red de edificios similares</strong> en tu zona. Gracias a nuestra base de datos, podemos decirte con precisión si un rubro (como administración o limpieza) está fuera de mercado.
               </p>
             </div>
-            {/* Visual Comparison Chart */}
-            <div className="mb-8">
-              <ComparisonChart
-                data={mockComparisonData}
-                leftLabel="Noviembre"
-                rightLabel="Diciembre"
-              />
+            <div className="mb-12">
+              <div className="grid gap-4">
+                {mockComparisonData.map((cat, index) => {
+                  const Icon = (expenseData.categories.find(c => c.name === cat.name)?.icon as any) || Building;
+                  const isIncrease = cat.diff > 0;
+
+                  return (
+                    <Card key={cat.name} className="overflow-hidden border-border/50 bg-card/40 backdrop-blur-md">
+                      <CardContent className="p-0">
+                        <div className="grid grid-cols-[1fr,auto,1fr] gap-4 items-center">
+                          <div className="p-6 text-right">
+                            <span className="text-xs text-muted-foreground block mb-1">Noviembre</span>
+                            <span className="text-lg font-bold tabular-nums opacity-60">{formatCurrency(cat.leftAmount)}</span>
+                          </div>
+
+                          <div className="flex flex-col items-center gap-2 min-w-[150px] py-4">
+                            <div className="flex items-center gap-2 px-3 py-1 bg-background rounded-full border border-border/50">
+                              <Icon className="w-3.5 h-3.5 text-primary" />
+                              <span className="text-xs font-bold">{cat.name}</span>
+                            </div>
+                            <div className={`text-[10px] font-black flex items-center gap-1 ${isIncrease ? "text-secondary" : "text-primary"}`}>
+                              {isIncrease ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                              {cat.changePercent > 0 ? "+" : ""}{cat.changePercent.toFixed(1)}%
+                            </div>
+                          </div>
+
+                          <div className="p-6 text-left">
+                            <span className="text-xs text-muted-foreground block mb-1">Diciembre</span>
+                            <span className="text-lg font-bold tabular-nums">{formatCurrency(cat.rightAmount)}</span>
+                            {cat.subcategories.length > 0 && (
+                              <div className="mt-2 space-y-0.5">
+                                {cat.subcategories.map((sub, i) => (
+                                  <p key={i} className="text-[9px] text-muted-foreground">
+                                    {sub.name}: <span className="font-bold text-foreground/60">{formatCurrency(sub.amount)}</span>
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Evolution Comparison Chart */}
