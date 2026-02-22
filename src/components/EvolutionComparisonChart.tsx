@@ -116,13 +116,13 @@ export const EvolutionComparisonChart = ({
                 >
                   <Info className="w-3 h-3 mr-1" />
                   {buildingsTrendStats.filtersApplied && !buildingsTrendStats.usedFallback
-                    ? `Comparando con ${buildingsTrendStats.totalBuildings} edificios similares`
+                    ? `Comparando por ${buildingsTrendStats.appliedFilters?.join(", ") || "similitud"} (${buildingsTrendStats.totalBuildings} edificios)`
                     : `Comparando con ${buildingsTrendStats.totalBuildings} edificios totales`
                   }
                 </Badge>
                 {buildingsTrendStats.usedFallback && buildingsTrendStats.filtersApplied && (
-                  <span className="text-xs text-muted-foreground">
-                    (sin suficientes datos similares)
+                  <span className="text-[10px] text-muted-foreground italic">
+                    (sin suficientes datos exactos, fallback global aplicado)
                   </span>
                 )}
               </div>

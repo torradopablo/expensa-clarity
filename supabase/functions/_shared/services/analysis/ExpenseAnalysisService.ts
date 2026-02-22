@@ -91,11 +91,22 @@ REGLAS DE SALIDA:
 
       // Ensure mathematical consistency programmatically
       if (data.categories && Array.isArray(data.categories)) {
+        data.categories.forEach((cat: any) => {
+          if (cat.subcategories && Array.isArray(cat.subcategories) && cat.subcategories.length > 0) {
+            const subSum = cat.subcategories.reduce((sum: number, sub: any) => sum + (Number(sub.amount) || 0), 0);
+
+            // If subcategories sum is different from category amount, we trust the subcategories (more granular)
+            if (subSum > 0 && Math.abs(subSum - cat.current_amount) > 1) {
+              console.warn(`Adjusting category ${cat.name} amount from ${cat.current_amount} to ${subSum} for consistency with subcategories.`);
+              cat.current_amount = subSum;
+            }
+          }
+        });
+
         const categoriesSum = data.categories.reduce((sum: number, cat: any) => sum + (Number(cat.current_amount) || 0), 0);
 
         // If the sum of categories is significantly different (> 10%) from the total_amount,
         // we prioritize the sum of categories as it's the more detailed data source.
-        // This handles cases where total_amount is the "Unit Total" but categories are "Building Total".
         if (categoriesSum > 0 && Math.abs(categoriesSum - data.total_amount) > (data.total_amount * 0.1)) {
           console.warn(`Programmatically adjusting total_amount from ${data.total_amount} to ${categoriesSum} for consistency.`);
           data.total_amount = categoriesSum;
@@ -165,7 +176,7 @@ REGLAS CRÍTICAS DE NEGOCIO:
 1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
 2. Los montos deben ser números positivos.
 3. El JSON debe ser válido y completo.
-4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". 
+4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". Además, la suma de los montos de las subcategorías DEBE ser exactamente igual al "current_amount" de su categoría padre.
    - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
    - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
    - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
@@ -181,7 +192,14 @@ REGLAS CRÍTICAS DE NEGOCIO:
      - Si dice "Estudio Jurídico Pérez" en grande, ignóralo y busca el nombre del consorcio.
    - Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, prioriza esos nombres si hay un match parcial (ej: el PDF dice "Arenales 10" y la guía dice "Arenales 10 - Torre A").
    - IMPORTANTE: Si solo encuentras una dirección, ese ES el nombre del edificio. No inventes nombres si no están.
-7. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
+8. IMPORTANTE - CLASIFICACIÓN DE GASTOS (NUEVO):
+   - Cada subcategoría DEBE tener un "expense_type" estrictamente limitado a: "ordinaria", "extraordinaria", o "fondo_reserva".
+   - CRITERIOS PARA ARGENTINA:
+     - "ordinaria": Gastos recurrentes de mantenimiento, sueldos, cargas sociales, abonos de servicios (ascensores, limpieza), reparaciones menores, seguros obligatorios, papelería.
+     - "extraordinaria": Reparaciones estructurales grandes (fachada, cañería principal), reemplazo de bienes de capital (bombas nuevas, cámaras), indemnizaciones laborales por despido, juicios del consorcio.
+     - "fondo_reserva": Ahorro mensual o cuota para futuros gastos.
+     - REGLA DE ORO: Si no estás seguro, marca como "ordinaria". Prioriza "extraordinaria" solo si el documento lo menciona explícitamente o es un gasto claramente no recurrente de gran impacto estructural.
+9. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
 
 JSON Schema:
 {
@@ -197,7 +215,15 @@ JSON Schema:
       "icon": string (use Lucide icon name),
       "current_amount": number,
       "status": "ok" | "attention" | "info",
-      "explanation": string o null
+      "explanation": string o null,
+      "subcategories": [
+        {
+          "name": string,
+          "amount": number,
+          "percentage": number (0-100),
+          "expense_type": "ordinaria" | "extraordinaria" | "fondo_reserva"
+        }
+      ] (mínimo 3 sub-ítems si existen, máximo 10)
     }
   ],
   "building_profile": {

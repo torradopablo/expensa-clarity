@@ -255,9 +255,9 @@ serve(async (req) => {
       throw new Error(`No se pudo actualizar el estado del análisis: ${updateError.message}`);
     }
 
-    // Insert categories using repository
+    // Insert categories and subcategories using repository
     if (extractedData.categories && extractedData.categories.length > 0) {
-      const categories = extractedData.categories.map((cat) => ({
+      const categoriesToInsert = extractedData.categories.map((cat) => ({
         analysis_id: analysisId,
         name: cat.name,
         icon: cat.icon || null,
@@ -267,10 +267,43 @@ serve(async (req) => {
         explanation: cat.explanation || null,
       }));
 
-      const { error: catError } = await analysisRepository.createCategories(categories);
+      const { data: createdCategories, error: catError } = await analysisRepository.createCategories(categoriesToInsert);
 
       if (catError) {
         console.error("Categories creation error:", catError);
+      } else if (createdCategories && createdCategories.length > 0) {
+        // Map subcategories back to their parent category IDs
+        const subcategoriesToInsert: any[] = [];
+
+        extractedData.categories.forEach((extractedCat) => {
+          if (extractedCat.subcategories && extractedCat.subcategories.length > 0) {
+            // Find the ID of the created category
+            const matchingCreatedCat = (createdCategories as any[]).find(
+              c => c.name === extractedCat.name && c.current_amount === extractedCat.current_amount
+            );
+
+            if (matchingCreatedCat) {
+              extractedCat.subcategories.forEach((sub) => {
+                subcategoriesToInsert.push({
+                  category_id: matchingCreatedCat.id,
+                  name: sub.name,
+                  amount: sub.amount,
+                  percentage: sub.percentage || null,
+                  expense_type: sub.expense_type || "ordinaria",
+                });
+              });
+            }
+          }
+        });
+
+        if (subcategoriesToInsert.length > 0) {
+          const { error: subError } = await analysisRepository.createSubcategories(subcategoriesToInsert);
+          if (subError) {
+            console.error("Subcategories creation error:", subError);
+          } else {
+            console.log(`Successfully persisted ${subcategoriesToInsert.length} subcategories`);
+          }
+        }
       }
     }
 

@@ -201,13 +201,17 @@
   /* PDF Export Optimization - High Contrast */
   .pdf-export-container {
     background-color: white !important;
-    color: #0f172a !important;
-    /* slate-900 */
+    color: #000000 !important;
+    opacity: 1 !important;
   }
 
   .pdf-export-container * {
     text-shadow: none !important;
     box-shadow: none !important;
+    opacity: 1 !important;
+    /* Force full opacity on all elements */
+    backdrop-filter: none !important;
+    visibility: visible !important;
   }
 
   .pdf-export-container h1,
@@ -230,9 +234,10 @@
   .pdf-export-container .bg-card\/30,
   .pdf-export-container [class*="bg-card"] {
     background-color: #ffffff !important;
-    border: 1.5px solid #e2e8f0 !important;
-    /* slate-200 */
+    border: 2px solid #cbd5e1 !important;
+    /* Slate 300 - thicker and darker */
     backdrop-filter: none !important;
+    box-shadow: none !important;
   }
 
   .pdf-export-container .bg-muted,
@@ -252,18 +257,21 @@
 
   /* Chart Specifics for PDF */
   .pdf-export-container .recharts-cartesian-grid line {
-    stroke: #e2e8f0 !important;
+    stroke: #94a3b8 !important;
+    /* Slate 400 - much visible */
+    stroke-dasharray: none !important;
   }
 
   .pdf-export-container .recharts-text tspan,
   .pdf-export-container .recharts-text {
-    fill: #1e293b !important;
-    font-weight: 600 !important;
+    fill: #000000 !important;
+    font-weight: 700 !important;
+    /* Bolder text on axes */
   }
 
   .pdf-export-container .recharts-legend-item-text {
-    color: #0f172a !important;
-    font-weight: 600 !important;
+    color: #000000 !important;
+    font-weight: 700 !important;
   }
 
   /* High contrast for primary/secondary elements in PDF */
@@ -277,12 +285,39 @@
     /* blue-600 */
   }
 
-  .pdf-export-container .bg-primary\/10 {
-    background-color: #ecfdf5 !important;
+  /* SVG / Chart Fill contrast */
+  .pdf-export-container .fill-primary,
+  .pdf-export-container [class*="fill-primary"] {
+    fill: #059669 !important;
   }
 
-  .pdf-export-container .bg-secondary\/10 {
+  .pdf-export-container .fill-secondary,
+  .pdf-export-container [class*="fill-secondary"] {
+    fill: #2563eb !important;
+  }
+
+  .pdf-export-container .fill-status-attention {
+    fill: #d97706 !important;
+    /* amber-600 */
+  }
+
+  .pdf-export-container .fill-status-ok {
+    fill: #059669 !important;
+    /* green-600 */
+  }
+
+  .pdf-export-container .bg-primary\/5,
+  .pdf-export-container .bg-primary\/10,
+  .pdf-export-container .bg-primary\/20 {
+    background-color: #f0fdf4 !important;
+    border: 1px solid #86efac !important;
+  }
+
+  .pdf-export-container .bg-secondary\/5,
+  .pdf-export-container .bg-secondary\/10,
+  .pdf-export-container .bg-secondary\/20 {
     background-color: #eff6ff !important;
+    border: 1px solid #93c5fd !important;
   }
 }
 
@@ -374,15 +409,21 @@
 .pdf-export-container h4,
 .pdf-export-container p,
 .pdf-export-container span,
-.pdf-export-container div:not(.bg-destructive\/5):not(.bg-primary\/5) {
+.pdf-export-container div,
+.pdf-export-container b,
+.pdf-export-container strong,
+.pdf-export-container i {
   color: #000000 !important;
   opacity: 1 !important;
   text-shadow: none !important;
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
 }
 
-.pdf-export-container .text-muted-foreground {
-  color: #1e293b !important;
-  /* Slate 800 para legibilidad máxima */
+.pdf-export-container .text-muted-foreground,
+.pdf-export-container .text-muted-foreground * {
+  color: #0f172a !important;
+  /* Much darker than original slate 800 */
 }
 
 /* Conservar colores de cajas de alerta por legibilidad pero oscurecer texto */
@@ -421,7 +462,60 @@
   opacity: 1 !important;
 }
 
-/* Logo en PDF */
-.pdf-export-container #pdf-header {
-  border-bottom: 2px solid #000000 !important;
+/* Standardized PDF Header */
+.pdf-header-standard {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 40px;
+  padding-bottom: 24px;
+  border-bottom: 3px solid #000000 !important;
+  width: 100%;
+}
+
+.pdf-header-standard .logo-section {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.pdf-header-standard .branding h1 {
+  font-size: 32px !important;
+  font-weight: 900 !important;
+  letter-spacing: -0.05em !important;
+  margin: 0 !important;
+  color: #000000 !important;
+}
+
+.pdf-header-standard .branding p {
+  font-size: 10px !important;
+  font-weight: 800 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.2em !important;
+  margin: 4px 0 0 0 !important;
+  color: #64748b !important;
+}
+
+.pdf-header-standard .info-section {
+  text-align: right;
+}
+
+.pdf-header-standard .info-section p {
+  margin: 0 !important;
+  font-weight: 700 !important;
+  color: #000000 !important;
+}
+
+@layer utilities {
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-muted-foreground/20 rounded-full hover:bg-muted-foreground/40;
+  }
 }

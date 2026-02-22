@@ -226,11 +226,15 @@ const Historial = () => {
 
 
 
-  // Filter and sort analyses by period (newest first)
-  const filteredAnalyses = useMemo(() => {
-    // Show completed, processing, paid, and failed statuses
+  // Separate failed analyses from successful/processing ones
+  const failedAnalyses = useMemo(() => {
+    return analyses.filter(a => a.status === "failed");
+  }, [analyses]);
+
+  // Filter and sort successful/processing analyses
+  const filteredCompletedAnalyses = useMemo(() => {
     const relevantAnalyses = analyses.filter(a =>
-      ["completed", "processing", "paid", "failed"].includes(a.status)
+      ["completed", "processing", "paid"].includes(a.status)
     );
 
     const filtered = relevantAnalyses.filter(analysis => {
@@ -245,7 +249,7 @@ const Historial = () => {
         }
       }
 
-      // Building filter (now mostly done by server, but we keep the logic consistent)
+      // Building filter
       if (buildingFilter !== "all" && analysis.building_name !== buildingFilter) {
         return false;
       }
@@ -306,7 +310,7 @@ const Historial = () => {
                 <h1 className="text-4xl font-extrabold tracking-tight">Mis Expensas</h1>
                 <p className="text-muted-foreground font-medium mt-1">
                   {totalCount > 0
-                    ? `Mostrando ${filteredAnalyses.length} de ${totalCount} análisis`
+                    ? `Mostrando ${filteredCompletedAnalyses.length + failedAnalyses.length} de ${totalCount} análisis`
                     : "0 análisis"}
                 </p>
               </div>
@@ -318,7 +322,7 @@ const Historial = () => {
                   Evolución
                 </Link>
               </Button>
-              {filteredAnalyses.length >= 2 && (
+              {filteredCompletedAnalyses.length >= 2 && (
                 <>
                   {selectionMode ? (
                     <div className="flex items-center gap-2 bg-background/50 backdrop-blur-md p-1 rounded-full border border-primary/20 shadow-lg">
@@ -395,7 +399,7 @@ const Historial = () => {
                 {hasActiveFilters && (
                   <div className="flex items-center justify-between mt-4 px-1">
                     <p className="text-sm font-medium text-muted-foreground">
-                      Resultados: <span className="text-foreground font-bold">{filteredAnalyses.length}</span>
+                      Resultados: <span className="text-foreground font-bold">{filteredCompletedAnalyses.length}</span>
                     </p>
                     <Button variant="link" onClick={clearFilters} className="h-auto p-0 text-xs font-bold uppercase tracking-widest text-primary hover:no-underline">
                       Limpiar Filtros
@@ -404,6 +408,57 @@ const Historial = () => {
                 )}
               </CardContent>
             </Card>
+          )}
+
+          {/* Failed Analyses Section */}
+          {failedAnalyses.length > 0 && (
+            <div className="mb-10 space-y-4">
+              <div className="flex items-center gap-2 px-1 mb-4">
+                <div className="w-2 h-2 rounded-full bg-destructive animate-pulse" />
+                <h2 className="text-sm font-black uppercase tracking-widest text-destructive">
+                  Análisis con errores ({failedAnalyses.length})
+                </h2>
+              </div>
+              <div className="grid gap-4">
+                {failedAnalyses.map((analysis, index) => (
+                  <Link
+                    key={analysis.id}
+                    to={`/analizar?payment=success&analysisId=${analysis.id}`}
+                    className="block"
+                  >
+                    <Card
+                      className="group transition-all duration-300 rounded-[1.5rem] bg-destructive/5 border-destructive/20 hover:border-destructive/40 shadow-md hover:shadow-xl"
+                    >
+                      <CardContent className="p-6 md:p-8">
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                          <div className="flex items-center gap-5">
+                            <div className="w-12 h-12 rounded-xl bg-destructive/10 flex items-center justify-center text-destructive">
+                              <X className="w-6 h-6" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-bold text-destructive/80 truncate mb-1">
+                                {analysis.building_name || "Error en identificación"}
+                              </p>
+                              <h3 className="text-xl font-black text-foreground">{analysis.period}</h3>
+                              <p className="text-xs font-medium text-destructive mt-1 italic">Hacer clic para intentar procesar de nuevo</p>
+                            </div>
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="rounded-full opacity-0 group-hover:opacity-100 hover:bg-destructive/10 text-destructive"
+                            onClick={(e) => handleDeleteClick(analysis, e)}
+                          >
+                            <Trash2 className="w-5 h-5" />
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                ))}
+              </div>
+              <div className="h-px bg-border/50 my-8" />
+            </div>
           )}
 
           {analyses.filter(a => a.status === "completed").length === 0 ? (
@@ -424,7 +479,7 @@ const Historial = () => {
                 </Button>
               </CardContent>
             </Card>
-          ) : filteredAnalyses.length === 0 ? (
+          ) : filteredCompletedAnalyses.length === 0 ? (
             <Card variant="soft" className="animate-fade-in-up">
               <CardContent className="p-8 text-center">
                 <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center mx-auto mb-4">
@@ -441,20 +496,18 @@ const Historial = () => {
             </Card>
           ) : (
             <div className="space-y-4">
-              {filteredAnalyses.map((analysis, index) => {
+              {filteredCompletedAnalyses.map((analysis, index) => {
                 const change = calculateChange(analysis.total_amount, analysis.previous_total);
                 const isSelected = selectedIds.has(analysis.id);
                 const isCompleted = analysis.status === "completed";
                 const isProcessing = analysis.status === "processing" || analysis.status === "paid";
-                const isFailed = analysis.status === "failed";
 
                 const cardContent = (
                   <Card
                     className={cn(
                       "group animate-fade-in-up transition-all duration-300 rounded-[1.5rem] overflow-hidden bg-card/40 backdrop-blur-xl border-border/50 hover:border-primary/50 shadow-lg hover:shadow-2xl hover:shadow-primary/5",
                       isSelected && "ring-2 ring-primary bg-primary/5 shadow-2xl shadow-primary/10",
-                      isProcessing && "border-primary/30",
-                      isFailed && "border-destructive/30"
+                      isProcessing && "border-primary/30"
                     )}
                     style={{ animationDelay: `${index * 0.05}s` }}
                   >
@@ -491,15 +544,10 @@ const Historial = () => {
                                       <CheckCircle2 className="w-4 h-4 text-primary" />
                                       <span className="text-muted-foreground">Analizado el {formatDate(analysis.created_at)}</span>
                                     </>
-                                  ) : isProcessing ? (
+                                  ) : (
                                     <>
                                       <Loader2 className="w-4 h-4 text-primary animate-spin" />
                                       <span className="text-primary font-bold">Procesando con IA...</span>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <X className="w-4 h-4 text-destructive" />
-                                      <span className="text-destructive font-bold">Error en proceso - Hacer clic para reintentar</span>
                                     </>
                                   )}
                                 </div>
@@ -594,7 +642,7 @@ const Historial = () => {
           )}
 
           {/* Comparison hint */}
-          {filteredAnalyses.length >= 2 && (
+          {filteredCompletedAnalyses.length >= 2 && (
             <Card variant="soft" className="mt-8 animate-fade-in-up">
               <CardContent className="p-6">
                 <div className="flex gap-4">

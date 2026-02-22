@@ -6,6 +6,7 @@ export interface MarketTrendFilters {
     unit_count_range?: string;
     age_category?: string;
     neighborhood?: string;
+    city?: string;
     zone?: string;
     has_amenities?: boolean;
     category?: string;
@@ -52,8 +53,6 @@ export class TrendService {
         const filterKey = JSON.stringify({ ...filters, fallbackIfEmpty });
 
         // 1. Try to fetch from cache table if it exists
-        // Cache table has RLS enabled but no policies, so it's only accessible by service role.
-        // We must use adminSupabase here as well.
         try {
             const { data: cachedTrend, error: cacheError } = await adminSupabase
                 .from("market_trends_cache")
@@ -65,7 +64,6 @@ export class TrendService {
                 const cacheAge = Date.now() - new Date(cachedTrend.created_at).getTime();
                 // If cache is less than 24 hours old, return it
                 if (cacheAge < 24 * 60 * 60 * 1000) {
-                    console.log("Returning cached market trend data.");
                     return {
                         success: true,
                         data: cachedTrend.data,
@@ -107,6 +105,7 @@ export class TrendService {
         let filteredAnalyses = allAnalyses || [];
         let usedFallback = false;
         let filtersApplied = false;
+        let appliedFilters: string[] = [];
 
         const profileFilters = { ...filters };
         delete profileFilters.category;
@@ -116,61 +115,74 @@ export class TrendService {
         if (Object.keys(profileFilters).length > 0) {
             filtersApplied = true;
 
-            // Start with base query
-            let profilesQuery = adminSupabase
-                .from("building_profiles")
-                .select("id, building_name");
+            const attributeFilters: string[] = [];
 
-            // Apply profile attribute filters if provided
-            if (filters?.unit_count_range) {
-                profilesQuery = profilesQuery.eq("unit_count_range", filters.unit_count_range);
-            }
-            if (filters?.age_category) {
-                profilesQuery = profilesQuery.eq("age_category", filters.age_category);
-            }
-            if (filters?.has_amenities !== undefined) {
-                profilesQuery = profilesQuery.eq("has_amenities", filters.has_amenities);
-            }
+            // Helper to get common filters query without pushing to state yet
+            const getCommonFiltersQuery = (q: any) => {
+                let currentQuery = q;
+                if (filters?.unit_count_range) {
+                    currentQuery = currentQuery.eq("unit_count_range", filters.unit_count_range);
+                }
+                if (filters?.age_category) {
+                    currentQuery = currentQuery.eq("age_category", filters.age_category);
+                }
+                if (filters?.has_amenities !== undefined) {
+                    currentQuery = currentQuery.eq("has_amenities", filters.has_amenities);
+                }
+                return currentQuery;
+            };
 
-            // Hierarchical geographic filtering: Neighborhood -> Zone -> Global
+            // Helper to update applied filters after success
+            const pushAttributeFilters = () => {
+                if (filters?.unit_count_range && !appliedFilters.includes("tamaño")) appliedFilters.push("tamaño");
+                if (filters?.age_category && !appliedFilters.includes("antigüedad")) appliedFilters.push("antigüedad");
+                if (filters?.has_amenities !== undefined && !appliedFilters.includes("amenities")) appliedFilters.push("amenities");
+            };
+
             let matchingProfiles: any[] = [];
 
             // 1. Try with Neighborhood + other filters
             if (filters?.neighborhood) {
-                const { data } = await profilesQuery.eq("neighborhood", filters.neighborhood);
-                matchingProfiles = data || [];
+                let q = adminSupabase.from("building_profiles").select("id, building_name").eq("neighborhood", filters.neighborhood);
+                const { data } = await getCommonFiltersQuery(q);
+                if (data && data.length >= 2) {
+                    matchingProfiles = data;
+                    appliedFilters.push("barrio");
+                    pushAttributeFilters();
+                }
             }
 
-            // 2. If not enough buildings, try with Zone + other filters
+            // 2. Try with City + other filters
+            if (matchingProfiles.length < 2 && filters?.city) {
+                let q = adminSupabase.from("building_profiles").select("id, building_name").eq("city", filters.city);
+                const { data } = await getCommonFiltersQuery(q);
+                if (data && data.length >= 2) {
+                    matchingProfiles = data;
+                    appliedFilters = ["ciudad"]; // Reset to city level
+                    pushAttributeFilters();
+                }
+            }
+
+            // 3. Try with Zone + other filters
             if (matchingProfiles.length < 2 && filters?.zone) {
-                let zoneQuery = adminSupabase
-                    .from("building_profiles")
-                    .select("id, building_name")
-                    .eq("zone", filters.zone);
-
-                if (filters?.unit_count_range) zoneQuery = zoneQuery.eq("unit_count_range", filters.unit_count_range);
-                if (filters?.age_category) zoneQuery = zoneQuery.eq("age_category", filters.age_category);
-                if (filters?.has_amenities !== undefined) zoneQuery = zoneQuery.eq("has_amenities", filters.has_amenities);
-
-                const { data } = await zoneQuery;
-                matchingProfiles = data || [];
+                let q = adminSupabase.from("building_profiles").select("id, building_name").eq("zone", filters.zone);
+                const { data } = await getCommonFiltersQuery(q);
+                if (data && data.length >= 2) {
+                    matchingProfiles = data;
+                    appliedFilters = ["zona"]; // Reset to zone level
+                    pushAttributeFilters();
+                }
             }
 
-            // 3. Fallback to all profiles if still empty and fallback permitted
+            // 4. Fallback to all profiles (just common filters)
             if (matchingProfiles.length < 2 && fallbackIfEmpty) {
                 usedFallback = true;
-                let globalQuery = adminSupabase
-                    .from("building_profiles")
-                    .select("id, building_name");
-
-                if (filters?.unit_count_range) globalQuery = globalQuery.eq("unit_count_range", filters.unit_count_range);
-                if (filters?.age_category) globalQuery = globalQuery.eq("age_category", filters.age_category);
-                if (filters?.has_amenities !== undefined) globalQuery = globalQuery.eq("has_amenities", filters.has_amenities);
-
-                const { data } = await globalQuery;
+                let q = adminSupabase.from("building_profiles").select("id, building_name");
+                const { data } = await getCommonFiltersQuery(q);
                 matchingProfiles = data || [];
+                appliedFilters = []; // Reset geo part
+                pushAttributeFilters();
             }
-
 
             const matchingBuildingNames = new Set(
                 matchingProfiles
@@ -214,7 +226,8 @@ export class TrendService {
                 totalAnalyses: trendResult.stats.totalAnalyses,
                 periodsCount: trendResult.stats.periodsCount,
                 filtersApplied,
-                usedFallback
+                usedFallback,
+                appliedFilters
             }
         };
 
