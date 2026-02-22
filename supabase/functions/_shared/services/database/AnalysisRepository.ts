@@ -126,9 +126,24 @@ export class AnalysisRepository {
   async getCategories(analysisId: string) {
     const { data, error } = await this.supabase
       .from("expense_categories")
-      .select("id, name, icon, current_amount, previous_amount, status, explanation")
+      .select("id, name, icon, current_amount, previous_amount, status, explanation, expense_subcategories(*)")
       .eq("analysis_id", analysisId)
       .order("current_amount", { ascending: false });
+
+    return { data, error };
+  }
+
+  async createSubcategories(subcategories: Array<{
+    category_id: string;
+    name: string;
+    amount: number;
+    percentage?: number | null;
+    expense_type?: string | null;
+  }>) {
+    const { data, error } = await this.supabase
+      .from("expense_subcategories")
+      .insert(subcategories)
+      .select();
 
     return { data, error };
   }

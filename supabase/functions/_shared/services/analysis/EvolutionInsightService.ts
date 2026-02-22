@@ -37,6 +37,8 @@ export class EvolutionInsightService {
                 this.trendService.getMarketTrend({
                     unit_count_range: profile?.unit_count_range || undefined,
                     age_category: profile?.age_category || undefined,
+                    neighborhood: profile?.neighborhood || undefined,
+                    city: profile?.city || undefined,
                     zone: profile?.zone || undefined,
                     has_amenities: profile?.has_amenities || undefined
                 })
@@ -98,7 +100,8 @@ export class EvolutionInsightService {
                 userTrend,
                 inflationTrend,
                 buildingsTrend,
-                buildingName
+                buildingName,
+                appliedFilters: marketResult.stats?.appliedFilters
             });
 
             // 6. Save to database

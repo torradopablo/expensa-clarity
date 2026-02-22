@@ -65,12 +65,13 @@ ${request.userTrend.map(t => `- ${t.period}: ${t.percent.toFixed(1)}%`).join("\n
 **Evolución de la inflación argentina (% acumulado desde el primer período):**
 ${request.inflationTrend.map(t => `- ${t.period}: ${t.percent.toFixed(1)}%`).join("\n")}
 
-**Evolución promedio de otros edificios en la plataforma (% acumulado):**
+**Evolución promedio de otros edificios similares (% acumulado):**
 ${request.buildingsTrend.map(t => `- ${t.period}: ${t.percent.toFixed(1)}%`).join("\n")}
+*(Comparación basada en: ${request.appliedFilters?.join(", ") || "promedio general"})*
 
 **Desvío actual:**
 - Respecto a inflación: ${deviation.fromInflation > 0 ? "+" : ""}${deviation.fromInflation.toFixed(1)} puntos porcentuales
-- Respecto a otros edificios: ${deviation.fromBuildings > 0 ? "+" : ""}${deviation.fromBuildings.toFixed(1)} puntos porcentuales
+- Respecto a edificios similares: ${deviation.fromBuildings > 0 ? "+" : ""}${deviation.fromBuildings.toFixed(1)} puntos porcentuales
 
 Proporciona un análisis breve y accionable (máximo 3-4 oraciones) que:
 1. Indique si el aumento de expensas está dentro de parámetros normales

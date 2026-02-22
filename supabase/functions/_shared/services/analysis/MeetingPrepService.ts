@@ -37,7 +37,13 @@ El objetivo es que el administrador esté 100% preparado para las consultas de l
 
 DATOS DE GASTOS Y ALERTAS (Basado en el análisis de expensas):
 ${data.analyses.map(a => `- Período ${a.period}: Total ${a.total_amount}. 
-  Alertas detectadas: ${a.categories?.filter((c: any) => c.status !== 'ok').map((c: any) => `${c.name} (${c.status}): ${c.explanation || 'Sin notas'}`).join('; ') || 'Ninguna'}`).join('\n')}
+  Detalle por Rubro y Sub-detalles:
+  ${a.categories?.map((c: any) => {
+            const subs = c.expense_subcategories && c.expense_subcategories.length > 0
+                ? ` (Sub-ítems: ${c.expense_subcategories.map((s: any) => `${s.name}: ${s.amount}`).join(', ')})`
+                : '';
+            return `- ${c.name}: ${c.current_amount}${subs}${c.status !== 'ok' ? ` [Alerta: ${c.explanation || 'Revisar'}]` : ''}`;
+        }).join('\n  ') || 'Ninguna'}`).join('\n')}
 
 RECLAMOS Y COMENTARIOS DE PROPIETARIOS (Externos):
 ${data.commentsByType.shared.length > 0

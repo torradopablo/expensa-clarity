@@ -5,6 +5,7 @@ export interface Category {
   previous_amount?: number | null;
   status?: "ok" | "attention" | "info";
   explanation?: string | null;
+  subcategories?: { name: string; amount: number; percentage?: number | null; expense_type?: "ordinaria" | "extraordinaria" | "fondo_reserva" }[];
 }
 
 export interface BuildingProfile {
@@ -26,6 +27,7 @@ export interface AnalysisRequest {
   buildingsTrend: { period: string; percent: number }[];
   buildingName: string;
   categoryName?: string;
+  appliedFilters?: string[];
 }
 
 export interface AIResponse {
@@ -69,4 +71,5 @@ export interface BuildingsTrendStats {
   periodsCount: number;
   filtersApplied: boolean;
   usedFallback: boolean;
+  appliedFilters?: string[];
 }

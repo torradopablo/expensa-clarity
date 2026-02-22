@@ -11,6 +11,24 @@ export const CategorySchema = z.object({
     z.enum(["ok", "attention", "info"]).default("ok")
   ),
   explanation: z.string().max(1000).nullable().optional().transform(s => s ? s.trim().slice(0, 1000) : s),
+  subcategories: z.array(z.object({
+    name: z.string().min(1).max(100).transform(s => s.trim()),
+    amount: z.preprocess(
+      (val: any) => {
+        const n = Number(val);
+        return isNaN(n) ? 0 : Math.abs(n);
+      },
+      z.number().min(0).max(100000000)
+    ),
+    percentage: z.preprocess(
+      (val: any) => {
+        if (val === null || val === undefined) return null;
+        const n = Number(val);
+        return isNaN(n) ? null : Math.min(100, Math.max(0, Math.abs(n)));
+      },
+      z.number().min(0).max(100).nullable().optional()
+    ),
+  })).max(20).optional(),
 });
 
 export const BuildingProfileSchema = z.object({
@@ -70,6 +88,10 @@ export function validateAIResponse(data: unknown): AIResponse {
     ...cat,
     name: sanitizeString(cat.name),
     explanation: cat.explanation ? sanitizeString(cat.explanation) : cat.explanation,
+    subcategories: cat.subcategories?.map(sub => ({
+      ...sub,
+      name: sanitizeString(sub.name)
+    }))
   }));
 
   if (validated.building_profile) {
