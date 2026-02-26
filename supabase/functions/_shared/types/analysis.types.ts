@@ -5,7 +5,14 @@ export interface Category {
   previous_amount?: number | null;
   status?: "ok" | "attention" | "info";
   explanation?: string | null;
-  subcategories?: { name: string; amount: number; percentage?: number | null; expense_type?: "ordinaria" | "extraordinaria" | "fondo_reserva" }[];
+  subcategories?: {
+    name: string;
+    amount: number;
+    percentage?: number | null;
+    expense_type?: "ordinaria" | "extraordinaria" | "fondo_reserva";
+    provider_name?: string | null;
+    provider_cuit?: string | null;
+  }[];
 }
 
 export interface BuildingProfile {
@@ -41,6 +48,8 @@ export interface AIResponse {
   previous_total?: number;
   categories: Category[];
   building_profile?: BuildingProfile;
+  administrator_name?: string | null;
+  administrator_cuit?: string | null;
 }
 
 // All fields are validated and sanitized

@@ -248,6 +248,8 @@ serve(async (req) => {
       status: "completed",
       scanned_at: new Date().toISOString(),
       building_profile_id: buildingProfileId,
+      administrator_name: extractedData.administrator_name || undefined,
+      administrator_cuit: extractedData.administrator_cuit || undefined,
     });
 
     if (updateError) {
@@ -290,6 +292,8 @@ serve(async (req) => {
                   amount: sub.amount,
                   percentage: sub.percentage || null,
                   expense_type: sub.expense_type || "ordinaria",
+                  provider_name: sub.provider_name || null,
+                  provider_cuit: sub.provider_cuit || null,
                 });
               });
             }
@@ -302,9 +306,51 @@ serve(async (req) => {
             console.error("Subcategories creation error:", subError);
           } else {
             console.log(`Successfully persisted ${subcategoriesToInsert.length} subcategories`);
+
+            // Save anonymized provider data for crowdsourcing / Savings Engine
+            const anonymizedPrices = subcategoriesToInsert
+              .filter(s => s.provider_name && s.provider_name.trim() !== '')
+              .map(s => {
+                let categoryName = "Desconocida";
+                if (createdCategories) {
+                  const cat = (createdCategories as any[]).find(c => c.id === s.category_id);
+                  if (cat) categoryName = cat.name;
+                }
+
+                return {
+                  provider_name: s.provider_name as string,
+                  provider_cuit: s.provider_cuit,
+                  category_name: categoryName,
+                  subcategory_name: s.name,
+                  amount: s.amount,
+                  expense_type: s.expense_type,
+                  period: extractedData.period,
+                  building_zone: extractedData.building_profile?.zone || null,
+                  building_unit_count: extractedData.building_profile?.unit_count_range || null,
+                };
+              });
+
+            if (anonymizedPrices.length > 0) {
+              await analysisRepository.createAnonymizedProviderPrices(anonymizedPrices).catch(e => {
+                console.error("Failed to insert anonymized provider prices (non-blocking):", e);
+              });
+            }
           }
         }
       }
+    }
+
+    // Save anonymized administrator data for crowdsourcing / Savings Engine
+    if (extractedData.administrator_name && extractedData.administrator_name.trim() !== '') {
+      await analysisRepository.createAnonymizedAdministratorData({
+        administrator_name: extractedData.administrator_name,
+        administrator_cuit: extractedData.administrator_cuit,
+        period: extractedData.period,
+        building_zone: extractedData.building_profile?.zone || null,
+        building_unit_count: extractedData.building_profile?.unit_count_range || null,
+      }).catch(e => {
+        console.error("Failed to insert anonymized administrator data (non-blocking):", e);
+      });
     }
 
     // Generate automated evolution analysis (async, but we wait for it to ensure it persists)

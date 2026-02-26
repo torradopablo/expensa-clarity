@@ -200,6 +200,7 @@ REGLAS CRÍTICAS DE NEGOCIO:
      - "fondo_reserva": Ahorro mensual o cuota para futuros gastos.
      - REGLA DE ORO: Si no estás seguro, marca como "ordinaria". Prioriza "extraordinaria" solo si el documento lo menciona explícitamente o es un gasto claramente no recurrente de gran impacto estructural.
 9. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
+10. MOTOR DE AHORRO: Para el edificio completo, intenta extraer el "administrator_name" y "administrator_cuit". Para CADA subcategoría, si el gasto menciona a una empresa, proveedor o servicio específico (ej: "Ascensores SRL", "Edenor"), incluye el "provider_name" y su "provider_cuit" si está disponible. Si no encuentras estos datos, déjalos como null.
 
 JSON Schema:
 {
@@ -221,7 +222,9 @@ JSON Schema:
           "name": string,
           "amount": number,
           "percentage": number (0-100),
-          "expense_type": "ordinaria" | "extraordinaria" | "fondo_reserva"
+          "expense_type": "ordinaria" | "extraordinaria" | "fondo_reserva",
+          "provider_name": string o null,
+          "provider_cuit": string o null
         }
       ] (mínimo 3 sub-ítems si existen, máximo 10)
     }
@@ -236,7 +239,9 @@ JSON Schema:
     "age_category": string o null,
     "has_amenities": boolean,
     "amenities": string[]
-  }
+  },
+  "administrator_name": string o null,
+  "administrator_cuit": string o null
 }`;
   }
 
