@@ -89,27 +89,24 @@ REGLAS DE SALIDA:
     try {
       const data = JSON.parse(cleanedContent.trim());
 
-      // Ensure mathematical consistency programmatically
+      // Ensure subcategory sums match their parent category (granular data takes precedence)
       if (data.categories && Array.isArray(data.categories)) {
         data.categories.forEach((cat: any) => {
           if (cat.subcategories && Array.isArray(cat.subcategories) && cat.subcategories.length > 0) {
             const subSum = cat.subcategories.reduce((sum: number, sub: any) => sum + (Number(sub.amount) || 0), 0);
-
-            // If subcategories sum is different from category amount, we trust the subcategories (more granular)
             if (subSum > 0 && Math.abs(subSum - cat.current_amount) > 1) {
-              console.warn(`Adjusting category ${cat.name} amount from ${cat.current_amount} to ${subSum} for consistency with subcategories.`);
+              console.warn(`Adjusting category ${cat.name} from ${cat.current_amount} to ${subSum}`);
               cat.current_amount = subSum;
             }
           }
         });
 
+        // NOTE: We intentionally do NOT override total_amount with the categories sum.
+        // If they diverge significantly it means the AI mixed scales (unit vs consorcio).
+        // Log it for debugging but trust the AI's explicit total_amount field.
         const categoriesSum = data.categories.reduce((sum: number, cat: any) => sum + (Number(cat.current_amount) || 0), 0);
-
-        // If the sum of categories is significantly different (> 10%) from the total_amount,
-        // we prioritize the sum of categories as it's the more detailed data source.
-        if (categoriesSum > 0 && Math.abs(categoriesSum - data.total_amount) > (data.total_amount * 0.1)) {
-          console.warn(`Programmatically adjusting total_amount from ${data.total_amount} to ${categoriesSum} for consistency.`);
-          data.total_amount = categoriesSum;
+        if (categoriesSum > 0 && Math.abs(categoriesSum - data.total_amount) > (data.total_amount * 0.15)) {
+          console.warn(`WARNING: categories sum (${categoriesSum}) differs >15% from total_amount (${data.total_amount}). Possible scale mix-up in AI response.`);
         }
       }
 
@@ -118,11 +115,6 @@ REGLAS DE SALIDA:
       console.error("JSON parsing error:", error);
       console.error("Cleaned content length:", cleanedContent.length);
       console.error("Original content length:", content.length);
-
-      // Fallback for truncated JSON - try to close it if it ends abruptly (very basic attempt)
-      if (cleanedContent.lastIndexOf('}') < cleanedContent.lastIndexOf('{')) {
-        console.warn("JSON seems truncated, attempt to return partial or error.");
-      }
 
       return {
         building_name: "Error en parsing",
@@ -159,89 +151,133 @@ REGLAS DE SALIDA:
     existingBuildingNames: string[] = []
   ): string {
     const categoriesGuide = previousCategories.length > 0
-      ? `\nGUÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):
-${previousCategories.map(c => `- ${c}`).join('\n')}\n`
+      ? `\nGUÍA DE CATEGORÍAS PREVIAS (Usa estos nombres si el concepto es el mismo):\n${previousCategories.map(c => `- ${c}`).join('\n')}\n`
       : "";
 
     const buildingGuide = existingBuildingNames.length > 0
-      ? `\nGUÍA DE EDIFICIOS EXISTENTES (Si el edificio es uno de estos, usa el nombre EXACTO):
-${existingBuildingNames.map(b => `- ${b}`).join('\n')}\n`
+      ? `\nGUÍA DE EDIFICIOS EXISTENTES (Si el edificio es uno de estos, usa el nombre EXACTO):\n${existingBuildingNames.map(b => `- ${b}`).join('\n')}\n`
       : "";
 
-    return `Eres un experto en liquidaciones de expensas argentinas. Devuelve ÚNICAMENTE JSON plano.
-No incluyas explicaciones externas al JSON. 
-Si hay muchas categorías, sé breve en las descripciones.
+    return `Eres un experto en liquidaciones de expensas argentinas. Devuelve ÚNICAMENTE JSON plano sin texto adicional.
 ${buildingGuide}${categoriesGuide}
-REGLAS CRÍTICAS DE NEGOCIO:
-1. El campo "status" en cada categoría DEBE ser estrictamente uno de estos: "ok", "attention", "info".
-2. Los montos deben ser números positivos.
-3. El JSON debe ser válido y completo.
-4. CONSISTENCIA MATEMÁTICA (CRUCIAL): La suma de las categorías DEBE ser igual al "total_amount". Además, la suma de los montos de las subcategorías DEBE ser exactamente igual al "current_amount" de su categoría padre.
-   - A veces el documento muestra el "Total del Consorcio" (millones) y el "Total por Unidad" (miles). 
-   - Debes elegir UNA escala: Si las categorías son del Consorcio, el "total_amount" DEBE ser el total del Consorcio. 
-   - NUNCA mezcles categorías de millones con un total de miles. Si el total por unidad es $127.000 pero los gastos suman $14.000.000, el "total_amount" DEBE ser $14.000.000.
-6. IMPORTANTE - IDENTIFICACIÓN DEL EDIFICIO (ESTRATEGIA ARGEN-HEADER):
-   - UBICACIÓN PREFERENTE: El nombre real suele estar ARRIBA de todo, a menudo centrado o a la izquierda.
-   - PATRONES COMUNES: 
-     a) "CONSORCIO [DIRECCIÓN]" (Ej: CONSORCIO CALLAO 1540) -> El nombre es "Callao 1540".
-     b) "CONSORCIO DE PROPIETARIOS DEL EDIFICIO [NOMBRE]" -> Usa el [NOMBRE].
-     c) Solo la dirección: "CALLE NUMERO, Ciudad" -> Usa "Calle Numero".
-   - CUIT DEL EDIFICIO: Casi siempre hay un CUIT (30-... o 33-...) cerca del nombre del consorcio. Úsalo como ancla. El CUIT de la administración suele estar en el pie de página o en un recuadro separado de "Datos del Administrador".
-   - REGLA DE EXCLUSIÓN TOTAL: Si un nombre está asociado a "Administración", "Administradora", "Adm.", "Estudio", "Adms. de Inmuebles" o "Liquidó", ESE NO ES EL EDIFICIO. 
-     - Ej: Si dice "Administración Los Robles" y abajo "CONSORCIO RIVADAVIA 500", el edificio es "Rivadavia 500".
-     - Si dice "Estudio Jurídico Pérez" en grande, ignóralo y busca el nombre del consorcio.
-   - Si se proporciona una GUÍA DE EDIFICIOS EXISTENTES, prioriza esos nombres si hay un match parcial (ej: el PDF dice "Arenales 10" y la guía dice "Arenales 10 - Torre A").
-   - IMPORTANTE: Si solo encuentras una dirección, ese ES el nombre del edificio. No inventes nombres si no están.
-8. IMPORTANTE - CLASIFICACIÓN DE GASTOS (NUEVO):
-   - Cada subcategoría DEBE tener un "expense_type" estrictamente limitado a: "ordinaria", "extraordinaria", o "fondo_reserva".
-   - CRITERIOS PARA ARGENTINA:
-     - "ordinaria": Gastos recurrentes de mantenimiento, sueldos, cargas sociales, abonos de servicios (ascensores, limpieza), reparaciones menores, seguros obligatorios, papelería.
-     - "extraordinaria": Reparaciones estructurales grandes (fachada, cañería principal), reemplazo de bienes de capital (bombas nuevas, cámaras), indemnizaciones laborales por despido, juicios del consorcio.
-     - "fondo_reserva": Ahorro mensual o cuota para futuros gastos.
-     - REGLA DE ORO: Si no estás seguro, marca como "ordinaria". Prioriza "extraordinaria" solo si el documento lo menciona explícitamente o es un gasto claramente no recurrente de gran impacto estructural.
-9. IMPORTANTE: Si se proporciona una GUÍA DE CATEGORÍAS PREVIAS, intenta mapear los gastos encontrados a esos nombres exactos si representan el mismo concepto.
-10. MOTOR DE AHORRO: Para el edificio completo, intenta extraer el "administrator_name" y "administrator_cuit". Para CADA subcategoría, si el gasto menciona a una empresa, proveedor o servicio específico (ej: "Ascensores SRL", "Edenor"), incluye el "provider_name" y su "provider_cuit" si está disponible. Si no encuentras estos datos, déjalos como null.
+═══════════════════════════════════════════════════════════════
+REGLA 1 — TOTAL DEL CONSORCIO vs TOTAL POR UNIDAD (CRÍTICO)
+═══════════════════════════════════════════════════════════════
+Las expensas argentinas muestran DOS totales distintos:
+  • "Total del Consorcio" o "Total General": suma de TODO el edificio (ej: $14.500.000)
+  • "Total por Unidad" o "Tu expensa" o "Importe a pagar": lo que paga UN departamento (ej: $127.000)
 
-JSON Schema:
+REGLA DE ORO: Debes extraer el TOTAL DEL CONSORCIO (no el de la unidad).
+  - El campo "total_amount" SIEMPRE debe ser el total del consorcio completo.
+  - Las categorías (Personal, Mantenimiento, etc.) también deben ser del consorcio.
+  - El campo "unit" es el número de unidad funcional (ej: "3B") si aparece.
+  - NUNCA reportes el importe por unidad como total_amount.
+  ✓ CORRECTO: total_amount = 14.500.000 (aunque la expensa de la unidad sea $127.000)
+  ✗ INCORRECTO: total_amount = 127.000
+
+Para identificar cuál es cuál:
+  - El total del consorcio suele estar en la página de detalle general, en mayúsculas: "TOTAL GENERAL", "TOTAL CONSORCIO"
+  - El total por unidad suele decir: "Total a pagar", "Importe", "Deuda", "Su expensa", y es proporcional al coeficiente de la unidad
+
+═══════════════════════════════════════════════════════════════
+REGLA 2 — NOMBRE DEL EDIFICIO
+═══════════════════════════════════════════════════════════════
+  - El edificio es el CONSORCIO, no quien lo administra.
+  - Busca: "CONSORCIO [DIRECCIÓN]", "CONSORCIO DE PROPIETARIOS", la dirección del inmueble.
+  - EXCLUIR: cualquier nombre asociado a "Administración", "Adm.", "Estudio", "Liquidó", "Responsable".
+  - Si hay GUÍA DE EDIFICIOS EXISTENTES, prioriza el nombre exacto si hay coincidencia parcial.
+
+═══════════════════════════════════════════════════════════════
+REGLA 3 — ADMINISTRADOR Y CUIT (MOTOR DE AHORRO — MUY IMPORTANTE)
+═══════════════════════════════════════════════════════════════
+FORMATO CUIT/CUIL EN ARGENTINA:
+  Estructura: XX-XXXXXXXX-X (11 dígitos con guiones)
+  Prefijos: 20-, 23-, 24-, 27- (personas físicas) | 30-, 33-, 34- (empresas)
+  Puede aparecer SIN guiones (ej: 30123456789) → formatealo igual como 30-12345678-9
+  Etiquetas en el doc: "CUIT:", "C.U.I.T.:", "CUIL:", "Nro. CUIT", "C.U.I.T. Nro."
+
+A) ADMINISTRADOR — Buscá en ESTAS zonas del documento:
+   1. ENCABEZADO: nombre de la administradora/estudio junto al logo arriba del todo
+   2. PIE DE PÁGINA: frase típica "Liquidó: [Nombre] CUIT XX-XXXXXXXX-X tel: XXXX"
+   3. RECUADRO "Datos del Administrador" o sección "Administración"
+   4. Junto a palabras clave: "Administra:", "Adm.:", "Estudio Adm.", "Responsable:", "Liquidó por:"
+
+   → Si encontrás cualquier nombre de administrador/estudio, SIEMPRE ponelo en "administrator_name".
+   → NO lo dejes null aunque no tengas el CUIT. El nombre es suficiente para el motor de ahorro.
+   → Si hay teléfono, email o dirección junto al nombre del admin, extraelos también.
+
+B) PROVEEDORES — Para cada línea de gasto identificá:
+   1. Nombre de empresa junto al concepto (ej: "Ascensores ABC S.A.", "METROGAS", "EDESUR")
+   2. CUIT en la misma línea, en detalle de comprobante o referencia de factura
+   3. Referencia: "FC A 0001-00012345 CUIT 30-12345678-9" o similar
+
+   → Si hay nombre de proveedor sin CUIT, igual ponelo en "provider_name".
+   → "provider_type": "ascensores" | "limpieza" | "seguridad" | "seguro" | "gas" | "electricidad" | "agua" | "mantenimiento" | "administracion" | "personal" | "contable_legal" | "otros"
+
+C) DIRECCIÓN DEL EDIFICIO: "building_address" = dirección completa del consorcio (ej: "Av. Corrientes 1234, CABA")
+
+═══════════════════════════════════════════════════════════════
+REGLA 4 — CLASIFICACIÓN DE GASTOS
+═══════════════════════════════════════════════════════════════
+expense_type por subcategoría:
+  "ordinaria": sueldos, cargas sociales, abonos fijos, servicios recurrentes, seguros, reparaciones menores
+  "extraordinaria": obras estructurales, reemplazo de equipos, indemnizaciones, juicios
+  "fondo_reserva": ahorro o cuota de reserva explícita
+  → Default: "ordinaria" si hay duda.
+
+═══════════════════════════════════════════════════════════════
+REGLA 5 — STATUS DE CATEGORÍAS
+═══════════════════════════════════════════════════════════════
+"status" DEBE ser uno de: "ok", "attention", "info"
+Subcategorías: extrae ABSOLUTAMENTE TODAS, sin límite de cantidad.
+
+JSON Schema a devolver:
 {
   "building_name": string,
+  "building_address": string | null,
   "period": string,
   "period_month": number (1-12),
   "period_year": number (YYYY),
-  "unit": string o null,
+  "unit": string | null,
   "total_amount": number,
   "categories": [
     {
       "name": string,
-      "icon": string (use Lucide icon name),
+      "icon": string,
       "current_amount": number,
       "status": "ok" | "attention" | "info",
-      "explanation": string o null,
+      "explanation": string | null,
       "subcategories": [
         {
           "name": string,
           "amount": number,
-          "percentage": number (0-100),
+          "percentage": number,
           "expense_type": "ordinaria" | "extraordinaria" | "fondo_reserva",
-          "provider_name": string o null,
-          "provider_cuit": string o null
+          "provider_name": string | null,
+          "provider_cuit": string | null,
+          "provider_type": string | null,
+          "cuit_confirmed": boolean
         }
-      ] (mínimo 3 sub-ítems si existen, máximo 10)
+      ]
     }
   ],
   "building_profile": {
     "country": "Argentina",
-    "province": string o null,
-    "city": string o null,
-    "neighborhood": string o null,
+    "province": string | null,
+    "city": string | null,
+    "neighborhood": string | null,
     "zone": "CABA" | "GBA Norte" | "GBA Oeste" | "GBA Sur" | "Interior" | null,
     "unit_count_range": "1-10" | "11-30" | "31-50" | "51-100" | "100+" | null,
-    "age_category": string o null,
+    "age_category": string | null,
     "has_amenities": boolean,
     "amenities": string[]
   },
-  "administrator_name": string o null,
-  "administrator_cuit": string o null
+  "administrator_name": string | null,
+  "administrator_cuit": string | null,
+  "administrator_cuit_confirmed": boolean,
+  "administrator_contact_phone": string | null,
+  "administrator_contact_email": string | null,
+  "administrator_contact_address": string | null
 }`;
   }
 
