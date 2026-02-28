@@ -21,9 +21,101 @@ import {
   User,
   LayoutList
 } from "lucide-react";
-import heroIllustration from "@/assets/hero-illustration.png";
-
 import { Logo } from "@/components/layout/ui/logo";
+
+const AIProcessingMockup = () => {
+  return (
+    <div className="w-full bg-background/80 backdrop-blur-xl rounded-[2rem] shadow-2xl border border-border/50 relative overflow-hidden group/mockup">
+      {/* Dynamic background glow */}
+      <div className="absolute -top-32 -right-32 w-64 h-64 bg-primary/20 blur-[80px] rounded-full group-hover/mockup:bg-primary/30 transition-colors duration-700"></div>
+      <div className="absolute -bottom-32 -left-32 w-64 h-64 bg-secondary/20 blur-[80px] rounded-full group-hover/mockup:bg-secondary/30 transition-colors duration-700"></div>
+
+      {/* MacOS like Header */}
+      <div className="h-14 border-b border-border/50 bg-muted/10 flex items-center px-6 gap-2 relative z-10">
+        <div className="flex gap-2">
+          <div className="w-3 h-3 rounded-full bg-destructive/60"></div>
+          <div className="w-3 h-3 rounded-full bg-status-attention/60"></div>
+          <div className="w-3 h-3 rounded-full bg-status-ok/60"></div>
+        </div>
+        <div className="mx-auto flex items-center gap-2 bg-background/50 px-4 py-1.5 rounded-full border border-border/50 shadow-sm text-xs font-medium text-muted-foreground mr-16">
+          <FileText className="w-3.5 h-3.5" />
+          expensas_agosto_2026.pdf
+        </div>
+      </div>
+
+      <div className="p-8 space-y-8 relative z-10">
+        <div className="flex justify-between items-center bg-card/50 backdrop-blur-md rounded-2xl p-5 border border-border/40 shadow-sm">
+          <div className="space-y-1">
+            <h3 className="text-lg font-semibold flex items-center gap-2 text-foreground">
+              <Shield className="w-5 h-5 text-primary" />
+              Procesamiento IA
+            </h3>
+            <p className="text-sm text-muted-foreground font-light">Analizando patrones de consumo...</p>
+          </div>
+          <div className="relative w-14 h-14">
+            <svg className="w-full h-full -rotate-90" viewBox="0 0 100 100">
+              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="6" className="text-muted/20" />
+              <circle cx="50" cy="50" r="45" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="283" strokeDashoffset="75" className="text-primary animate-[spin_4s_linear_infinite]" />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center font-bold text-sm text-foreground">
+              74%
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-5">
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-status-ok" /> Lectura de documento</span>
+              <span className="text-status-ok">100%</span>
+            </div>
+            <div className="h-2 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-status-ok w-full"></div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-muted-foreground flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-status-ok" /> Extracción de rubros</span>
+              <span className="text-status-ok">100%</span>
+            </div>
+            <div className="h-2 w-full bg-muted overflow-hidden rounded-full">
+              <div className="h-full bg-status-ok w-full"></div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex justify-between text-xs font-semibold">
+              <span className="text-foreground flex items-center gap-1.5">
+                <span className="w-4 h-4 flex items-center justify-center">
+                  <span className="w-3.5 h-3.5 rounded-full border-2 border-primary border-t-transparent animate-spin"></span>
+                </span>
+                Analisis de precios
+              </span>
+              <span className="text-primary animate-pulse">Comparando...</span>
+            </div>
+            <div className="h-2 w-full bg-muted overflow-hidden rounded-full relative">
+              <div className="absolute top-0 left-0 h-full bg-gradient-to-r from-primary/50 to-primary w-[65%] rounded-full shadow-[0_0_10px_rgba(var(--primary),0.5)] relative overflow-hidden">
+                <div className="absolute inset-0 bg-white/20 w-full animate-[slide-in-right_2s_ease-in-out_infinite]"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Alert Card mock */}
+        <div className="bg-status-attention/10 border border-status-attention/20 rounded-2xl p-4 flex gap-4 animate-fade-in-up shadow-sm" style={{ animationDelay: '0.5s' }}>
+          <div className="w-10 h-10 rounded-full bg-status-attention/20 flex items-center justify-center flex-shrink-0">
+            <TrendingUp className="w-5 h-5 text-status-attention" />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-foreground">Sobrecosto detectado</p>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">El abono en <strong className="text-foreground">Ascensores</strong> es un 22% mayor al mercado.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 import { formatCurrency } from "@/services/formatters/currency";
 
 const EXPENSE_PRICE = Number(import.meta.env.VITE_EXPENSE_PRICE || 5000);
@@ -235,11 +327,7 @@ const HeroSection = () => (
           <div className="relative z-10 p-1 rounded-[2.5rem] bg-gradient-to-br from-primary/20 via-border/30 to-secondary/20 backdrop-blur-sm group">
             <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-border/30 to-secondary/20 opacity-0 group-hover:opacity-100 transition-opacity duration-700 blur border-0 rounded-[2.5rem]"></div>
             <div className="bg-background/90 rounded-[2.4rem] overflow-hidden p-2 shadow-2xl relative z-10 transition-transform duration-700 group-hover:scale-[1.01]">
-              <img
-                src={heroIllustration}
-                alt="Análisis inteligente"
-                className="w-full rounded-[2rem] shadow-2xl"
-              />
+              <AIProcessingMockup />
             </div>
           </div>
 
